@@ -24,17 +24,18 @@ Reviewed and agreed on 28 September 2026. See the Decisions section at the end, 
 | sessions | id CHAR(64) PK (SHA-256 hex of the cookie token), user_id (FK), expires_at, last_seen_at, ip VARCHAR(45), user_agent VARCHAR(255), created_at. Index user_id, expires_at |
 | rate_limits | bucket VARCHAR(191) PK (e.g. `login:ip:1.2.3.4`), count INT UNSIGNED, window_ends_at DATETIME. Updated with an atomic upsert; expired rows are reset on the next hit and swept on writes |
 
-Permission keys (REQUIREMENTS §3.2, plus client decisions): `dashboard.view`, `order.view`, `order.update_status`, `order.verify_payment`, `order.set_shipping`, `order.export`, `wholesale.view`, `product.view`, `product.create`, `product.update`, `product.delete`, `product.import`, `category.manage`, `discount.manage`, `coupon.manage`, `shipping.manage`, `settings.manage`, `user.manage`, `role.manage`, `audit.view`.
-Admin default set: `dashboard.view`, `order.view`, `order.update_status`, `order.verify_payment`, `order.set_shipping`, `order.export`, `wholesale.view`, `product.view`.
+Permission keys (REQUIREMENTS §3.2, plus client decisions): `dashboard.view`, `order.view`, `order.update_status`, `order.verify_payment`, `order.set_shipping`, `order.export`, `wholesale.view`, `wholesale.manage`, `product.view`, `product.create`, `product.update`, `product.delete`, `product.import`, `category.manage`, `discount.manage`, `coupon.manage`, `shipping.manage`, `settings.manage`, `user.manage`, `role.manage`, `audit.view`.
+Admin default set: `dashboard.view`, `order.view`, `order.update_status`, `order.verify_payment`, `order.set_shipping`, `order.export`, `wholesale.view`, `wholesale.manage`, `product.view`.
 
 ## Catalogue
 | Table | Columns | Indexes |
 |---|---|---|
 | categories | id, parent_id (FK NULL), name, slug VARCHAR(191) unique, description TEXT NULL, image_path NULL, sort_order INT, is_active, created_at, updated_at | slug, parent_id, (is_active, sort_order) |
-| products | id, category_id (FK), name, slug VARCHAR(191) unique, sku VARCHAR(64) unique, short_description VARCHAR(500) NULL, description TEXT NULL, price DECIMAL(12,2), stock INT UNSIGNED, weight_grams INT UNSIGNED NULL, is_featured, status ENUM('draft','active','archived'), created_at, updated_at | slug, sku, (category_id, status), (status, created_at), is_featured |
+| products | id, category_id (FK), name, slug VARCHAR(191) unique, short_description VARCHAR(500) NULL, description TEXT NULL, price DECIMAL(12,2), weight_grams INT UNSIGNED NULL (fallback default), is_featured, status ENUM('draft','active','archived'), created_at, updated_at | slug, (category_id, status), (status, created_at), is_featured |
+| product_variants | id, product_id (FK), sku VARCHAR(64) unique, label VARCHAR(150) (e.g. "Red / Large"), attributes TEXT (JSON, Zod-validated, e.g. {"Colour":"Red","Size":"Large"}), price_override DECIMAL(12,2) NULL, stock INT UNSIGNED, weight_grams INT UNSIGNED NULL (overrides the product's), sort_order INT, is_active, created_at, updated_at | sku, (product_id, sort_order) |
 | product_images | id, product_id (FK), path (base name under `UPLOAD_DIR/media`, without the size suffix), width INT, height INT (original size), alt VARCHAR(255), sort_order INT, created_at. **Primary image = lowest sort_order** | (product_id, sort_order) |
 
-Out-of-stock active products are listed and shown as "Sold out" (client decision).
+Every product has at least one `product_variants` row; a simple product gets one "Default" variant with no `attributes`. SKU and stock live only on the variant — `products` has neither. Out-of-stock active variants are listed and shown as "Sold out" (client decision).
 
 ## Promotions
 | Table | Columns |
@@ -50,13 +51,15 @@ Out-of-stock active products are listed and shown as "Sold out" (client decision
 | shipping_zones | id, name, mode ENUM('flat','quote'), flat_rate DECIMAL(12,2), free_over_amount DECIMAL(12,2) NULL, cod_enabled, is_fallback BOOL (exactly one zone, e.g. "Rest of world"), is_active, sort_order, created_at, updated_at |
 | shipping_zone_areas | id, zone_id (FK), country_code CHAR(2), city VARCHAR(100) NULL (lowercase; NULL = whole country). UNIQUE (country_code, city) |
 
-Zone resolution: an exact (country, city) row, else (country, NULL), else the `is_fallback` zone. In Pakistan the checkout city picker offers "Karachi" or "Other city". Weight-based tiers are deferred (a later migration can add the `weight` mode and a tiers table; `products.weight_grams` already exists).
+Zone resolution: an exact (country, city) row, else (country, NULL), else the `is_fallback` zone. In Pakistan the checkout city picker offers "Karachi" or "Other city". **Client decision:** all three zones (Karachi, Pakistan, International) are seeded in `quote` mode with `flat_rate = 0.00` — the client quotes delivery on WhatsApp per parcel. `flat` mode stays in the schema for a future zone switch but isn't seeded active today. Weight-based tiers are deferred (a later migration can add the `weight` mode and a tiers table; `products.weight_grams` and `product_variants.weight_grams` already exist).
+
+**COD is Pakistan-only, enforced twice:** the International zone's `cod_enabled` is `false`, and `createOrder` independently refuses a COD order whenever `orders.country != 'PK'`, regardless of the resolved zone's `cod_enabled` value.
 
 ## Orders
 | Table | Columns | Indexes |
 |---|---|---|
-| orders | id, order_number VARCHAR(20) unique (`RSH-YYMMDD-XXXX`), checkout_token CHAR(36) unique, customer_name, phone VARCHAR(32) (normalised), email VARCHAR(191) NULL, address_line, city, state NULL, postal_code NULL, country CHAR(2), shipping_zone_id (FK NULL), payment_method ENUM('cod','bank_transfer'), order_status ENUM('pending','awaiting_shipping_quote','confirmed','processing','shipped','delivered','cancelled','rejected'), payment_status ENUM('unpaid','proof_submitted','verified','rejected','cod_pending','cod_collected'), rejection_reason TEXT NULL, subtotal, discount_total, coupon_id (FK NULL), coupon_code NULL, coupon_discount, shipping_total NULL (NULL while a quote is pending), total (PKR), display_currency CHAR(3), exchange_rate DECIMAL(12,4), display_total DECIMAL(12,2), customer_note TEXT NULL, courier NULL, tracking_note NULL, created_at, updated_at | order_number, checkout_token, (order_status, created_at), (payment_status, created_at), phone, created_at |
-| order_items | id, order_id (FK), product_id (FK), name_snapshot, sku_snapshot, unit_price (base), discount_amount (per unit), quantity, line_total | order_id |
+| orders | id, order_number VARCHAR(20) unique (`RSH-YYMMDD-XXXX`), checkout_token CHAR(36) unique, customer_name, phone VARCHAR(32) (normalised), email VARCHAR(191) NULL, address_line, city, state NULL, postal_code NULL, country CHAR(2), shipping_zone_id (FK NULL), payment_method ENUM('cod','bank_transfer'), order_status ENUM('pending','awaiting_shipping_quote','confirmed','processing','shipped','delivered','cancelled','rejected'), payment_status ENUM('unpaid','proof_submitted','verified','rejected','cod_pending','cod_collected'), rejection_reason TEXT NULL, subtotal, discount_total, coupon_id (FK NULL), coupon_code NULL, coupon_discount, shipping_total NULL (NULL while a quote is pending), shipping_note VARCHAR(255) NULL (staff's short courier/parcel note, set alongside shipping_total), total (PKR), display_currency CHAR(3), exchange_rate DECIMAL(12,4), display_total DECIMAL(12,2), customer_note TEXT NULL, courier NULL, tracking_note NULL, created_at, updated_at | order_number, checkout_token, (order_status, created_at), (payment_status, created_at), phone, created_at |
+| order_items | id, order_id (FK), product_id (FK), variant_id (FK product_variants), name_snapshot, variant_label_snapshot, sku_snapshot (the variant's sku), unit_price (base), discount_amount (per unit), quantity, line_total | order_id |
 | payment_proofs | id, order_id (FK), file_path (relative to `UPLOAD_DIR`), file_size INT, status ENUM('submitted','verified','rejected'), rejection_reason NULL, reviewed_by (FK users NULL), reviewed_at NULL, created_at | order_id |
 | order_status_history | id, order_id (FK), kind ENUM('order','payment','note'), from_status NULL, to_status NULL, note TEXT NULL (reason or internal note), changed_by (FK users NULL; NULL = customer/system), created_at | (order_id, created_at) |
 
@@ -65,16 +68,19 @@ Zone resolution: an exact (country, city) row, else (country, NULL), else the `i
 ## Other
 | Table | Columns |
 |---|---|
-| wholesale_inquiries | id, name, business NULL, phone, email NULL, items_of_interest TEXT NULL, message TEXT, status ENUM('new','contacted','closed'), created_at, updated_at |
-| settings | `key` VARCHAR(100) PK, value TEXT (JSON, validated per key with Zod), updated_at. Keys: store info, contact, bank_accounts (list, per currency or zone), exchange_rate, announcement_text, social_links, home hero text |
+| wholesale_inquiries | id, name, business NULL, business_type ENUM('retail','restaurant_cafe','hotel','event','other'), phone, email NULL, city, needed_by_date DATE NULL, message TEXT, status ENUM('new','contacted','closed'), created_at, updated_at |
+| wholesale_inquiry_items | id, inquiry_id (FK), product_id (FK NULL — set only when the row matches a catalogue product), item_name VARCHAR(200), quantity INT UNSIGNED | (inquiry_id) |
+| settings | `key` VARCHAR(100) PK, value TEXT (JSON, validated per key with Zod), updated_at. Keys seeded today: `contact` (phone, WhatsApp number, address), `social_links` (Facebook, Instagram URL and handle). Reserved for later: bank_accounts, announcement_text, home hero text |
 | audit_logs | id, user_id (FK NULL), action VARCHAR(50), entity VARCHAR(50), entity_id VARCHAR(50), old_values TEXT NULL, new_values TEXT NULL, created_at. Index (entity, entity_id), created_at |
 | static_pages | id, slug VARCHAR(191) unique, title, body TEXT (Markdown), is_published, created_at, updated_at |
 
 ## Seed data (idempotent; safe to run repeatedly)
 - Upsert permissions from the code `PERMISSIONS` const. Roles `developer` (is_system, all permissions) and `admin` (the default set above).
 - One developer and one admin user from `SEED_*` env vars (created if missing; existing passwords never overwritten).
-- Settings defaults. Shipping zones: Karachi (PK + city `karachi`, flat, COD), Pakistan (PK, flat, COD), International (fallback, flat, no COD); rates are placeholders until the client decides.
-- Sample categories (Tableware, Tea Sets, Trays, Decor) and a few sample products for development.
+- Settings: `contact` and `social_links` (client decision, section 8 of the S2b brief).
+- Shipping zones, all in `quote` mode with `flat_rate = 0.00`: Karachi (PK + city `karachi`, COD on), Pakistan (PK, COD on), International (fallback, COD off).
+- Sample categories (Tableware, Tea Sets, Trays, Decor) and 8 sample products for development, several with two or three `product_variants` (colour or size, some with `price_override`) and the rest with one "Default" variant.
+- Placeholder product images: the 4 images in `design-reference/src/assets/` (`hero.jpg`, `tableware.jpg`, `teaset.jpg`, `tray.jpg`) are wired up through the S4 media pipeline, not this seed script.
 - Launch products are loaded from the client's spreadsheet (CSV) and image folder through `scripts/import-products.ts`.
 
 ## Rules the schema must support
@@ -97,3 +103,7 @@ Zone resolution: an exact (country, city) row, else (country, NULL), else the `i
 | DB8 | `audit_logs.old_values/new_values` | `BEFORE` is a reserved word in MySQL. |
 | DB9 | `coupon_usages.order_id` unique; usage released on cancel/reject | Client decision; one usage per order. |
 | DB10 | `wholesale_inquiries.items_of_interest`, `payment_proofs.file_size`, relative `file_path` | SF-08; paths survive moving `UPLOAD_DIR`. |
+| DB11 | `product_variants` added; `products.sku` and `products.stock` dropped; `order_items` gains `variant_id` and `variant_label_snapshot` | Client decision: colour/size options. One SKU/stock system (the variant), not two. |
+| DB12 | `wholesale_inquiries.items_of_interest` replaced by `wholesale_inquiry_items`; `business_type`, `city`, `needed_by_date` added | Client decision: structured wholesale form (S2b). |
+| DB13 | `orders.shipping_note` added; all shipping zones seeded as `quote` with `flat_rate = 0.00`; new permission `wholesale.manage` | Client decisions: WhatsApp-quoted delivery is the default flow; Admin/Developer can action wholesale inquiries, not just view them. |
+| DB14 | `wholesale_inquiries.business` made nullable | Client decision: individuals and event inquiries may have no business name. |

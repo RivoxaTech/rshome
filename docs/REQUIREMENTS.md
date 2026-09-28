@@ -54,6 +54,7 @@ Access control is **permission-based (RBAC)**, not hard-coded per role name. Rol
 | order.verify_payment (accept or reject screenshot) | Yes | Yes |
 | order.export | Yes | Yes |
 | wholesale.view | Yes | Yes |
+| wholesale.manage (change inquiry status, add internal notes) | Yes | Yes |
 | product.view | Read-only (optional) | Yes |
 | product.create / update / delete / import | No | Yes |
 | category.manage | No | Yes |
@@ -88,12 +89,12 @@ Priority key: **M1** = required for the week-1 demo, **M2** = week 2, **P3** = a
 
 - **SF-01 (M1) Home page.** Rebuild exactly as the demo: top announcement bar ("Nationwide Delivery / Wholesale & Bulk Orders Available"), header with logo text "RS Home" and nav (Home, Shop, Tableware, Tea Sets, Trays, Decor, Wholesale), full-width hero ("Elevate Everyday Living", two buttons), Collections grid, "The RS Home Edit" horizontally scrolling featured products with Add to Cart, one story section per category, Wholesale and Bulk Orders section, Why RS Home (four points), footer with address and Instagram handle.
 - **SF-02 (M1) Shop / category listing.** Product grid, category filter, sort (newest, price low to high, price high to low), pagination, basic name search. Category nav items open the matching category.
-- **SF-03 (M1) Product detail page.** Image gallery (about 3 images, zoom or swipe), name, price, discounted price with original struck through and badge when a discount is active, description, stock status, quantity selector, Add to Cart.
-- **SF-04 (M1) Cart.** Slide-out drawer plus full cart page. Change quantity, remove, coupon field, subtotal, discount, shipping estimate, total. Cart persists in the browser for guests.
+- **SF-03 (M1) Product detail page.** Image gallery (about 3 images, zoom or swipe), name, variant picker when a product has more than one variant (for example Colour, Size), price for the selected variant, discounted price with original struck through and badge when a discount is active, description, stock status for the selected variant, quantity selector, Add to Cart.
+- **SF-04 (M1) Cart.** Slide-out drawer plus full cart page. Lines are keyed by variant id (a product with variants can appear as more than one line). Change quantity, remove, coupon field, subtotal, discount, shipping estimate ("to be confirmed" per §6.4), total. Cart persists in the browser for guests.
 - **SF-05 (M1) Checkout.** Contact details, shipping address, country selector (Pakistan or international), currency display (see 6.3), shipping cost by zone (see 6.4), payment method (COD or Bank Transfer), order summary, place order. See section 6.
-- **SF-06 (M1) Order confirmation page.** Order number, summary. For bank transfer: show the account details and the screenshot upload control.
-- **SF-07 (M2) Order tracking.** Look up by order number plus phone or email. Shows status timeline. Allows uploading a new screenshot if the previous one was rejected.
-- **SF-08 (M2) Wholesale inquiry form.** Name, business, phone, email, message, items of interest. Saved in the database and visible to Admin.
+- **SF-06 (M1) Order confirmation / tracking page.** The same page (`/order/[orderNumber]`) as SF-07. Order number, summary, a friendly status timeline (Waiting for delivery charge, Awaiting payment, Payment under review, Confirmed, Being prepared, Shipped with courier and tracking note, Delivered, Cancelled or Rejected with the reason), the current total including the delivery charge once staff set it, payment instructions for bank transfer, the screenshot upload control (blocked while the order is `awaiting_shipping_quote`), and a WhatsApp button (customer to shop, prefilled with the order number). Reads live from the database, so admin changes appear on the next load.
+- **SF-07 (M1) Order tracking.** `/track` looks up an order by order number **plus the phone number used at checkout** (rate-limited). On success it sets the signed order-access cookie and redirects to SF-06. No email-based lookup (phone is required at checkout; email is optional and may be absent).
+- **SF-08 (M2) Wholesale inquiry form.** Fields: name, business name (optional — individuals and event inquiries may have none), business type (retail, restaurant/cafe, hotel, event, other), phone/WhatsApp, email (optional), city, items (repeatable rows: item + quantity, an item may or may not match a catalogue product), needed-by date (optional), message. Anti-spam: rate limit plus a hidden honeypot field. Saved in the database and visible to Admin and Developer (`wholesale.view`); status changes need `wholesale.manage`.
 - **SF-09 (M2) Static pages.** Contact, About, Shipping and Returns, Privacy, Terms. Content stored in the database or markdown files.
 - **SF-10 (M2) SEO.** Per-page title and description, Open Graph tags, sitemap.xml, robots.txt, product structured data (JSON-LD), clean slugs.
 - **SF-11 (M1) Responsive.** Mobile-first, checked at 375, 768 and 1440 px widths.
@@ -115,6 +116,7 @@ There is **no payment gateway**. Two payment methods only.
 - **PAY-03** Store outside the public web folder. Serve only through an authenticated route that requires `order.verify_payment` or `order.view`. Screenshots must never be publicly reachable by URL.
 - **PAY-04** Keep the history: each upload is a row (`payment_proofs`) linked to the order, with status (submitted, verified, rejected), reviewer and rejection reason.
 - **PAY-05** Rate-limit uploads per IP and per order.
+- **PAY-06** The screenshot upload control is disabled while the order is `awaiting_shipping_quote` (no confirmed total to pay yet). Staff can filter the orders list for bank-transfer orders that are still unpaid.
 
 ### 6.2 Order and payment statuses
 
@@ -133,29 +135,28 @@ Keep order status and payment status as two separate fields.
 - **Order snapshot:** `order_items` stores product name, SKU, unit price and discount at the time of purchase. Later product edits never change past orders.
 - **Revenue definition:** sum of `total` for non-cancelled orders where `payment_status` is `verified` or `cod_collected`. Show "pending revenue" (awaiting verification or COD not yet collected) separately.
 
-### 6.3 Currency (decision pending, design ready)
+### 6.3 Currency (client decision: PKR only)
 
-The client has not decided yet. The system is built so either choice is a setting, not a rewrite.
+- **PKR everywhere.** Product prices are stored once, in PKR, and every customer (local or international) sees and pays the PKR amount. There is no USD display, no currency switcher and no exchange-rate UI.
+- Feature flag `multi_currency` stays off. All money output goes through one `formatMoney()` helper. The order schema keeps `display_currency`, `exchange_rate` and `display_total` columns (always PKR / 1.0000 / equal to `total` while the flag is off) so a future client can turn on a second display currency without a schema rewrite — this is reuse infrastructure, not active week-1 scope.
+- International customers who pay by bank transfer need account details they can actually send to (for example IBAN or SWIFT). Settings supports separate payment instruction blocks per zone.
 
-- **Base currency is PKR.** Product prices are stored once, in PKR.
-- **Option A (simplest):** every customer sees PKR. International customers pay the PKR amount.
-- **Option B:** a header switcher (or first-visit popup) offers Pakistan (PKR) and International (USD). USD is calculated as `PKR price / exchange_rate`, where `exchange_rate` is a single value in store settings that the Developer updates when needed. Rounded display prices, for example to the nearest 1 USD or 0.5 USD.
-- The customer's choice is remembered in a cookie. The **order stores** `currency`, `exchange_rate` used, the PKR totals and the display-currency totals, so old orders never change when the rate changes.
-- Feature flag `multi_currency` (default off). All money output goes through one `formatMoney()` helper.
-- International customers who pay by bank transfer need account details they can actually send to (for example IBAN or SWIFT, or a USD account). Settings supports separate payment instruction blocks per currency or zone.
+### 6.4 Delivery charges (client decision: quote on WhatsApp)
 
-### 6.4 Delivery charges (decision pending, design ready)
-
-Delivery charges are not fixed yet and international shipping is hard to price for heavy or fragile items. The data model supports several modes per shipping zone; the first release ships the simplest and the rest are turned on from settings.
+The client handles delivery on WhatsApp: the charge depends on the parcel, and international goes by FedEx cartons. All three shipping zones (Karachi, Pakistan, International) run in **quote** mode with `flat_rate = 0` for the first release.
 
 | Mode | How it works | Release |
 |---|---|---|
-| Flat rate | One fixed charge per zone (for example Karachi, rest of Pakistan, Middle East, UK and Europe, USA and Canada, rest of world). | First release |
-| Free over amount | Charge becomes zero above a cart total threshold, per zone. | First release |
-| Quote after order | Customer places the order, shipping shows as "to be confirmed". Admin checks the courier rate, adds the shipping charge, the customer sees the final total and then pays (screenshot). Order has status awaiting_shipping_quote. | Build the fields now, UI in week 2 |
-| Weight-based | Each product has an optional `weight_grams`. Zone rate tiers by total weight. | Fields now, UI later |
+| Quote after order | Customer places the order; checkout shows "Delivery charge: to be confirmed, we will contact you on WhatsApp" and the order starts as `awaiting_shipping_quote`. Staff enter the delivery charge plus a short note (for example "2 cartons, FedEx") on the admin order detail page (`order.set_shipping`). The total updates and the order moves to `pending`, so the customer can pay. A WhatsApp button (shop to customer, prefilled with the order number and total) sits next to the quote form; a WhatsApp button (customer to shop, prefilled with the order number) sits on the customer's order page. This is week 1 scope (S7/S9), not deferred. | First release |
+| Flat rate | One fixed charge per zone. The data model already supports this mode; it can be turned on from settings later if the client moves away from per-parcel quoting. | Fields ready; not used at launch |
+| Free over amount | Charge becomes zero above a cart total threshold, per zone. Only meaningful once a zone is in `flat` mode. | Fields ready; not used at launch |
+| Weight-based | Each product (and each variant) has an optional `weight_grams`. Zone rate tiers by total weight. | Fields now, UI later |
 
-Products get an optional `weight_grams` field from day one, so weight-based rates can be enabled later without migrating data.
+Products and variants get an optional `weight_grams` field from day one, so weight-based rates can be enabled later without migrating data.
+
+**COD is Pakistan-only, enforced on the server.** The Karachi and Pakistan zones have `cod_enabled = true`; the International zone keeps `cod_enabled = false`. `createOrder` additionally refuses a COD order whenever `country != 'PK'`, even if the request is edited to claim a Pakistani zone — this is a hard rule, not just per-zone configuration.
+
+Customers cannot cancel their own orders; the WhatsApp button on the order/tracking page covers that instead.
 
 ## 7. Discounts and Coupons
 
@@ -165,6 +166,7 @@ Products get an optional `weight_grams` field from day one, so weight-based rate
 - **DIS-02** Type: percentage or fixed amount. Has start date, end date and an active flag.
 - **DIS-03** If more than one discount matches a product, the single best (lowest final price) wins. Discounts never stack.
 - **DIS-04** The storefront shows the discounted price and the original price struck through. Prices are computed server-side by the shared pricing module.
+- **DIS-05** Discounts target a product (or category, or the whole store), never a single variant. A discount applies to every variant of a matched product, against that variant's own base price (`price_override` if set, else the product price).
 
 ### 7.2 Coupons (managed by Developer)
 
@@ -184,23 +186,23 @@ Products get an optional `weight_grams` field from day one, so weight-based rate
 
 - **AD-01 (M1) Login.** Email and password. Session expiry. Login rate-limited.
 - **AD-02 (M1) Orders list.** Search by order number, name, phone. Filter by order status, payment status, payment method, date range. Badge for "proof submitted, needs review".
-- **AD-03 (M1) Order detail page.** Opened from the orders list. Shows items, customer, address, totals, payment method, the **payment screenshot(s) in a large viewer**, status history and internal notes. Payment actions: **Approve payment** or **Reject payment (reason required)**. Order actions: **Accept order** or **Reject order (reason required)**, then Mark processing, Mark shipped (courier and tracking note), Mark delivered, Mark COD collected, Cancel. Rejection reasons are stored and shown to the customer on the tracking page.
+- **AD-03 (M1) Order detail page.** Opened from the orders list. Shows items (with variant label and SKU), customer, address, totals, payment method, the **payment screenshot(s) in a large viewer**, status history and internal notes. For an `awaiting_shipping_quote` order: a **set shipping charge** form (amount plus a short note, `order.set_shipping`) that moves the order to `pending` and updates the total, next to a WhatsApp button (shop to customer, prefilled with order number and total). Payment actions: **Approve payment** or **Reject payment (reason required)**. Order actions: **Accept order** or **Reject order (reason required)**, then Mark processing, Mark shipped (courier and tracking note), Mark delivered, Mark COD collected, Cancel. Rejection reasons are stored and shown to the customer on the tracking page.
 - **AD-04 (M2) Dashboard.** Revenue (today, 7 days, 30 days, all time), pending revenue, orders by status, count of payments awaiting review, recent orders, simple revenue chart.
-- **AD-05 (M2) Wholesale inquiries.** List and detail, mark as contacted.
+- **AD-05 (M2) Wholesale inquiries.** List and detail (name, business, business type, contact, city, requested items, needed-by date, message), status new/contacted/closed (`wholesale.manage`), a WhatsApp button, and an internal note field.
 - **AD-06 (P3) Export orders** to CSV. **Printable order slip** for packing.
 - By default Admin has no access to product, category, discount, coupon or settings editing. These appear only if the permission is granted to the role.
 
 ## 9. Developer Panel (Agency)
 
-Same application, extra menu items controlled by permissions. Utilitarian UI is acceptable: clean and fast, it does not need to match the storefront styling.
+Same application, extra menu items controlled by permissions. The panel uses the **same theme tokens as the storefront** (colours, fonts, radii, spacing) — not a separate utilitarian look — but its layouts stay dense and functional (tables, forms), tuned for speed rather than for browsing.
 
 - **DV-01 (M1) Categories.** Create, edit, reorder, activate or deactivate. Name, slug, description, image (used on the home Collections cards), optional parent category.
-- **DV-02 (M1) Products.** Create, edit, archive. Name, slug, SKU, short and long description, price, stock, category, active or draft, featured flag (shows in "The RS Home Edit"), multiple images with drag-to-reorder and primary image. Images are resized to WebP on upload.
+- **DV-02 (M1) Products.** Create, edit, archive. Name, slug, short and long description, price, category, active or draft, featured flag (shows in "The RS Home Edit"), multiple images with drag-to-reorder and primary image. Each product has one or more **variants** (colour, size, or a single "Default" variant for a simple product): SKU, label, attributes, optional price override, stock, optional weight override, sort order, active flag. Stock and SKU live on the variant, never on the product. Images are resized to WebP on upload.
 - **DV-03 (M2) Bulk import.** Upload a CSV or Excel file to create or update products (150 more products after launch). Image handling by URL or by matching filenames from a zip. Shows a validation report before saving. This saves days of manual entry.
 - **DV-04 (M2) Discounts.** CRUD per section 7.1.
 - **DV-05 (M2) Coupons.** CRUD per section 7.2, with usage counter.
-- **DV-06 (M2) Shipping.** Zones (Pakistan cities or regions, and international countries or regions), mode per zone (section 6.4), flat rate, free-shipping threshold, COD on or off per zone, and setting the shipping charge on an order awaiting a quote.
-- **DV-07 (M2) Store settings.** Store name, logo text, contact details, bank account details shown at checkout (more than one account, per currency or zone), announcement bar text, social links, currency and exchange rate.
+- **DV-06 (M2) Shipping.** Zones (Pakistan cities or regions, and international countries or regions), mode per zone (section 6.4; all zones start as `quote`), flat rate, free-shipping threshold, COD on or off per zone (the server still refuses COD outside Pakistan regardless of this setting). Setting the shipping charge on an order awaiting a quote is on the order detail page (AD-03), not here.
+- **DV-07 (M2) Store settings.** Store name, logo text, contact details (phone, WhatsApp number, address), social links (Facebook, Instagram), bank account details shown at checkout, announcement bar text. No currency or exchange-rate setting (PKR only, section 6.3).
 - **DV-08 (M2) Users and roles.** Create Admin users, edit roles and their permissions.
 - **DV-09 (M2) Audit log.** Who changed what and when, for products, prices, discounts, coupons, settings and order status.
 
@@ -213,17 +215,19 @@ Money is stored as DECIMAL(12,2) in PKR. The full column-level schema is produce
 | users | id, name, email (unique), password_hash, role_id, is_active, last_login_at |
 | roles / permissions / role_permissions | Data-driven RBAC. Permission keys such as `product.create`. |
 | categories | id, name, slug (unique), description, image, parent_id, sort_order, is_active |
-| products | id, name, slug (unique), sku (unique), description, price (PKR), stock, weight_grams (nullable), category_id, is_featured, status, created_at. Indexes on slug, category_id, status. |
+| products | id, name, slug (unique), description, price (PKR), weight_grams (nullable, default/fallback), category_id, is_featured, status, created_at. Indexes on slug, category_id, status. No sku, no stock — see product_variants. |
+| product_variants | id, product_id, sku (unique), label (e.g. "Red / Large"), attributes (JSON, e.g. {"Colour":"Red","Size":"Large"}), price_override (nullable), stock, weight_grams (nullable override), sort_order, is_active. Every product has at least one variant; a simple product gets one "Default" variant. |
 | product_images | id, product_id, path, alt, sort_order, is_primary |
-| discounts | id, name, type, value, target_type (product, category, all), target ids, starts_at, ends_at, is_active |
+| discounts | id, name, type, value, target_type (product, category, all), target ids, starts_at, ends_at, is_active. Never targets a single variant. |
 | coupons / coupon_usages | Fields per section 7.2. Usage rows link coupon, order and customer contact. |
-| shipping_zones / shipping_rate_tiers | Zone: id, name, countries (JSON), mode (flat, free_over, quote_later, weight), flat_rate, free_over, cod_enabled, is_active. Tiers: zone_id, min_weight, max_weight, rate. |
-| orders | id, order_number (unique, human-friendly), customer name, email, phone, address fields, country, payment_method, order_status, payment_status, rejection_reason, subtotal, discount_total, coupon_code, shipping_total, total (PKR base), display_currency, exchange_rate, display_total, notes, created_at. Indexes on order_number, status, created_at. |
-| order_items | id, order_id, product_id, name snapshot, sku snapshot, unit_price, discount_amount, quantity, line_total |
+| shipping_zones / shipping_rate_tiers | Zone: id, name, countries (JSON), mode (flat, quote, weight — all zones start as `quote`), flat_rate (0 while quoting), free_over, cod_enabled, is_active. Tiers: zone_id, min_weight, max_weight, rate (not used yet). |
+| orders | id, order_number (unique, human-friendly), customer name, email, phone, address fields, country, payment_method, order_status (includes awaiting_shipping_quote), payment_status, rejection_reason, subtotal, discount_total, coupon_code, shipping_total, shipping_note, total (PKR base), display_currency, exchange_rate, display_total, notes, created_at. Indexes on order_number, status, created_at. |
+| order_items | id, order_id, product_id, variant_id, name snapshot, variant label snapshot, sku snapshot (the variant's sku), unit_price, discount_amount, quantity, line_total |
 | payment_proofs | id, order_id, file_path, status, rejection_reason, reviewed_by, reviewed_at, created_at |
 | order_status_history | id, order_id, from_status, to_status, changed_by, note, created_at |
-| wholesale_inquiries | id, name, business, phone, email, message, status, created_at |
-| settings | key, value (JSON). Bank accounts, contact info, banner text, currency. |
+| wholesale_inquiries | id, name, business (nullable), business_type, phone, email, city, needed_by_date, message, status, created_at |
+| wholesale_inquiry_items | id, inquiry_id, product_id (nullable — set only when the item matches a catalogue product), item_name, quantity |
+| settings | key, value (JSON). Bank accounts, contact info, social links, banner text. |
 | audit_logs | id, user_id, action, entity, entity_id, before, after, created_at |
 
 ## 11. Non-Functional Requirements
@@ -257,7 +261,7 @@ Money is stored as DECIMAL(12,2) in PKR. The full column-level schema is produce
 - The storefront must match the demo exactly: logo text, typography, colour palette, spacing, icons, image treatment, hover and scroll behaviour, mobile layout.
 - **Reference workflow:** the demo is built with Lovable, so export or sync its source to GitHub and place a copy in `/design-reference` inside the repo. Extract fonts, colours, spacing and components from it into Tailwind tokens and port the components to Next.js. Do not redesign from screenshots.
 - The demo only shows the home page. Product page, cart drawer, checkout, confirmation, tracking, and wholesale form must be designed **in the same visual language** using the same tokens and components. Show these to the client for approval early in week 1.
-- Keep all design tokens (colours, fonts, radii, spacing) in one place so a future client can be re-themed quickly.
+- Keep all design tokens (colours, fonts, radii, spacing) in one place so a future client can be re-themed quickly. The admin and developer panels (section 9) use the same tokens, so re-theming covers the whole app, not just the storefront.
 - Verify visually at 375, 768 and 1440 px against the demo before each milestone.
 
 ## 13. Reusability Requirements
@@ -299,14 +303,14 @@ Money is stored as DECIMAL(12,2) in PKR. The full column-level schema is produce
 
 ## 16. Open Questions to Confirm with the Client
 
-- **Currency:** PKR only, or PKR plus USD for international customers with a fixed exchange rate she sets? (Default: PKR only, `multi_currency` flag off. See 6.3.)
-- **Delivery charges:** Pakistan flat rate or by city? International: flat rate per region, or quote after order? Free shipping above an amount? Which courier? Is COD limited to Pakistan? (Default: flat rate per zone plus COD in Pakistan only. See 6.4.)
+- ~~**Currency:** PKR only, or PKR plus USD?~~ **Answered:** PKR only, everywhere. See 6.3.
+- ~~**Delivery charges:** flat rate or quote?~~ **Answered:** all zones quote on WhatsApp after the order is placed; COD limited to Pakistan, enforced on the server. See 6.4.
 - **Coupon and discount rule:** cart-level block or item-level? (Default: cart-level, section 7.3.)
 - **Accounts:** guest checkout only, or must customers register? (Default: guest checkout with order tracking.)
-- **Variants:** do products have options such as colour, size or set count? (Default: no variants in the first release.)
+- ~~**Variants:** do products have options such as colour, size or set count?~~ **Answered:** yes, via `product_variants`. See section 9 (DV-02) and DATABASE.md.
 - **Bank details:** one account or several (bank, Easypaisa, JazzCash)? Which account can international customers pay into?
-- **Notifications:** email to the owner and customer on new order? WhatsApp link? (Default: email via SMTP, WhatsApp click-to-chat button.)
-- **Wholesale:** inquiry form only, or separate wholesale prices? (Default: inquiry form only.)
+- **Notifications:** email to the owner and customer on new order? WhatsApp link? (Default: email via SMTP, WhatsApp click-to-chat button — now also a required WhatsApp button on the order/tracking and admin order-detail pages, section 6.4.)
+- ~~**Wholesale:** inquiry form only, or separate wholesale prices?~~ **Answered:** inquiry form only, with repeatable item rows. See SF-08.
 - **Tax and invoices:** any tax line or printed invoice needed?
 - **Content:** who supplies product data, photos, descriptions, About and policy text, and in what format? A spreadsheet plus an image folder is ideal.
 - **Domain and email:** who owns the .com domain, and is a business email needed?

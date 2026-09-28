@@ -32,7 +32,7 @@ Deployed to cPanel shared hosting (Passenger) as a `standalone` build. Never rel
 11. Keep memory use low (shared hosting): limit sharp concurrency, paginate every list, no heavy work at request time.
 
 ## UI rules
-Storefront must match the demo exactly: fonts, colours, spacing, icons, logo text, hover and scroll behaviour, mobile layout. Extract tokens into Tailwind config first. Admin and developer panels are utilitarian and fast; they do not need the storefront styling.
+Storefront must match the demo exactly: fonts, colours, spacing, icons, logo text, hover and scroll behaviour, mobile layout. Extract tokens into Tailwind config first. Admin and developer panels use the same theme tokens (colours, fonts, radii) as the storefront — not a separate utilitarian look — but their layouts stay dense and functional (tables, forms), not storefront-style pages.
 
 ## Workflow
 - Plan before code for each slice. Build one vertical slice at a time in the order of REQUIREMENTS section 15.

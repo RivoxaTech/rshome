@@ -11,7 +11,7 @@ import {
   varchar,
 } from "drizzle-orm/mysql-core";
 import { users } from "./access-control";
-import { products } from "./catalog";
+import { productVariants, products } from "./catalog";
 import { coupons } from "./promotions";
 import { shippingZones } from "./shipping";
 
@@ -62,6 +62,7 @@ export const orders = mysqlTable(
     couponCode: varchar("coupon_code", { length: 50 }),
     couponDiscount: decimal("coupon_discount", { precision: 12, scale: 2 }).notNull(),
     shippingTotal: decimal("shipping_total", { precision: 12, scale: 2 }),
+    shippingNote: varchar("shipping_note", { length: 255 }),
     total: decimal("total", { precision: 12, scale: 2 }).notNull(),
     displayCurrency: char("display_currency", { length: 3 }).notNull(),
     exchangeRate: decimal("exchange_rate", { precision: 12, scale: 4 }).notNull(),
@@ -93,7 +94,11 @@ export const orderItems = mysqlTable(
     productId: bigint("product_id", { mode: "number", unsigned: true })
       .notNull()
       .references(() => products.id),
+    variantId: bigint("variant_id", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => productVariants.id),
     nameSnapshot: varchar("name_snapshot", { length: 150 }).notNull(),
+    variantLabelSnapshot: varchar("variant_label_snapshot", { length: 150 }).notNull(),
     skuSnapshot: varchar("sku_snapshot", { length: 64 }).notNull(),
     unitPrice: decimal("unit_price", { precision: 12, scale: 2 }).notNull(),
     discountAmount: decimal("discount_amount", { precision: 12, scale: 2 }).notNull(),

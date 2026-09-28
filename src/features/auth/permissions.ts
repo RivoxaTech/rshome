@@ -11,6 +11,7 @@ export const PERMISSIONS = {
   ORDER_SET_SHIPPING: "order.set_shipping",
   ORDER_EXPORT: "order.export",
   WHOLESALE_VIEW: "wholesale.view",
+  WHOLESALE_MANAGE: "wholesale.manage",
   PRODUCT_VIEW: "product.view",
   PRODUCT_CREATE: "product.create",
   PRODUCT_UPDATE: "product.update",
@@ -36,6 +37,7 @@ export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
   [PERMISSIONS.ORDER_SET_SHIPPING]: "Set the shipping charge on a quote-pending order",
   [PERMISSIONS.ORDER_EXPORT]: "Export orders to CSV",
   [PERMISSIONS.WHOLESALE_VIEW]: "View wholesale inquiries",
+  [PERMISSIONS.WHOLESALE_MANAGE]: "Change wholesale inquiry status and add internal notes",
   [PERMISSIONS.PRODUCT_VIEW]: "View products",
   [PERMISSIONS.PRODUCT_CREATE]: "Create products",
   [PERMISSIONS.PRODUCT_UPDATE]: "Edit products",
@@ -60,5 +62,6 @@ export const ADMIN_DEFAULT_PERMISSIONS: PermissionKey[] = [
   PERMISSIONS.ORDER_SET_SHIPPING,
   PERMISSIONS.ORDER_EXPORT,
   PERMISSIONS.WHOLESALE_VIEW,
+  PERMISSIONS.WHOLESALE_MANAGE,
   PERMISSIONS.PRODUCT_VIEW,
 ];

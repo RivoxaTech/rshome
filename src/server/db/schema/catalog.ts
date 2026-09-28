@@ -46,11 +46,9 @@ export const products = mysqlTable(
       .references(() => categories.id),
     name: varchar("name", { length: 150 }).notNull(),
     slug: varchar("slug", { length: 191 }).notNull().unique(),
-    sku: varchar("sku", { length: 64 }).notNull().unique(),
     shortDescription: varchar("short_description", { length: 500 }),
     description: text("description"),
     price: decimal("price", { precision: 12, scale: 2 }).notNull(),
-    stock: int("stock", { unsigned: true }).notNull().default(0),
     weightGrams: int("weight_grams", { unsigned: true }),
     isFeatured: boolean("is_featured").notNull().default(false),
     status: mysqlEnum("status", ["draft", "active", "archived"]).notNull().default("draft"),
@@ -82,4 +80,33 @@ export const productImages = mysqlTable(
     createdAt: datetime("created_at").notNull().$defaultFn(() => new Date()),
   },
   (table) => [index("product_images_product_sort_idx").on(table.productId, table.sortOrder)],
+);
+
+/**
+ * Every product has at least one variant (a simple product gets one default variant).
+ * Stock and SKU live only here, never on `products`. `attributes` is JSON-shaped TEXT
+ * (e.g. {"Colour":"Red","Size":"Large"}), validated with Zod in the repo (DB2 in DATABASE.md).
+ */
+export const productVariants = mysqlTable(
+  "product_variants",
+  {
+    id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+    productId: bigint("product_id", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => products.id),
+    sku: varchar("sku", { length: 64 }).notNull().unique(),
+    label: varchar("label", { length: 150 }).notNull(),
+    attributes: text("attributes").notNull(),
+    priceOverride: decimal("price_override", { precision: 12, scale: 2 }),
+    stock: int("stock", { unsigned: true }).notNull().default(0),
+    weightGrams: int("weight_grams", { unsigned: true }),
+    sortOrder: int("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: datetime("created_at").notNull().$defaultFn(() => new Date()),
+    updatedAt: datetime("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date())
+      .$onUpdateFn(() => new Date()),
+  },
+  (table) => [index("product_variants_product_sort_idx").on(table.productId, table.sortOrder)],
 );

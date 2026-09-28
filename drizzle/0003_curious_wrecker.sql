@@ -1,0 +1,1 @@
+ALTER TABLE `wholesale_inquiries` MODIFY COLUMN `business` varchar(150);
