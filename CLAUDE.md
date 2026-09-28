@@ -14,7 +14,7 @@ Deployed to cPanel shared hosting (Passenger) as a `standalone` build. Never rel
 
 ## Commands (keep this section accurate)
 - `npm run dev` : local dev
-- `npm run build && npm run start:standalone` : test the production build
+- `npm run build:standalone && npm run start:standalone` : test the production build
 - `npm run db:generate` / `npm run db:migrate` / `npm run db:seed`
 - `npm run lint` / `npm run typecheck` / `npm test`
 

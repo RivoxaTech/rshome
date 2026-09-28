@@ -241,7 +241,7 @@ Money is stored as DECIMAL(12,2) in PKR. The full column-level schema is produce
 ### 11.2 Performance
 
 - Server Components by default. Client components only where interaction is needed.
-- Catalogue pages cached or revalidated on product change. Pagination on all lists.
+- Catalogue pages are rendered per request (see ARCHITECTURE.md D7). Pagination on all lists.
 - Images stored in a few sizes as WebP, lazy-loaded, with explicit width and height (no layout shift).
 - Limit `sharp` concurrency and avoid heavy work at request time. Shared hosting has small memory limits.
 - Target: fast first load on mobile, Lighthouse performance 85+ on home and product pages.

@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Lovable export, visual reference only, never imported.
+    "design-reference/**",
   ]),
 ]);
 
