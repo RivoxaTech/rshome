@@ -53,3 +53,5 @@ next-env.d.ts
 # design reference (Lovable export)
 design-reference/node_modules/
 design-reference/.git/
+# design reference (Lovable export, local only)
+/design-reference/

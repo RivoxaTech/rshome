@@ -1,7 +1,7 @@
 @AGENTS.md
 # RS HOME Store: project rules for Claude Code
 
-Read these first, in order: `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`.
+Read these first, in order: `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/BUILD_PLAN.md` (slice order, status and the owner's answers).
 The Lovable demo source (when available) is in `design-reference/`. It is a visual reference only and is never imported by the app.
 
 ## What this is
@@ -9,7 +9,7 @@ A reusable e-commerce base for small stores. First client: RS HOME (home decor, 
 No payment gateway. Payments are COD or bank transfer with a screenshot that staff verify.
 
 ## Stack
-Next.js (App Router) + TypeScript strict, Tailwind, MySQL (MariaDB-compatible) with Drizzle ORM + mysql2, Zod, sharp, bcrypt or argon2.
+Next.js (App Router) + TypeScript strict, Tailwind, MySQL (MariaDB-compatible) with Drizzle ORM + mysql2, Zod, sharp, `node:crypto` scrypt for passwords. Code runs on Node 20.9+.
 Deployed to cPanel shared hosting (Passenger) as a `standalone` build. Never rely on serverless features, on-server builds, or a persistent background process.
 
 ## Commands (keep this section accurate)

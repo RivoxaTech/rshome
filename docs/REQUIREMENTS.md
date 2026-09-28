@@ -270,7 +270,7 @@ Money is stored as DECIMAL(12,2) in PKR. The full column-level schema is produce
 
 ## 14. Deployment (cPanel, PKWebHost)
 
-**Hosting is bought last.** Before paying, ask the host's pre-sales chat (free) to confirm: Setup Node.js App (Passenger) is included, which Node versions are offered (needs a version supported by the chosen Next.js, 18.18+ or 20+), MySQL/MariaDB version, disk space (10 GB+ recommended for images), and whether SSH or terminal access exists. Until purchase, run and test the production build locally with `next build` and the standalone server so deployment surprises are minimised.
+**Hosting is bought last.** Before paying, ask the host's pre-sales chat (free) to confirm: Setup Node.js App (Passenger) is included, which Node versions are offered (Next.js 16 needs **20.9+**), MySQL/MariaDB version, disk space (10 GB+ recommended for images), and whether SSH or terminal access exists. Also ask: OS/CloudLinux version and glibc ≥ 2.26 (needed by sharp), LVE memory, process and entry-process limits, `max_user_connections`, Remote MySQL access, upload body limit (ModSecurity / `LimitRequestBody` ≥ 6 MB), and whether cron jobs are allowed. Until purchase, run and test the production build locally with `next build` and the standalone server so deployment surprises are minimised.
 
 - Next.js `output: 'standalone'`. Build on a local machine or in CI, never on the shared server.
 - Copy `public/` and `.next/static` into the standalone folder. Zip, upload, extract, point the Node app startup file at `server.js`.

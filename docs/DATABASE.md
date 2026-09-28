@@ -1,68 +1,99 @@
-# Database design (proposed, MySQL / MariaDB compatible)
+# Database design (MySQL 8 / MariaDB 10.5+ compatible)
 
-Conventions
-- Engine InnoDB, charset `utf8mb4`, collation `utf8mb4_unicode_ci`.
-- Primary keys: `BIGINT UNSIGNED AUTO_INCREMENT` named `id`. Public identifier for orders is `order_number`.
-- Every table has `created_at`; mutable tables also `updated_at`.
-- Money: `DECIMAL(12,2)`, PKR base currency. Never floats.
-- Never hard-delete rows referenced by orders (products, coupons). Use `status` / `is_active`.
-- Keep to features common to MySQL 8 and MariaDB 10.5+. `JSON` columns are used only for small settings-type data.
-- Foreign keys on all relations, with indexes.
+Reviewed and agreed on 28 September 2026. See the Decisions section at the end, and ARCHITECTURE.md §9.
+
+## Conventions
+- Engine InnoDB. Charset `utf8mb4`, collation **`utf8mb4_unicode_ci`**, set on the database by the first migration (`ALTER DATABASE`) and on the mysql2 connection. Never use `utf8mb4_0900_*` (MySQL 8 only).
+- Primary keys: `BIGINT UNSIGNED AUTO_INCREMENT` named `id`. FK columns are `BIGINT UNSIGNED` too, so types match. The public identifier for orders is `order_number`.
+- Times: `DATETIME` stored in **UTC**. Every table has `created_at`; mutable tables also `updated_at`. No `TIMESTAMP` columns.
+- Money: `DECIMAL(12,2)`, PKR base currency. Never floats. Drizzle returns decimals as strings, and `features/pricing/money.ts` converts them to integer paisa.
+- Strings that are indexed or unique are `VARCHAR(191)` or shorter.
+- JSON-shaped data (settings values, audit snapshots) is stored as **`TEXT`** and parsed and validated with Zod in the repo. No `JSON` columns and no JSON SQL functions.
+- Only features common to both engines: no `RETURNING`, no `SKIP LOCKED`, no CHECK constraints relied upon. `INSERT … ON DUPLICATE KEY UPDATE` and `SELECT … FOR UPDATE` are fine.
+- Rows referenced by orders (products, coupons) are never hard-deleted. Use `status` / `is_active`.
+- Foreign keys on all relations (default `RESTRICT`), with indexes.
+- Avoid reserved words as column names where it's cheap (`old_values`, not `before`). `key` is kept; Drizzle always quotes identifiers.
 
 ## Access control
 | Table | Columns |
 |---|---|
-| roles | id, `key` (unique, e.g. developer, admin), name, is_system (bool) |
-| permissions | id, `key` (unique, e.g. `order.verify_payment`), description |
+| roles | id, `key` VARCHAR(50) unique (developer, admin), name, is_system BOOL, created_at, updated_at |
+| permissions | id, `key` VARCHAR(100) unique (e.g. `order.verify_payment`), description |
 | role_permissions | role_id (FK), permission_id (FK), PK (role_id, permission_id) |
-| users | id, name, email (unique), password_hash, role_id (FK), is_active, last_login_at |
-| sessions (optional) | id (random token hash), user_id (FK), expires_at, ip, user_agent |
+| users | id, name, email VARCHAR(191) unique, password_hash (scrypt, encoded with salt and params), role_id (FK), is_active, last_login_at NULL, created_at, updated_at |
+| sessions | id CHAR(64) PK (SHA-256 hex of the cookie token), user_id (FK), expires_at, last_seen_at, ip VARCHAR(45), user_agent VARCHAR(255), created_at. Index user_id, expires_at |
+| rate_limits | bucket VARCHAR(191) PK (e.g. `login:ip:1.2.3.4`), count INT UNSIGNED, window_ends_at DATETIME. Updated with an atomic upsert; expired rows are reset on the next hit and swept on writes |
+
+Permission keys (REQUIREMENTS §3.2, plus client decisions): `dashboard.view`, `order.view`, `order.update_status`, `order.verify_payment`, `order.set_shipping`, `order.export`, `wholesale.view`, `product.view`, `product.create`, `product.update`, `product.delete`, `product.import`, `category.manage`, `discount.manage`, `coupon.manage`, `shipping.manage`, `settings.manage`, `user.manage`, `role.manage`, `audit.view`.
+Admin default set: `dashboard.view`, `order.view`, `order.update_status`, `order.verify_payment`, `order.set_shipping`, `order.export`, `wholesale.view`, `product.view`.
 
 ## Catalogue
 | Table | Columns | Indexes |
 |---|---|---|
-| categories | id, parent_id (nullable FK), name, slug (unique), description, image_path, sort_order, is_active | slug, parent_id |
-| products | id, category_id (FK), name, slug (unique), sku (unique), short_description, description (TEXT), price DECIMAL(12,2), stock INT, weight_grams INT NULL, is_featured, status ENUM('draft','active','archived') | slug, sku, (category_id, status), is_featured |
-| product_images | id, product_id (FK), path, alt, sort_order, is_primary | product_id |
+| categories | id, parent_id (FK NULL), name, slug VARCHAR(191) unique, description TEXT NULL, image_path NULL, sort_order INT, is_active, created_at, updated_at | slug, parent_id, (is_active, sort_order) |
+| products | id, category_id (FK), name, slug VARCHAR(191) unique, sku VARCHAR(64) unique, short_description VARCHAR(500) NULL, description TEXT NULL, price DECIMAL(12,2), stock INT UNSIGNED, weight_grams INT UNSIGNED NULL, is_featured, status ENUM('draft','active','archived'), created_at, updated_at | slug, sku, (category_id, status), (status, created_at), is_featured |
+| product_images | id, product_id (FK), path (base name under `UPLOAD_DIR/media`, without the size suffix), width INT, height INT (original size), alt VARCHAR(255), sort_order INT, created_at. **Primary image = lowest sort_order** | (product_id, sort_order) |
+
+Out-of-stock active products are listed and shown as "Sold out" (client decision).
 
 ## Promotions
 | Table | Columns |
 |---|---|
-| discounts | id, name, type ENUM('percent','fixed'), value DECIMAL(12,2), target_type ENUM('all','category','product'), starts_at, ends_at, is_active |
-| discount_targets | discount_id (FK), target_id (category or product id), PK (discount_id, target_id) |
-| coupons | id, code (unique, stored uppercase), type ENUM('percent','fixed'), value, min_order DECIMAL NULL, max_discount DECIMAL NULL, usage_limit INT NULL, per_customer_limit INT NULL, used_count INT, starts_at, ends_at, is_active |
-| coupon_usages | id, coupon_id (FK), order_id (FK), customer_key (normalised phone or email), created_at. Index (coupon_id, customer_key) |
+| discounts | id, name, type ENUM('percent','fixed'), value DECIMAL(12,2), target_type ENUM('all','category','product'), starts_at NULL, ends_at NULL, is_active, created_at, updated_at |
+| discount_targets | discount_id (FK), target_id (category or product id, depending on target_type; no FK), PK (discount_id, target_id) |
+| coupons | id, code VARCHAR(50) unique (stored uppercase), type ENUM('percent','fixed'), value, min_order DECIMAL NULL, max_discount DECIMAL NULL, usage_limit INT NULL, per_customer_limit INT NULL, used_count INT UNSIGNED DEFAULT 0, starts_at NULL, ends_at NULL, is_active, created_at, updated_at |
+| coupon_usages | id, coupon_id (FK), order_id (FK, unique), customer_key VARCHAR(32) (normalised phone), created_at. Index (coupon_id, customer_key). Deleted, and `used_count` decremented, when the order is cancelled or rejected |
 
 ## Shipping
 | Table | Columns |
 |---|---|
-| shipping_zones | id, name, countries (JSON list of ISO codes, or "PK-city" rules), mode ENUM('flat','free_over','quote_later','weight'), flat_rate DECIMAL, free_over DECIMAL NULL, cod_enabled, is_active, sort_order |
-| shipping_rate_tiers | id, zone_id (FK), min_weight_g, max_weight_g, rate DECIMAL (used when mode = weight) |
+| shipping_zones | id, name, mode ENUM('flat','quote'), flat_rate DECIMAL(12,2), free_over_amount DECIMAL(12,2) NULL, cod_enabled, is_fallback BOOL (exactly one zone, e.g. "Rest of world"), is_active, sort_order, created_at, updated_at |
+| shipping_zone_areas | id, zone_id (FK), country_code CHAR(2), city VARCHAR(100) NULL (lowercase; NULL = whole country). UNIQUE (country_code, city) |
+
+Zone resolution: an exact (country, city) row, else (country, NULL), else the `is_fallback` zone. In Pakistan the checkout city picker offers "Karachi" or "Other city". Weight-based tiers are deferred (a later migration can add the `weight` mode and a tiers table; `products.weight_grams` already exists).
 
 ## Orders
 | Table | Columns | Indexes |
 |---|---|---|
-| orders | id, order_number (unique), customer_name, email, phone, address_line, city, state, postal_code, country, shipping_zone_id (FK NULL), payment_method ENUM('cod','bank_transfer'), order_status ENUM('pending','awaiting_shipping_quote','confirmed','processing','shipped','delivered','cancelled','rejected'), payment_status ENUM('unpaid','proof_submitted','verified','rejected','cod_pending','cod_collected'), rejection_reason TEXT NULL, subtotal, discount_total, coupon_id NULL, coupon_code NULL, shipping_total, total (PKR base), display_currency CHAR(3), exchange_rate DECIMAL(12,4), display_total DECIMAL, courier, tracking_note, internal_note, created_at, updated_at | order_number, order_status, payment_status, created_at, phone |
-| order_items | id, order_id (FK), product_id (FK), name_snapshot, sku_snapshot, unit_price, discount_amount, quantity, line_total | order_id |
-| payment_proofs | id, order_id (FK), file_path, status ENUM('submitted','verified','rejected'), rejection_reason NULL, reviewed_by (FK users NULL), reviewed_at NULL, created_at | order_id |
-| order_status_history | id, order_id (FK), kind ENUM('order','payment'), from_status, to_status, reason NULL, changed_by (FK users NULL), created_at | order_id |
+| orders | id, order_number VARCHAR(20) unique (`RSH-YYMMDD-XXXX`), checkout_token CHAR(36) unique, customer_name, phone VARCHAR(32) (normalised), email VARCHAR(191) NULL, address_line, city, state NULL, postal_code NULL, country CHAR(2), shipping_zone_id (FK NULL), payment_method ENUM('cod','bank_transfer'), order_status ENUM('pending','awaiting_shipping_quote','confirmed','processing','shipped','delivered','cancelled','rejected'), payment_status ENUM('unpaid','proof_submitted','verified','rejected','cod_pending','cod_collected'), rejection_reason TEXT NULL, subtotal, discount_total, coupon_id (FK NULL), coupon_code NULL, coupon_discount, shipping_total NULL (NULL while a quote is pending), total (PKR), display_currency CHAR(3), exchange_rate DECIMAL(12,4), display_total DECIMAL(12,2), customer_note TEXT NULL, courier NULL, tracking_note NULL, created_at, updated_at | order_number, checkout_token, (order_status, created_at), (payment_status, created_at), phone, created_at |
+| order_items | id, order_id (FK), product_id (FK), name_snapshot, sku_snapshot, unit_price (base), discount_amount (per unit), quantity, line_total | order_id |
+| payment_proofs | id, order_id (FK), file_path (relative to `UPLOAD_DIR`), file_size INT, status ENUM('submitted','verified','rejected'), rejection_reason NULL, reviewed_by (FK users NULL), reviewed_at NULL, created_at | order_id |
+| order_status_history | id, order_id (FK), kind ENUM('order','payment','note'), from_status NULL, to_status NULL, note TEXT NULL (reason or internal note), changed_by (FK users NULL; NULL = customer/system), created_at | (order_id, created_at) |
+
+`awaiting_shipping_quote` is used by zones in `quote` mode (not listed in REQUIREMENTS §6.2, but required by §6.4).
 
 ## Other
 | Table | Columns |
 |---|---|
-| wholesale_inquiries | id, name, business, phone, email, message, status ENUM('new','contacted','closed'), created_at |
-| settings | `key` (PK), value (JSON), updated_at. Keys: store info, bank_accounts, exchange_rate, announcement_text, social_links, currency defaults |
-| audit_logs | id, user_id (FK NULL), action, entity, entity_id, before (JSON NULL), after (JSON NULL), created_at. Index (entity, entity_id) |
-| static_pages (optional) | id, slug (unique), title, body, is_published |
+| wholesale_inquiries | id, name, business NULL, phone, email NULL, items_of_interest TEXT NULL, message TEXT, status ENUM('new','contacted','closed'), created_at, updated_at |
+| settings | `key` VARCHAR(100) PK, value TEXT (JSON, validated per key with Zod), updated_at. Keys: store info, contact, bank_accounts (list, per currency or zone), exchange_rate, announcement_text, social_links, home hero text |
+| audit_logs | id, user_id (FK NULL), action VARCHAR(50), entity VARCHAR(50), entity_id VARCHAR(50), old_values TEXT NULL, new_values TEXT NULL, created_at. Index (entity, entity_id), created_at |
+| static_pages | id, slug VARCHAR(191) unique, title, body TEXT (Markdown), is_published, created_at, updated_at |
 
-## Seed data
-- Permissions (see REQUIREMENTS section 3.2), roles `developer` (all permissions, is_system) and `admin` (default set).
-- First developer user from env vars, and one admin user.
-- Settings defaults, shipping zones (Karachi, Pakistan, International placeholder), sample categories (Tableware, Tea Sets, Trays, Decor).
-- 50 launch products loaded from the client's spreadsheet through `scripts/import-products.ts`.
+## Seed data (idempotent; safe to run repeatedly)
+- Upsert permissions from the code `PERMISSIONS` const. Roles `developer` (is_system, all permissions) and `admin` (the default set above).
+- One developer and one admin user from `SEED_*` env vars (created if missing; existing passwords never overwritten).
+- Settings defaults. Shipping zones: Karachi (PK + city `karachi`, flat, COD), Pakistan (PK, flat, COD), International (fallback, flat, no COD); rates are placeholders until the client decides.
+- Sample categories (Tableware, Tea Sets, Trays, Decor) and a few sample products for development.
+- Launch products are loaded from the client's spreadsheet (CSV) and image folder through `scripts/import-products.ts`.
 
 ## Rules the schema must support
 1. A payment can be rejected many times; every proof is kept.
-2. An order can be rejected with a reason without deleting anything; stock is restored.
-3. Discount and coupon exclusivity is enforced in `features/pricing`, tested, and recorded on the order (`coupon_id` set only when no discounted line existed).
+2. An order can be rejected with a reason without deleting anything; stock is restored and the coupon use released.
+3. Discount and coupon exclusivity is enforced in `features/pricing`, tested, and recorded on the order (`coupon_id` is set only when no line was discounted).
 4. Old orders never change when prices, rates or products change (snapshots).
+5. A repeated checkout submit never creates a second order (`checkout_token`).
+
+## Decisions (28 September 2026)
+| # | Decision | Reason |
+|---|---|---|
+| DB1 | `utf8mb4_unicode_ci` forced by migration and checked by `migrate` | MySQL 8's default collation doesn't exist in MariaDB; cPanel DBs may default to latin1. |
+| DB2 | `TEXT` + Zod instead of `JSON` columns | MariaDB stores JSON as LONGTEXT, so drivers return different types. |
+| DB3 | `DATETIME` UTC instead of `TIMESTAMP` | No 2038 limit, no session-timezone conversion, no MariaDB auto-update quirk. |
+| DB4 | `sessions` required; `rate_limits` table added | Revocable sessions; limits shared across Passenger processes. |
+| DB5 | `shipping_zone_areas` table replaces the countries JSON; modes `flat`/`quote` + `free_over_amount`; tiers deferred | Portable matching; no unused branches. |
+| DB6 | `product_images.is_primary` dropped; `width`/`height` added | One fact, one field; explicit image size avoids layout shift. |
+| DB7 | Orders gain `checkout_token`, `coupon_discount`, `customer_note`; `shipping_total` NULL-able; `internal_note` removed (notes live in history, `kind='note'`) | Idempotency, reporting, quote flow, full note timeline. |
+| DB8 | `audit_logs.old_values/new_values` | `BEFORE` is a reserved word in MySQL. |
+| DB9 | `coupon_usages.order_id` unique; usage released on cancel/reject | Client decision; one usage per order. |
+| DB10 | `wholesale_inquiries.items_of_interest`, `payment_proofs.file_size`, relative `file_path` | SF-08; paths survive moving `UPLOAD_DIR`. |

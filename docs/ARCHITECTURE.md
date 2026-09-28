@@ -1,22 +1,28 @@
-# Architecture (proposed starting point)
+# Architecture
 
-Claude Code may improve this, but must record every change and the reason here before coding.
+Reviewed and agreed on 28 September 2026. Record every later change here, with its reason, before coding it (see §9 Decisions).
+
+Runtime: Next.js 16 (App Router, Turbopack build), React 19, TypeScript strict, Tailwind 4. Code must run on **Node 20.9+** (`engines` in package.json). Local development uses Node 24, and the host will likely offer 20 or 22, so avoid Node APIs newer than 20.9.
 
 ## 1. Shape
-One Next.js app. No separate backend. Three surfaces share one codebase and one database:
+One Next.js app. No separate backend. The storefront and the panel share one codebase and one database:
 
 ```
 Browser
-  |-- Storefront   (public pages, cart, checkout, tracking)
-  |-- Panel        (/panel/*  admin + developer, permission-gated menus)
+  |-- Storefront   (public pages, cart, checkout, confirmation, tracking)
+  |-- Panel        (/panel/*  admin + developer, menus built from permissions)
   v
-Next.js server (Passenger on cPanel)
+Next.js server (Passenger on cPanel, standalone build, pages rendered per request)
   |-- Server Components  : read data for pages
-  |-- Server Actions     : mutations (cart checkout, order actions, CRUD)
-  |-- Route Handlers     : health check, authenticated file serving
+  |-- Server Actions     : mutations (cart quote, checkout, order actions, CRUD)
+  |-- Route Handlers     : /api/health
+  |                        /media/[...path]                  public product/category images
+  |                        /api/files/proof/[id]             payment proofs, permission required
+  |                        /api/orders/[orderNumber]/proofs  customer proof upload
+  |                        /api/panel/uploads                panel image upload
   v
-features/*/service  ->  features/*/repo  ->  server/db (Drizzle)  ->  MySQL
-                                        \->  server/storage (sharp)  ->  UPLOAD_DIR on disk
+features/*/service  ->  features/*/repo  ->  server/db (Drizzle + mysql2)  ->  MySQL / MariaDB
+                    \->  server/storage (sharp)  ->  UPLOAD_DIR on disk (outside the app folder)
 ```
 
 ## 2. Layers and rules
@@ -25,92 +31,173 @@ features/*/service  ->  features/*/repo  ->  server/db (Drizzle)  ->  MySQL
 | UI | `src/app`, `src/components` | call services, render | touch DB, contain business rules |
 | Service | `src/features/*/service.ts` | business rules, permissions, transactions | render UI |
 | Repo | `src/features/*/repo.ts` | DB queries via Drizzle | business rules |
-| Server infra | `src/server/*` | db client, session, storage, mail, rate limit | know about features |
+| Pure logic | `src/features/pricing/pricing.ts`, `src/features/orders/status.ts` | calculations on plain data | touch DB or I/O (so unit tests need no DB) |
+| Server infra | `src/server/*` | env, db client, session, storage, mail, rate limit | know about features |
 
 ## 3. Folder structure
 ```
 rs-home/
   CLAUDE.md
-  docs/                  REQUIREMENTS.md, ARCHITECTURE.md, DATABASE.md
-  design-reference/      Lovable export (read-only, excluded from tsconfig and build)
-  drizzle/               generated SQL migrations
-  public/                static assets (logo, fonts if self-hosted)
-  scripts/               seed.ts, import-products.ts, deploy.sh
+  docs/                  REQUIREMENTS.md, ARCHITECTURE.md, DATABASE.md, BUILD_PLAN.md
+  design-reference/      Lovable export (TanStack Start + Tailwind 4 + shadcn). Read-only, gitignored,
+                         excluded from tsconfig, eslint and build. Its own AGENTS.md / configs are ignored.
+  drizzle/               generated SQL migrations (tracked in git)
+  public/                static assets (logo, pre-sized hero images)
+  scripts/               migrate.ts, seed.ts, import-products.ts, build-standalone.mjs
   src/
     app/
+      theme.css          design tokens (Tailwind 4 @theme), the only place for colours, fonts, radii, spacing
       (store)/           layout.tsx (announcement bar, header, footer), page.tsx (home)
         shop/  category/[slug]/  product/[slug]/  cart/  checkout/
-        order/[orderNumber]/     confirmation + screenshot upload
-        track/  wholesale/  pages/[slug]/   (contact, about, policies)
+        order/[orderNumber]/     confirmation + screenshot upload (needs the order-access cookie)
+        track/  wholesale/  pages/[slug]/
       panel/
-        login/  dashboard/
-        orders/  orders/[id]/    order detail: screenshot, approve or reject payment, accept or reject order
+        login/  dashboard/  orders/  orders/[id]/
         products/  categories/  discounts/  coupons/  shipping/
         settings/  users/  roles/  wholesale/  audit/
+      media/[...path]/route.ts                 public images from UPLOAD_DIR/media
       api/
         health/route.ts
-        files/proof/[id]/route.ts     authenticated payment-proof streaming
+        files/proof/[id]/route.ts             authenticated payment-proof streaming
+        orders/[orderNumber]/proofs/route.ts  customer proof upload
+        panel/uploads/route.ts                panel image upload
       sitemap.ts  robots.ts
     features/
-      auth/  users/  roles/
-      catalog/     (products, categories, images)
-      pricing/     pricing.ts (single source of truth), money.ts, *.test.ts
-      cart/
-      checkout/    createOrder transaction
-      orders/      status machine, history
-      payments/    proofs upload, review
-      discounts/  coupons/  shipping/  settings/  wholesale/  audit/
+      auth/        permissions.ts (typed PERMISSIONS const, the source of truth), service.ts
+      users/  roles/
+      catalog/     products, categories, images
+      pricing/     pricing.ts (pure), money.ts, service.ts (loads data), *.test.ts
+      cart/        quote action; the cart itself lives in the browser
+      checkout/    createOrder transaction, order-access cookie
+      orders/      status.ts (pure status machine), service.ts, history
+      payments/    proof upload and review
+      discounts/  coupons/  shipping/  settings/  wholesale/  audit/  pages/
     server/
+      env.ts       Zod-validated environment
       db/          client.ts, schema/*.ts (one file per feature)
-      auth/        session.ts, password.ts, permissions.ts (requirePermission)
-      storage/     images.ts (sharp), files.ts (UPLOAD_DIR)
-      mail/        nodemailer wrapper (optional)
-      rate-limit.ts
-    components/    ui/ (primitives), store/ (storefront), panel/ (admin tables, forms)
-    config/        site.config.ts, features.ts, theme.ts (tokens)
-    lib/           small pure helpers
+      auth/        session.ts, password.ts (node:crypto scrypt), permissions.ts (requirePermission)
+      storage/     images.ts (sharp), files.ts (UPLOAD_DIR paths)
+      mail/        nodemailer wrapper (M2, optional)
+      rate-limit.ts  (MySQL-backed)
+      request.ts   client IP, origin check for Route Handlers
+    components/    ui/ (primitives), store/ (storefront), panel/ (tables, forms)
+    config/        site.config.ts (build-time defaults), features.ts (flags)
+    lib/           small pure helpers, image-loader.ts (next/image custom loader)
   next.config.ts   output: "standalone"
   drizzle.config.ts
-  .env.example
+  .env.example     (the app, drizzle-kit and scripts all load .env.local)
 ```
 
 ## 4. Key flows
 
-### 4.1 Price calculation (one module)
-`pricing.calculateCart(items, { coupon?, zone, currency })` returns per-line effective prices, discount total, coupon result, shipping, total, display totals.
-Rules: best single discount per product; discounts never stack; **a coupon is rejected if any cart line has an active discount**; shipping from zone mode; display currency from `exchange_rate` when `multi_currency` is on.
-Used by the cart UI (through a server action) and again inside order creation. The browser never sends prices.
+### 4.1 Price calculation (`features/pricing`)
+- `pricing.ts` is pure. `calculateCart({ lines, products, discounts, coupon, zone, currency, flags, now })` returns per-line base and effective prices, the discount total, the coupon result (applied or rejected, with a reason code), shipping (or pending), the total, and display amounts. `service.ts` loads the data and calls it. The cart quote action and `createOrder` both use the same service. The browser only ever sends product ids, quantities and a coupon code.
+- **Money:** integer paisa inside the module. `money.ts` converts to and from DECIMAL strings and formats (`formatMoney()`). PKR amounts from percentages are **rounded to whole rupees**, half up.
+- **Discounts:** the single discount giving the lowest unit price wins. Ties go to the lowest discount id. Discounts never stack. A fixed amount is per unit, clamped at 0. A `category` target matches the product's category or that category's parent. A discount is active when `is_active` is set and `starts_at <= now < ends_at` (null bounds are open).
+- **Exclusivity (cart-level, confirmed):** a line is discounted when its effective price is below its base price. If any line is discounted, the coupon is rejected with `COUPON_BLOCKED_BY_DISCOUNT` ("Coupons cannot be combined with discounted items."). The cart then removes the stored code and shows the message.
+- **Coupons:** the code is case-insensitive. The coupon must be active and within its dates. `min_order` is compared with the subtotal. A percentage is capped by `max_discount`. A fixed amount is clamped to the subtotal. Coupons never reduce shipping. The total and per-customer limits (normalised phone) are checked in the service and enforced again under lock in `createOrder`.
+- **Shipping:** in `flat` mode the charge is `flat_rate`, and 0 when the goods total after discount and coupon is at least `free_over_amount`. `quote` mode returns `pending` (the order waits for a quote). COD is allowed when the `cod` flag is on and the zone has `cod_enabled`.
+- **Currency:** PKR is always computed first. With `multiCurrency` on (default off), display = PKR / `exchange_rate`, rounded to the currency's step.
 
-### 4.2 Place order (`checkout/createOrder`, one transaction)
-1. Validate input (Zod). Rate-limit.
-2. Load products, lock rows, check stock.
-3. Recompute totals with `pricing.calculateCart`.
-4. Insert order (`order_number` like `RSH-260928-0001`), items with price snapshots.
-5. Decrement stock. Insert `coupon_usages` if a coupon was used.
-6. Set statuses: bank transfer -> `pending` + `unpaid`; COD -> `pending` + `cod_pending`; quote-later zone -> `awaiting_shipping_quote`.
-7. Insert `order_status_history`. Commit. Redirect to confirmation.
+### 4.2 Place order (`checkout/createOrder`)
+1. Validate input with Zod. Check the rate limit (IP). Phone is required, email optional.
+2. If an order with this `checkout_token` exists, return it (idempotent re-submit).
+3. Resolve the shipping zone from country + city (the city picker offers Karachi / other in Pakistan).
+4. Start the transaction. `SELECT … FOR UPDATE` the products **in ascending id order**. If there is a coupon, `SELECT … FOR UPDATE` the coupon row.
+5. Recompute with the pricing service using the locked rows. If an item is inactive or out of stock, fail with a clear message. If the total differs from the client's `expectedTotal`, fail with "Prices changed, please review". Nothing is written in either case.
+6. Insert the order. `order_number` = `RSH-YYMMDD-XXXX`: the Karachi date plus 4 random characters from `23456789ABCDEFGHJKMNPQRSTUVWXYZ`, retried on a duplicate key. Then insert the items with name, SKU and price snapshots.
+7. Decrement stock. If a coupon was used, insert `coupon_usages` and increment `used_count`.
+8. Set statuses: bank → `pending` + `unpaid`; COD → `pending` + `cod_pending`; quote zone → `awaiting_shipping_quote` (the customer can't pay until the quote is set).
+9. Insert `order_status_history`, then commit. On deadlock (errno 1213), retry the whole transaction once.
+10. Set the order-access cookie and redirect to the confirmation page. Emails (M2) go out after the response via `after()`, never inside the transaction, and a mail failure is logged and does not fail the order.
 
-### 4.3 Payment screenshot
-Customer uploads on confirmation or tracking page -> validate type and size -> sharp re-encode -> save to `UPLOAD_DIR/proofs/<random>.webp` -> row in `payment_proofs` (status `submitted`), order `payment_status = proof_submitted`.
-Admin opens order detail -> image loaded from `/api/files/proof/[id]` (requires permission) -> **Approve payment** (payment_status `verified`) or **Reject payment** with reason (customer may re-upload).
-Then **Accept order** (`confirmed`) or **Reject order** with reason (`rejected`, stock restored). Every action writes history and, where relevant, audit.
+### 4.3 Order status machine (`orders/status.ts`, pure and tested)
+- Order: `awaiting_shipping_quote → pending` (quote set); `pending → confirmed | rejected | cancelled`; `confirmed → processing | cancelled`; `processing → shipped | cancelled`; `shipped → delivered`. Cancelling after `shipped` is not allowed.
+- A bank order can't enter `confirmed` until `payment_status = verified`. The combined action "Approve payment and accept order" runs in one transaction.
+- Payment: `unpaid | rejected → proof_submitted` (upload); `proof_submitted → verified | rejected` (reason required); `cod_pending → cod_collected`.
+- Moving into `cancelled` or `rejected` (reason required for rejected) restores stock and **releases the coupon use** (the usage row is deleted and `used_count` decremented) in the same transaction. This happens once only, because the state machine forbids leaving those states.
+- Unpaid bank orders hold their stock until staff cancel them. The orders list has an "unpaid > 3 days" filter. Nothing expires automatically.
+- Every change writes `order_status_history` (user, time, note). Internal notes are history rows with `kind = 'note'`.
 
-### 4.4 Auth and permissions
-Email + password, signed HTTP-only session cookie, session row or signed token with expiry. `requirePermission(key)` is called at the top of every panel page, action and route. The sidebar is built from the user's permission list. The Developer role is a system role holding every permission.
+### 4.4 Payment screenshot
+- **Upload:** `POST /api/orders/[orderNumber]/proofs`, from the confirmation page or tracking. Requires the order-access cookie, a same-origin `Origin` header, and rate limits per IP and per order. Allowed only while `payment_status` is `unpaid`, `proof_submitted` or `rejected` and the order is open. At most 5 proofs per order.
+- **Validation:** reject when `Content-Length` > 5.5 MB before reading the body, then check the file part ≤ 5 MB. The real type comes from `sharp().metadata()` (magic bytes): jpeg, png or webp only. `limitInputPixels` guards against decompression bombs.
+- **Processing:** `.rotate()` (applies EXIF orientation), resize so the longest side is ≤ 2000 px, WebP output with no metadata. sharp runs with concurrency 1 and cache off. Written to a temp file, then renamed to `UPLOAD_DIR/proofs/YYYY/MM/<random>.webp`. The DB row (status `submitted`, relative path) is inserted, and the file is deleted if that insert fails. The order moves to `proof_submitted`.
+- **Serving:** `/api/files/proof/[id]` needs `order.verify_payment` or `order.view`. It looks the path up by id (never a user-supplied path) and sends `Cache-Control: private, no-store`, `X-Content-Type-Options: nosniff`, `Content-Type: image/webp`.
+- **Review:** approve (`verified`) or reject with a reason. Rejecting a payment keeps the order open, and the customer can upload again.
 
-### 4.5 Currency and shipping (flagged, not hard-coded)
-`config/features.ts`: `multiCurrency`, `coupons`, `discounts`, `wholesale`, `cod`, `bankTransfer`, `guestCheckout`.
-Products priced in PKR. When `multiCurrency` is on, the header switcher sets a cookie; display price = PKR / `settings.exchange_rate`. Orders snapshot currency and rate.
-Shipping zones have a `mode`: flat, free_over, quote_later, weight. First release implements flat, free_over and COD-per-zone; the others are schema-ready.
+### 4.5 Auth, permissions and order access
+- **Passwords:** `node:crypto` scrypt with a random salt, compared with `timingSafeEqual`. No native module.
+- **Sessions:** a random 32-byte token in an HTTP-only, Secure, SameSite=Lax cookie. The DB stores its SHA-256 (`sessions.id`). Expiry is 7 days absolute, and `last_seen_at` is updated at most once an hour. Logout or deactivating a user deletes the sessions. Login is rate-limited by IP and email.
+- **Permissions:** `requirePermission(key)` sits at the top of every panel page, action and route. `key` is typed from the `PERMISSIONS` const. The user's permission set is loaded once per request (React `cache()`). The sidebar is built from the same set. The code never checks role names.
+- **Seed sync:** the seed is idempotent. It upserts the permission rows from `PERMISSIONS` and grants all of them to the system `developer` role. `is_system` roles can't be edited or deleted in the panel. A user can only grant permissions they hold.
+- **Order access (customers):** an HMAC-signed (SESSION_SECRET), HTTP-only cookie listing up to 20 order numbers, valid 30 days. It is granted by placing an order, or by a tracking lookup with order number + phone or email (rate-limited). The confirmation page and proof upload require it.
+- **CSRF:** Server Actions use Next's built-in Origin check (`serverActions.allowedOrigins` from `APP_URL`, plus the tunnel host for the demo). Route Handlers that change state check `Origin` themselves (`server/request.ts`).
+- **Client IP:** the last `X-Forwarded-For` entry, which is the one appended by Apache/Passenger.
 
-## 5. Caching and performance
-Catalog pages are Server Components with revalidation triggered when a product, category or discount changes (`revalidatePath` or tags). Paginated lists. Images: WebP in sizes 400, 800, 1200, lazy-loaded with width and height. Indexes listed in DATABASE.md.
+### 4.6 Flags, settings and shipping
+- `config/features.ts`: `multiCurrency` (off), `coupons`, `discounts`, `wholesale`, `cod`, `bankTransfer`. A flag is only added when some code reads it, so `guestCheckout` waits for accounts (P3).
+- `config/site.config.ts` holds build-time defaults (store name, logo text, contact, currency, timezone `Asia/Karachi`). The `settings` table holds values editable at runtime (bank accounts per currency or zone, announcement text, contact, social links, exchange rate, home hero text) and falls back to `site.config` when a key is missing.
+- Current client decision: PKR only and a flat rate per zone. Shipping modes are `flat` (optional free-over threshold) and `quote` (quote after order: fields now, UI in week 2). Weight-based rates are deferred; `products.weight_grams` exists so they can be added without migrating data.
+
+## 5. Rendering, images and performance
+- Pages are Server Components **rendered per request**, with no data cache and no Cache Components. At about 200 products, indexed queries are cheap. This keeps timed discounts correct, needs no DB during `next build`, and avoids per-process cache drift under Passenger. React `cache()` shares a query within one request. Revisit in the performance pass only if Lighthouse needs it.
+- Client Components only where interaction is needed (cart drawer, gallery, forms).
+- **Images:** on upload, sharp writes WebP at 400, 800 and 1200 px wide (`<base>-400.webp` and so on) and stores the original width and height. `/media/[...path]` streams them with `Cache-Control: public, max-age=31536000, immutable` (filenames are random and never reused). The path must match `^[a-z0-9/-]+-(400|800|1200)\.webp$`; anything else is a 404. `next/image` uses the custom loader in `lib/image-loader.ts`, which maps the requested width to the nearest variant, so there is no runtime optimiser. Images are lazy-loaded with explicit width and height.
+- Every list is paginated. Indexes are listed in DATABASE.md.
 
 ## 6. Environment variables
-`DATABASE_URL`, `SESSION_SECRET`, `UPLOAD_DIR` (absolute, outside app folder), `APP_URL`, `SMTP_*` (optional), `NODE_ENV`.
+Every entry point loads `.env.local`: the app (Next does this), `drizzle.config.ts`, and every script. `server/env.ts` validates them with Zod at startup. `.env.example` is committed.
+
+| Variable | Notes |
+|---|---|
+| `DATABASE_URL` | `mysql://user:pass@host:3306/rs_home` |
+| `SESSION_SECRET` | ≥ 32 random characters; also signs the order-access cookie |
+| `UPLOAD_DIR` | absolute path outside the app folder; contains `media/` and `proofs/` |
+| `APP_URL` | public origin, used for `allowedOrigins`, links and SEO |
+| `ALLOWED_ORIGINS` | optional extra hosts (the demo tunnel) |
+| `SEED_DEVELOPER_EMAIL`, `SEED_DEVELOPER_PASSWORD`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | seed only |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | optional (M2) |
+| `NODE_OPTIONS` | `--max-old-space-size=256` on the host |
+
+**Database pool:** one pool per process, `connectionLimit: 4`, `idleTimeout` below the server's `wait_timeout`, `timezone: 'Z'`, `charset: 'utf8mb4_unicode_ci'`. In dev it is kept on `globalThis` so hot reload doesn't open new pools.
 
 ## 7. Build and deploy (cPanel)
-`next build` with `output: "standalone"` locally. Assemble: copy `public/` and `.next/static` into `.next/standalone`. Zip, upload, extract, Node app startup file `server.js`, set env vars in the Node app screen, run migrations against the cPanel MySQL from local (allow remote MySQL for your IP temporarily) or via a one-off script. `UPLOAD_DIR` outside the app folder. `scripts/deploy.sh` automates build, assemble and zip.
+1. **Build on Linux** (GitHub Actions in a private repo, planned; WSL or Docker also work). A Windows build bundles win32 sharp binaries that won't run on the host. `scripts/build-standalone.mjs` is Linux-ready: it runs `next build`, copies `public/` and `.next/static` into `.next/standalone`, and zips it.
+2. **Layout on the host:** the CloudLinux Node selector refuses a real `node_modules` folder in the application root, so the bundle is extracted into a subfolder: `~/rshome/app/` (contains `server.js`, `node_modules`, `.next`). The application root is `~/rshome`, and the startup file is `app/server.js`. `UPLOAD_DIR` is `~/rshome-uploads` (outside both).
+3. Set env vars in the Node app screen. Restart via the panel or `touch ~/rshome/tmp/restart.txt`.
+4. **Migrations:** `scripts/migrate.ts` (the drizzle-orm migrator) runs from the local machine against the host DB (cPanel Remote MySQL, own IP allowed temporarily), or over SSH if the host offers it. The first migration sets `utf8mb4_unicode_ci` on the database, and the script refuses to run if the database collation differs.
+5. **Initial content:** the demo data is built locally, so for launch: `mysqldump` the local DB → import on cPanel (phpMyAdmin), and zip `UPLOAD_DIR/media` → extract on the host.
+6. **Staging smoke test right after purchase:** sharp works (image upload), login, order, proof upload, restart. Things to confirm with the host: Node 20.9+, glibc ≥ 2.26, the upload body limit (≥ 6 MB), and whether Passenger's `listen()` hook works with the standalone server.
+7. **Backups:** a daily cPanel cron running `mysqldump`, and a periodic copy of `UPLOAD_DIR`.
+8. Logging: `console.error` goes to Passenger's stderr log. `instrumentation.ts` `onRequestError` logs unhandled errors. Friendly `error.tsx` / `not-found.tsx` pages.
 
 ## 8. Testing
-Unit tests for `features/pricing` (discounts, coupons, exclusivity, shipping, currency rounding) and the order status machine. One end-to-end smoke test of the order flow. Manual visual check at 375, 768 and 1440 px against the demo.
+- **Vitest** (no Playwright).
+- Unit tests: `features/pricing` (discounts, coupons, exclusivity, shipping, rounding, currency), `orders/status.ts`, the rate limiter, password hashing, the image-loader mapping.
+- Integration tests against a test database (`rs_home_test`): `createOrder` (stock, coupon limits, idempotency, concurrent last unit, changed total) and the cancel/reject restore.
+- Manual: the browser walk-through for each slice, and a visual check at 375, 768 and 1440 px against `design-reference/` and the live demo.
+
+## 9. Decisions (28 September 2026)
+| # | Decision | Reason |
+|---|---|---|
+| D1 | Order-access cookie (signed; granted by placing the order or a tracking lookup) guards the confirmation page and proof upload | An order number alone would expose customer details and allow fake proofs. |
+| D2 | Uploads go through Route Handlers with an early size check and a manual Origin check | Server Actions cap bodies at 1 MB; raising it everywhere is a blunt fix. |
+| D3 | Build the deploy artifact on Linux (GitHub Actions later) | sharp's native binaries are platform-specific. |
+| D4 | Passwords with `node:crypto` scrypt | No native module or extra dependency; strong KDF. |
+| D5 | Standalone bundle in an `app/` subfolder; startup file `app/server.js` | CloudLinux Node selector forbids `node_modules` in the app root. |
+| D6 | Rate limits in MySQL | Passenger may run several processes and restarts them. |
+| D7 | Render pages per request; no data cache | Timed discounts stay correct, no DB at build, no per-process cache drift; cheap at this size. |
+| D8 | `/media` route + custom `next/image` loader over pre-generated WebP sizes | Images live outside `public/`; no runtime optimiser memory spikes. |
+| D9 | Collation `utf8mb4_unicode_ci` forced by the first migration and checked by `migrate` | MySQL 8's default collation doesn't exist in MariaDB. |
+| D10 | JSON-shaped data in `TEXT` + Zod; no JSON SQL | MySQL and MariaDB return and query JSON differently. |
+| D11 | `checkout_token` idempotency + `expectedTotal` check | Prevents duplicate orders and silent total changes. |
+| D12 | `DATETIME` in UTC; display and date boundaries in Asia/Karachi | Avoids TIMESTAMP quirks; "today" means Karachi time. |
+| D13 | Small DB pool (4) per process | Shared-host connection caps. |
+| D14 | Random order numbers `RSH-YYMMDD-XXXX` | No counter table or race, and they don't reveal order volume. |
+| D15 | Cancel/reject restores stock and releases the coupon use | Client decision. |
+| D16 | Shipping modes `flat` (+ free-over) and `quote`; weight tiers deferred | Only the product weight must exist now; later is a plain migration. |
+| D17 | Tokens only in `src/app/theme.css`; no `config/theme.ts` | Tailwind 4 keeps tokens in CSS; one place to re-theme. |
+| D18 | Vitest only; CSV-only import; no `guestCheckout` flag yet; no `proxy.ts` | Fewer dependencies and no dead code. Proxy would buffer upload bodies; gating is done in pages and actions. |
+| D19 | New permission `order.set_shipping` (Admin + Developer); Admin also gets `product.view` | Client decisions: the owner enters courier quotes and can look up products. |
+| D20 | Phone required, email optional at checkout; PKR rounded to whole rupees | Client decisions. |
