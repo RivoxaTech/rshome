@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# project
+/uploads/
+*.log
+
+# keep the env template, ignore real env files
+!.env.example
+
+# local tooling
+.claude/settings.local.json
+
+# design reference (Lovable export)
+design-reference/node_modules/
+design-reference/.git/
