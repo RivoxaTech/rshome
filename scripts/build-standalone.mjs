@@ -12,8 +12,13 @@ import path from "node:path";
 const root = process.cwd();
 const standaloneDir = path.join(root, ".next", "standalone");
 
-console.log("Running next build...");
-execSync("next build", { stdio: "inherit", cwd: root });
+// Turbopack needs native bindings; this dev laptop's Smart App Control blocks the win32 one
+// (falls back to WASM, which Turbopack's build step refuses to run on). The real deploy build
+// happens on Linux (ARCHITECTURE.md D3), where the native binary loads fine and Turbopack runs.
+const buildCommand = process.platform === "win32" ? "next build --webpack" : "next build";
+
+console.log(`Running ${buildCommand}...`);
+execSync(buildCommand, { stdio: "inherit", cwd: root });
 
 if (!existsSync(standaloneDir)) {
   throw new Error(`Expected ${standaloneDir} to exist after build. Is "output: standalone" set in next.config.ts?`);

@@ -1,5 +1,7 @@
 import "../src/server/load-env";
-import { eq, sql } from "drizzle-orm";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   ADMIN_DEFAULT_PERMISSIONS,
@@ -9,7 +11,7 @@ import {
 } from "../src/features/auth/permissions";
 import { hashPassword } from "../src/server/auth/password";
 import { db, pool } from "../src/server/db/client";
-import { categories, productVariants, products } from "../src/server/db/schema/catalog";
+import { categories, productImages, productVariants, products } from "../src/server/db/schema/catalog";
 import {
   permissions as permissionsTable,
   rolePermissions,
@@ -18,6 +20,7 @@ import {
 } from "../src/server/db/schema/access-control";
 import { settings } from "../src/server/db/schema/settings";
 import { shippingZoneAreas, shippingZones } from "../src/server/db/schema/shipping";
+import { processMediaImage, type ProcessedMediaImage } from "../src/server/storage/images";
 
 const seedUsersEnvSchema = z.object({
   SEED_DEVELOPER_EMAIL: z.email(),
@@ -25,6 +28,31 @@ const seedUsersEnvSchema = z.object({
   SEED_ADMIN_EMAIL: z.email(),
   SEED_ADMIN_PASSWORD: z.string().min(6),
 });
+
+// The 4 placeholder photos from design-reference/src/assets, run through the real S4 media
+// pipeline (DATABASE.md "Seed data"). Fixed basenames (instead of the random ones real uploads
+// get, CLAUDE.md #8) make this idempotent: processMediaImage skips re-encoding once the WebP
+// files already exist under UPLOAD_DIR/media/seed.
+const SEED_SOURCE_IMAGES = {
+  hero: "hero.jpg",
+  tableware: "tableware.jpg",
+  teaset: "teaset.jpg",
+  tray: "tray.jpg",
+} as const;
+type SeedImageKey = keyof typeof SEED_SOURCE_IMAGES;
+
+async function seedMediaImages(): Promise<Record<SeedImageKey, ProcessedMediaImage>> {
+  const assetsDir = path.join(process.cwd(), "design-reference", "src", "assets");
+  const entries = await Promise.all(
+    (Object.entries(SEED_SOURCE_IMAGES) as [SeedImageKey, string][]).map(async ([key, filename]) => {
+      const buffer = await readFile(path.join(assetsDir, filename));
+      const image = await processMediaImage(buffer, "seed", key);
+      return [key, image] as const;
+    }),
+  );
+  console.log(`Processed ${entries.length} seed images into UPLOAD_DIR/media/seed.`);
+  return Object.fromEntries(entries) as Record<SeedImageKey, ProcessedMediaImage>;
+}
 
 async function seedPermissions() {
   const allKeys = Object.values(PERMISSIONS) as PermissionKey[];
@@ -193,19 +221,54 @@ type VariantSeed = {
   priceOverride?: string;
 };
 
-async function seedCatalog() {
+async function seedCatalog(media: Record<SeedImageKey, ProcessedMediaImage>) {
   const categorySeeds = [
-    { name: "Tableware", slug: "tableware", sortOrder: 0 },
-    { name: "Tea Sets", slug: "tea-sets", sortOrder: 1 },
-    { name: "Trays", slug: "trays", sortOrder: 2 },
-    { name: "Decor", slug: "decor", sortOrder: 3 },
+    {
+      name: "Tableware",
+      slug: "tableware",
+      sortOrder: 0,
+      description: "Elegant pieces for everyday dining and entertaining.",
+      imageKey: "tableware" as SeedImageKey,
+    },
+    {
+      name: "Tea Sets",
+      slug: "tea-sets",
+      sortOrder: 1,
+      description: "Refined tea moments, beautifully presented.",
+      imageKey: "teaset" as SeedImageKey,
+    },
+    {
+      name: "Trays",
+      slug: "trays",
+      sortOrder: 2,
+      description: "Functional pieces designed to elevate presentation.",
+      imageKey: "tray" as SeedImageKey,
+    },
+    {
+      // Reuses the hero photo, same as the demo's own Decor section (design-reference/src/routes/index.tsx).
+      name: "Decor",
+      slug: "decor",
+      sortOrder: 3,
+      description: "Small details that transform a space.",
+      imageKey: "hero" as SeedImageKey,
+    },
   ];
+  const categoryImageKeyBySlug = new Map(categorySeeds.map((c) => [c.slug, c.imageKey]));
 
   for (const category of categorySeeds) {
+    const image = media[category.imageKey];
     await db
       .insert(categories)
-      .values({ name: category.name, slug: category.slug, sortOrder: category.sortOrder })
-      .onDuplicateKeyUpdate({ set: { name: category.name, sortOrder: category.sortOrder } });
+      .values({
+        name: category.name,
+        slug: category.slug,
+        description: category.description,
+        imagePath: image.path,
+        sortOrder: category.sortOrder,
+      })
+      .onDuplicateKeyUpdate({
+        set: { name: category.name, description: category.description, imagePath: image.path, sortOrder: category.sortOrder },
+      });
   }
 
   const categoryRows = await db.select().from(categories);
@@ -216,6 +279,7 @@ async function seedCatalog() {
     categorySlug: string;
     name: string;
     slug: string;
+    shortDescription: string;
     price: string;
     isFeatured: boolean;
     variants: VariantSeed[];
@@ -224,6 +288,7 @@ async function seedCatalog() {
       categorySlug: "tableware",
       name: "Porcelain Dinner Plate Set",
       slug: "porcelain-dinner-plate-set",
+      shortDescription: "Premium dining collection",
       price: "4500.00",
       isFeatured: true,
       variants: [
@@ -235,6 +300,7 @@ async function seedCatalog() {
       categorySlug: "tableware",
       name: "Stoneware Bowl Set",
       slug: "stoneware-bowl-set",
+      shortDescription: "Everyday stoneware bowls",
       price: "3200.00",
       isFeatured: false,
       variants: [{ sku: "RSH-TW-002", label: "Default", attributes: {}, stock: 20 }],
@@ -243,6 +309,7 @@ async function seedCatalog() {
       categorySlug: "tea-sets",
       name: "Floral Ceramic Tea Set",
       slug: "floral-ceramic-tea-set",
+      shortDescription: "Elegant ceramic tea set",
       price: "6800.00",
       isFeatured: true,
       variants: [
@@ -254,6 +321,7 @@ async function seedCatalog() {
       categorySlug: "tea-sets",
       name: "Classic White Tea Set",
       slug: "classic-white-tea-set",
+      shortDescription: "Timeless white porcelain tea set",
       price: "5200.00",
       isFeatured: false,
       variants: [{ sku: "RSH-TS-002", label: "Default", attributes: {}, stock: 20 }],
@@ -262,6 +330,7 @@ async function seedCatalog() {
       categorySlug: "trays",
       name: "Wooden Serving Tray",
       slug: "wooden-serving-tray",
+      shortDescription: "Minimal luxury serving tray",
       price: "2400.00",
       isFeatured: true,
       variants: [
@@ -274,6 +343,7 @@ async function seedCatalog() {
       categorySlug: "trays",
       name: "Marble Finish Tray",
       slug: "marble-finish-tray",
+      shortDescription: "Polished marble-finish tray",
       price: "3100.00",
       isFeatured: false,
       variants: [{ sku: "RSH-TR-002", label: "Default", attributes: {}, stock: 20 }],
@@ -282,8 +352,10 @@ async function seedCatalog() {
       categorySlug: "decor",
       name: "Ceramic Vase",
       slug: "ceramic-vase",
+      shortDescription: "Minimal decorative accent",
       price: "2900.00",
-      isFeatured: false,
+      // One featured product per category, matching the demo's "Edit" section (one item per collection).
+      isFeatured: true,
       variants: [
         { sku: "RSH-DC-001-WHT", label: "White", attributes: { Colour: "White" }, stock: 20 },
         { sku: "RSH-DC-001-BLK", label: "Black", attributes: { Colour: "Black" }, stock: 20 },
@@ -293,6 +365,7 @@ async function seedCatalog() {
       categorySlug: "decor",
       name: "Wall Art Panel",
       slug: "wall-art-panel",
+      shortDescription: "Statement wall art panel",
       price: "5600.00",
       isFeatured: false,
       variants: [{ sku: "RSH-DC-002", label: "Default", attributes: {}, stock: 20 }],
@@ -308,12 +381,18 @@ async function seedCatalog() {
         categoryId,
         name: product.name,
         slug: product.slug,
+        shortDescription: product.shortDescription,
         price: product.price,
         isFeatured: product.isFeatured,
         status: "active",
       })
       .onDuplicateKeyUpdate({
-        set: { name: product.name, price: product.price, isFeatured: product.isFeatured },
+        set: {
+          name: product.name,
+          shortDescription: product.shortDescription,
+          price: product.price,
+          isFeatured: product.isFeatured,
+        },
       });
   }
 
@@ -347,8 +426,42 @@ async function seedCatalog() {
       variantCount += 1;
     }
   }
+
+  // Every product gets its category's placeholder image (product_images, sort_order 0 = primary
+  // per DATABASE.md). No unique constraint covers (product_id, sort_order), so this checks first
+  // rather than relying on onDuplicateKeyUpdate.
+  let imageCount = 0;
+  for (const product of productSeeds) {
+    const productId = productIdBySlug.get(product.slug);
+    const imageKey = categoryImageKeyBySlug.get(product.categorySlug);
+    if (!productId || !imageKey) continue;
+    const image = media[imageKey];
+
+    const [existingImage] = await db
+      .select()
+      .from(productImages)
+      .where(and(eq(productImages.productId, productId), eq(productImages.sortOrder, 0)));
+
+    if (existingImage) {
+      await db
+        .update(productImages)
+        .set({ path: image.path, width: image.width, height: image.height, alt: product.name })
+        .where(eq(productImages.id, existingImage.id));
+    } else {
+      await db.insert(productImages).values({
+        productId,
+        path: image.path,
+        width: image.width,
+        height: image.height,
+        alt: product.name,
+        sortOrder: 0,
+      });
+    }
+    imageCount += 1;
+  }
+
   console.log(
-    `Upserted ${categorySeeds.length} categories, ${productSeeds.length} sample products and ${variantCount} variants.`,
+    `Upserted ${categorySeeds.length} categories, ${productSeeds.length} sample products, ${variantCount} variants and ${imageCount} product images.`,
   );
 }
 
@@ -383,7 +496,8 @@ async function main() {
   const { developerRole, adminRole } = await seedRolePermissions();
   await seedUsers(developerRole.id, adminRole.id);
   await seedShippingZones();
-  await seedCatalog();
+  const media = await seedMediaImages();
+  await seedCatalog(media);
   await seedSettings();
   console.log("Seed complete.");
 }

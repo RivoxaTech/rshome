@@ -17,6 +17,7 @@ Deployed to cPanel shared hosting (Passenger) as a `standalone` build. Never rel
 - `npm run build:standalone && npm run start:standalone` : test the production build
 - `npm run db:generate` / `npm run db:migrate` / `npm run db:seed`
 - `npm run lint` / `npm run typecheck` / `npm test`
+- On this Windows laptop, Smart App Control blocks Turbopack's native binary: use `npm run dev:webpack` for local dev. `build:standalone` already falls back to `next build --webpack` on win32 automatically.
 
 ## Code rules
 1. Simple and readable beats clever. Small files. No dependency without a stated reason. No dead code or unused exports.

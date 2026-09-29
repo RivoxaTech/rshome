@@ -1,16 +1,92 @@
-import { siteConfig } from "@/config/site.config";
+import { CollectionsSection } from "@/components/store/home/CollectionsSection";
+import { FeaturedSection } from "@/components/store/home/FeaturedSection";
+import { HeroSection } from "@/components/store/home/HeroSection";
+import { StorySection } from "@/components/store/home/StorySection";
+import { WholesaleSection } from "@/components/store/home/WholesaleSection";
+import { WhySection } from "@/components/store/home/WhySection";
+import { homeContent } from "@/config/home-content";
+import { getHomeCategories, getHomeFeaturedProducts } from "@/features/catalog/service";
 
-// Placeholder so the S3 store shell (announcement bar, header, footer) is visible end to end.
-// The real home page (hero, collections, featured products) is built in S4.
-export default function HomePage() {
+// Categories carry no width/height column, so the hero and story images use fixed sizes here
+// (CollectionsSection.tsx explains why that's fine for a fully CSS-constrained box).
+const HERO_CATEGORY_SLUG = "decor";
+const HERO_ACCENT_CATEGORY_SLUG = "tea-sets";
+const HERO_IMAGE_SIZE = { width: 1920, height: 1280 };
+const HERO_ACCENT_IMAGE_SIZE = { width: 1408, height: 1008 };
+
+export default async function HomePage() {
+  const [categories, featuredProducts] = await Promise.all([getHomeCategories(), getHomeFeaturedProducts()]);
+  const categoryBySlug = new Map(categories.map((category) => [category.slug, category]));
+
+  const heroCategory = categoryBySlug.get(HERO_CATEGORY_SLUG);
+  const accentCategory = categoryBySlug.get(HERO_ACCENT_CATEGORY_SLUG);
+
+  const wholesaleImages = homeContent.wholesale.imageCategorySlugs.flatMap((slug) => {
+    const category = categoryBySlug.get(slug);
+    return category?.imagePath ? [{ path: category.imagePath, alt: category.name }] : [];
+  });
+
   return (
-    <div className="mx-auto flex max-w-[1400px] flex-col items-start px-6 pt-40 pb-32 lg:px-10 lg:pt-48">
-      <p className="eyebrow">{siteConfig.logoText} &bull; Karachi</p>
-      <h1 className="mt-6 font-serif text-4xl tracking-tight lg:text-6xl">Elevate Everyday Living</h1>
-      <p className="text-muted-foreground mt-6 max-w-md text-sm leading-relaxed">
-        The home page (hero, collections, featured products) arrives in slice S4. This placeholder
-        confirms the announcement bar, header and footer shell.
-      </p>
+    <div className="bg-background text-foreground overflow-x-hidden">
+      {heroCategory?.imagePath && (
+        <HeroSection
+          eyebrow={homeContent.hero.eyebrow}
+          headingLines={homeContent.hero.headingLines}
+          copy={homeContent.hero.copy}
+          primaryCta={homeContent.hero.primaryCta}
+          secondaryCta={homeContent.hero.secondaryCta}
+          image={{ path: heroCategory.imagePath, alt: heroCategory.name, ...HERO_IMAGE_SIZE }}
+          accentImage={
+            accentCategory?.imagePath
+              ? { path: accentCategory.imagePath, alt: accentCategory.name, ...HERO_ACCENT_IMAGE_SIZE }
+              : null
+          }
+        />
+      )}
+
+      <CollectionsSection
+        eyebrow={homeContent.collections.eyebrow}
+        heading={homeContent.collections.heading}
+        categories={categories}
+      />
+
+      <FeaturedSection
+        eyebrow={homeContent.edit.eyebrow}
+        heading={homeContent.edit.heading}
+        copy={homeContent.edit.copy}
+        products={featuredProducts}
+      />
+
+      {categories.map((category) => {
+        const story = homeContent.stories[category.slug];
+        if (!story || !category.imagePath) return null;
+        return (
+          <StorySection
+            key={category.id}
+            id={category.slug}
+            imagePath={category.imagePath}
+            imageAlt={category.name}
+            eyebrow={story.eyebrow}
+            title={story.title}
+            copy={story.copy}
+            cta={story.cta}
+            ctaHref={`/category/${category.slug}`}
+            reverse={story.reverse}
+            dark={story.dark}
+          />
+        );
+      })}
+
+      <WholesaleSection
+        eyebrow={homeContent.wholesale.eyebrow}
+        heading={homeContent.wholesale.heading}
+        copy={homeContent.wholesale.copy}
+        primaryCta={homeContent.wholesale.primaryCta}
+        secondaryCta={homeContent.wholesale.secondaryCta}
+        images={wholesaleImages}
+      />
+
+      <WhySection eyebrow={homeContent.why.eyebrow} points={homeContent.why.points} />
     </div>
   );
 }

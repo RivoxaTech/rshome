@@ -10,6 +10,11 @@ const extraServerActionOrigins = (process.env.ALLOWED_ORIGINS ?? "")
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // ARCHITECTURE.md §5, D8: pre-generated WebP sizes served from /media, no runtime optimizer.
+  images: {
+    loader: "custom",
+    loaderFile: "./src/lib/image-loader.ts",
+  },
   experimental: {
     serverActions:
       extraServerActionOrigins.length > 0 ? { allowedOrigins: extraServerActionOrigins } : undefined,
