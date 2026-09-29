@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Section } from "@/components/store/Section";
-import type { HomeCategory } from "@/features/catalog/service";
+import type { StoreCategory } from "@/features/catalog/service";
 
 // Categories have no width/height column (unlike product_images): the demo's own hardcoded
 // hero/collection <img> dimensions show this is fine, since every card here has a fixed
@@ -25,7 +25,7 @@ export function CollectionsSection({
 }: {
   eyebrow: string;
   heading: string;
-  categories: HomeCategory[];
+  categories: StoreCategory[];
 }) {
   if (categories.length === 0) return null;
 

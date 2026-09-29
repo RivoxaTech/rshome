@@ -18,6 +18,7 @@ import {
   roles,
   users,
 } from "../src/server/db/schema/access-control";
+import { discounts, discountTargets } from "../src/server/db/schema/promotions";
 import { settings } from "../src/server/db/schema/settings";
 import { shippingZoneAreas, shippingZones } from "../src/server/db/schema/shipping";
 import { processMediaImage, type ProcessedMediaImage } from "../src/server/storage/images";
@@ -427,42 +428,73 @@ async function seedCatalog(media: Record<SeedImageKey, ProcessedMediaImage>) {
     }
   }
 
-  // Every product gets its category's placeholder image (product_images, sort_order 0 = primary
-  // per DATABASE.md). No unique constraint covers (product_id, sort_order), so this checks first
+  // Every product gets a 3-image gallery: its category's placeholder first (sort_order 0 = primary
+  // per DATABASE.md), then the next two placeholders, so the product-page gallery has something to
+  // switch between. No unique constraint covers (product_id, sort_order), so this checks first
   // rather than relying on onDuplicateKeyUpdate.
+  const allImageKeys = Object.keys(SEED_SOURCE_IMAGES) as SeedImageKey[];
   let imageCount = 0;
   for (const product of productSeeds) {
     const productId = productIdBySlug.get(product.slug);
-    const imageKey = categoryImageKeyBySlug.get(product.categorySlug);
-    if (!productId || !imageKey) continue;
-    const image = media[imageKey];
+    const primaryKey = categoryImageKeyBySlug.get(product.categorySlug);
+    if (!productId || !primaryKey) continue;
+    const galleryKeys = [primaryKey, ...allImageKeys.filter((key) => key !== primaryKey).slice(0, 2)];
 
-    const [existingImage] = await db
-      .select()
-      .from(productImages)
-      .where(and(eq(productImages.productId, productId), eq(productImages.sortOrder, 0)));
+    for (const [sortOrder, imageKey] of galleryKeys.entries()) {
+      const image = media[imageKey];
+      const [existingImage] = await db
+        .select()
+        .from(productImages)
+        .where(and(eq(productImages.productId, productId), eq(productImages.sortOrder, sortOrder)));
 
-    if (existingImage) {
-      await db
-        .update(productImages)
-        .set({ path: image.path, width: image.width, height: image.height, alt: product.name })
-        .where(eq(productImages.id, existingImage.id));
-    } else {
-      await db.insert(productImages).values({
-        productId,
-        path: image.path,
-        width: image.width,
-        height: image.height,
-        alt: product.name,
-        sortOrder: 0,
-      });
+      if (existingImage) {
+        await db
+          .update(productImages)
+          .set({ path: image.path, width: image.width, height: image.height, alt: product.name })
+          .where(eq(productImages.id, existingImage.id));
+      } else {
+        await db.insert(productImages).values({
+          productId,
+          path: image.path,
+          width: image.width,
+          height: image.height,
+          alt: product.name,
+          sortOrder,
+        });
+      }
+      imageCount += 1;
     }
-    imageCount += 1;
   }
 
   console.log(
     `Upserted ${categorySeeds.length} categories, ${productSeeds.length} sample products, ${variantCount} variants and ${imageCount} product images.`,
   );
+}
+
+// SAMPLE DATA for development (S5): shows the discount badge and struck price on every Trays
+// variant. Created once and never overwritten, so switching it off or editing its dates in the DB
+// survives a reseed. Deactivate or delete it before launch.
+const SAMPLE_DISCOUNT_NAME = "[Sample] 10% off Trays";
+
+async function seedSampleDiscount() {
+  const [existing] = await db.select().from(discounts).where(eq(discounts.name, SAMPLE_DISCOUNT_NAME));
+  if (existing) {
+    console.log(`Sample discount "${SAMPLE_DISCOUNT_NAME}" already exists, left untouched.`);
+    return;
+  }
+
+  const [trays] = await db.select().from(categories).where(eq(categories.slug, "trays"));
+  if (!trays) return;
+
+  const [result] = await db.insert(discounts).values({
+    name: SAMPLE_DISCOUNT_NAME,
+    type: "percent",
+    value: "10.00",
+    targetType: "category",
+    isActive: true,
+  });
+  await db.insert(discountTargets).values({ discountId: result.insertId, targetId: trays.id });
+  console.log(`Created sample discount "${SAMPLE_DISCOUNT_NAME}".`);
 }
 
 // Contact and social values from the client (S2b #8); logo text "RS Home" is a build-time
@@ -498,6 +530,7 @@ async function main() {
   await seedShippingZones();
   const media = await seedMediaImages();
   await seedCatalog(media);
+  await seedSampleDiscount();
   await seedSettings();
   console.log("Seed complete.");
 }

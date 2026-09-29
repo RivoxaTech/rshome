@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Jost } from "next/font/google";
+import { FocusModality } from "@/components/ui/FocusModality";
 import { siteConfig } from "@/config/site.config";
 import "./theme.css";
 
@@ -24,7 +25,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${cormorantGaramond.variable} ${jost.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <FocusModality />
+        {children}
+      </body>
     </html>
   );
 }

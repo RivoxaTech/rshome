@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 const BASE =
-  "inline-flex items-center justify-center px-8 py-4 text-[10px] tracking-[0.28em] uppercase transition-all duration-500";
+  "inline-flex items-center justify-center px-8 py-4 text-[10px] tracking-[0.28em] uppercase transition-all duration-500 disabled:pointer-events-none disabled:opacity-40";
 
 const VARIANTS = {
   solid: "bg-espresso text-background hover:bg-champagne hover:text-espresso",
@@ -20,10 +20,13 @@ type ButtonVariant = keyof typeof VARIANTS;
 export function Button({
   href,
   variant = "solid",
+  disabled = false,
   children,
 }: {
   href?: string;
   variant?: ButtonVariant;
+  /** Only for the `<button>` form, e.g. "Sold out". */
+  disabled?: boolean;
   children: ReactNode;
 }) {
   const className = `${BASE} ${VARIANTS[variant]}`;
@@ -35,7 +38,7 @@ export function Button({
     );
   }
   return (
-    <button type="button" className={className}>
+    <button type="button" disabled={disabled} className={className}>
       {children}
     </button>
   );

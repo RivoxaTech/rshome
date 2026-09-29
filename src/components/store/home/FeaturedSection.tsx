@@ -1,9 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/store/Button";
+import { DiscountBadge, PriceTag } from "@/components/store/catalog/PriceTag";
 import { Section } from "@/components/store/Section";
-import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
-import type { HomeFeaturedProduct } from "@/features/catalog/service";
+import type { ProductCard } from "@/features/catalog/service";
 
 export function FeaturedSection({
   eyebrow,
@@ -14,7 +14,7 @@ export function FeaturedSection({
   eyebrow: string;
   heading: string;
   copy: string;
-  products: HomeFeaturedProduct[];
+  products: ProductCard[];
 }) {
   if (products.length === 0) return null;
 
@@ -35,7 +35,7 @@ export function FeaturedSection({
             key={product.id}
             className="tilt-card bg-background group w-[280px] shrink-0 snap-start lg:w-[330px]"
           >
-            <Link href={`/product/${product.slug}`} className="block w-full overflow-hidden">
+            <Link href={`/product/${product.slug}`} className="relative block w-full overflow-hidden">
               {product.image ? (
                 <Image
                   src={product.image.path}
@@ -48,13 +48,14 @@ export function FeaturedSection({
               ) : (
                 <div className="bg-muted h-[340px] w-full" />
               )}
+              {product.price.badge && <DiscountBadge label={product.price.badge} className="absolute top-3 left-3" />}
             </Link>
             <div className="p-6">
               <h3 className="font-serif text-2xl">{product.name}</h3>
               {product.shortDescription && (
                 <p className="text-muted-foreground mt-1 text-xs">{product.shortDescription}</p>
               )}
-              <p className="mt-4 text-sm tracking-widest">{formatMoney(decimalToPaisa(product.price))}</p>
+              <PriceTag price={product.price} from={product.priceFrom} className="mt-4 text-sm" />
               <div className="mt-5">
                 {/* Inert until S6 wires up the cart (BUILD_PLAN.md S4). */}
                 <Button variant="outline">Add to Cart</Button>

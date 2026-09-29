@@ -92,6 +92,29 @@
   html {
     scroll-behavior: smooth;
   }
+
+  /*
+   * Keyboard focus only: a soft champagne ring when tabbing, nothing after a mouse or touch
+   * interaction. `data-input` comes from components/ui/FocusModality.tsx; before it hydrates,
+   * plain :focus-visible applies.
+   */
+  :focus:not(:focus-visible),
+  [data-input="pointer"] :focus {
+    outline: none;
+  }
+
+  :root:not([data-input="pointer"]) :focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--champagne) 70%, transparent);
+    outline-offset: 3px;
+  }
+}
+
+/* Sideways-scrolling rows (category chips, product gallery) without a visible scrollbar. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @utility eyebrow {

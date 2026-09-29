@@ -5,7 +5,7 @@ import { StorySection } from "@/components/store/home/StorySection";
 import { WholesaleSection } from "@/components/store/home/WholesaleSection";
 import { WhySection } from "@/components/store/home/WhySection";
 import { homeContent } from "@/config/home-content";
-import { getHomeCategories, getHomeFeaturedProducts } from "@/features/catalog/service";
+import { getHomeFeaturedProducts, getStoreCategories } from "@/features/catalog/service";
 
 // Categories carry no width/height column, so the hero and story images use fixed sizes here
 // (CollectionsSection.tsx explains why that's fine for a fully CSS-constrained box).
@@ -15,7 +15,7 @@ const HERO_IMAGE_SIZE = { width: 1920, height: 1280 };
 const HERO_ACCENT_IMAGE_SIZE = { width: 1408, height: 1008 };
 
 export default async function HomePage() {
-  const [categories, featuredProducts] = await Promise.all([getHomeCategories(), getHomeFeaturedProducts()]);
+  const [categories, featuredProducts] = await Promise.all([getStoreCategories(), getHomeFeaturedProducts()]);
   const categoryBySlug = new Map(categories.map((category) => [category.slug, category]));
 
   const heroCategory = categoryBySlug.get(HERO_CATEGORY_SLUG);
