@@ -9,7 +9,7 @@ export default async function ProductsPage() {
   return (
     <div className="flex flex-col gap-2">
       <h1 className="text-xl font-semibold">Products</h1>
-      <p className="text-sm text-black/60">Catalogue management arrives in slice S10.</p>
+      <p className="text-muted-foreground text-sm">Catalogue management arrives in slice S10.</p>
     </div>
   );
 }

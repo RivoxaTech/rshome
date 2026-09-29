@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens (ported from design-reference/src/styles.css).
+ * This is the only place colours, fonts, radii, spacing and animation utilities are defined.
+ * Re-theming a future client means editing this file, not components.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-champagne: var(--champagne);
+  --color-espresso: var(--espresso);
+  --color-sand: var(--sand);
+  --font-serif: var(--font-cormorant-garamond);
+  --font-sans: var(--font-jost);
+}
+
+:root {
+  color-scheme: light;
+  --radius: 0.125rem;
+  --background: oklch(0.978 0.008 85);
+  --foreground: oklch(0.245 0.016 45);
+  --card: oklch(0.962 0.012 85);
+  --card-foreground: oklch(0.245 0.016 45);
+  --popover: oklch(0.978 0.008 85);
+  --popover-foreground: oklch(0.245 0.016 45);
+  --primary: oklch(0.275 0.02 45);
+  --primary-foreground: oklch(0.978 0.008 85);
+  --secondary: oklch(0.935 0.017 82);
+  --secondary-foreground: oklch(0.275 0.02 45);
+  --muted: oklch(0.935 0.017 82);
+  --muted-foreground: oklch(0.52 0.02 60);
+  --accent: oklch(0.76 0.072 76);
+  --accent-foreground: oklch(0.245 0.016 45);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(0.885 0.018 82);
+  --input: oklch(0.885 0.018 82);
+  --ring: oklch(0.76 0.072 76);
+  --champagne: oklch(0.76 0.072 76);
+  --espresso: oklch(0.245 0.016 45);
+  --sand: oklch(0.935 0.017 82);
+  --shadow-soft: 0 30px 60px -30px oklch(0.4 0.03 60 / 0.35);
+  --shadow-lift: 0 45px 80px -35px oklch(0.4 0.03 60 / 0.45);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+    font-weight: 300;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@utility eyebrow {
+  font-size: 0.6875rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+@utility tilt-card {
+  transition:
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-style: preserve-3d;
+  &:hover {
+    transform: perspective(1200px) rotateX(3deg) rotateY(-5deg) translateY(-8px) scale(1.015);
+    box-shadow: var(--shadow-lift);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility rise {
+  animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-16px) rotate(1.5deg);
+  }
+}
+
+@utility float-soft {
+  animation: float-soft 9s ease-in-out infinite;
+}

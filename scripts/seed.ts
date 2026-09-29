@@ -359,7 +359,7 @@ async function seedSettings() {
     contact: {
       phone: "03218581969",
       whatsapp: "923218581969",
-      address: "DHA Phase 6, Karachi, Pakistan",
+      address: "Shop #2 & #3, Plot 3C, Lane 9, Bukhari Commercial, DHA Phase 6, Karachi, Pakistan",
     },
     social_links: {
       facebook: "https://www.facebook.com/share/1BzHaKucmx/",
