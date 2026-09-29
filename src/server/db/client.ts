@@ -24,3 +24,6 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export const db = drizzle(pool, { schema, mode: "default" });
+
+/** The pool-backed client or a transaction handle: repo functions accept either. */
+export type DbClient = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];

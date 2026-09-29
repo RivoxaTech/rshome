@@ -150,6 +150,7 @@ describe("formatCartQuote", () => {
       coupon: { status: "none" },
       delivery: { status: "pending" },
       total: "PKR 6,200",
+      expectedTotal: "6200.00",
       notices: [],
       storedLines: [{ variantId: 1, quantity: 2 }],
       storedCouponCode: null,

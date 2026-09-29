@@ -14,13 +14,44 @@ interface CountRow extends mysql.RowDataPacket {
   tableCount: number;
 }
 
-async function main() {
-  const databaseName = new URL(env.DATABASE_URL).pathname.replace(/^\//, "");
-  if (!databaseName) {
-    throw new Error("DATABASE_URL must include a database name.");
-  }
+/**
+ * `--test` migrates TEST_DATABASE_URL instead (the integration tests' database, ARCHITECTURE.md
+ * §8), creating it first if needed. Its name must end in `_test` so this can never touch the
+ * real database.
+ */
+function resolveTarget(): { databaseUrl: string; createIfMissing: boolean } {
+  if (!process.argv.includes("--test")) return { databaseUrl: env.DATABASE_URL, createIfMissing: false };
 
-  const connection = await mysql.createConnection({ uri: env.DATABASE_URL, multipleStatements: false });
+  const databaseUrl = process.env.TEST_DATABASE_URL;
+  if (!databaseUrl) throw new Error("TEST_DATABASE_URL is not set. Check .env.local against .env.example.");
+  if (!/_test$/.test(new URL(databaseUrl).pathname)) {
+    throw new Error("TEST_DATABASE_URL must name a database ending in _test.");
+  }
+  return { databaseUrl, createIfMissing: true };
+}
+
+async function createDatabase(databaseUrl: string, databaseName: string) {
+  const serverUrl = new URL(databaseUrl);
+  serverUrl.pathname = "/";
+  const connection = await mysql.createConnection({ uri: serverUrl.toString() });
+  try {
+    await connection.query(
+      `CREATE DATABASE IF NOT EXISTS \`${databaseName}\` CHARACTER SET utf8mb4 COLLATE ${REQUIRED_COLLATION}`,
+    );
+  } finally {
+    await connection.end();
+  }
+}
+
+async function main() {
+  const { databaseUrl, createIfMissing } = resolveTarget();
+  const databaseName = new URL(databaseUrl).pathname.replace(/^\//, "");
+  if (!databaseName) {
+    throw new Error("The database URL must include a database name.");
+  }
+  if (createIfMissing) await createDatabase(databaseUrl, databaseName);
+
+  const connection = await mysql.createConnection({ uri: databaseUrl, multipleStatements: false });
 
   try {
     const [[schemaRow]] = await connection.query<SchemaRow[]>(
@@ -54,7 +85,7 @@ async function main() {
     }
 
     const db = drizzle(connection);
-    console.log("Running migrations...");
+    console.log(`Running migrations on "${databaseName}"...`);
     await migrate(db, { migrationsFolder: "./drizzle" });
     console.log("Migrations complete.");
   } finally {

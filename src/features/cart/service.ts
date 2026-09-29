@@ -3,11 +3,12 @@ import { getPrimaryImagesByProductId } from "@/features/catalog/repo";
 import { variantAttributesSchema } from "@/features/catalog/schemas";
 import { decimalToPaisa } from "@/features/pricing/money";
 import { normalizeCouponCode } from "@/features/pricing/pricing";
-import { priceCart } from "@/features/pricing/service";
+import { loadCoupon, priceCart } from "@/features/pricing/service";
+import { normalizePhone } from "@/lib/phone";
 import { consumeRateLimit, resetRateLimit } from "@/server/rate-limit";
 import { formatCartQuote, reconcileCart, toCartLineInputs, type CartQuote, type CartVariant } from "./quote";
 import { getCartVariantRows, type CartVariantRow } from "./repo";
-import { cartInputSchema } from "./schemas";
+import { cartQuoteRequestSchema } from "./schemas";
 
 /**
  * Coupon guessing is throttled per IP. Every quote that carries a code consumes an attempt and a
@@ -18,7 +19,8 @@ const COUPON_ATTEMPT_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 };
 
 export type CartQuoteResult = { ok: true; quote: CartQuote } | { ok: false; error: string };
 
-function hasDisplayableAttributes(raw: string): boolean {
+/** A variant with attributes shows its label ("Red / Large"); a simple product's only variant doesn't. */
+export function hasDisplayableAttributes(raw: string): boolean {
   try {
     return Object.keys(variantAttributesSchema.parse(JSON.parse(raw))).length > 0;
   } catch {
@@ -46,10 +48,11 @@ function toCartVariant(row: CartVariantRow, image: CartVariant["image"]): CartVa
 /**
  * The cart quote (ARCHITECTURE.md §4.1): validates the browser's ids and quantities, loads the
  * live rows, fixes the cart against them, prices it and returns display strings. Nothing the
- * browser sends beyond ids, quantities and a coupon code can influence the numbers.
+ * browser sends beyond ids, quantities, a coupon code and (at checkout) a phone number can
+ * influence the numbers.
  */
 export async function quoteCart(rawInput: unknown, ctx: { ip: string }): Promise<CartQuoteResult> {
-  const parsed = cartInputSchema.safeParse(rawInput);
+  const parsed = cartQuoteRequestSchema.safeParse(rawInput);
   if (!parsed.success) return { ok: false, error: "Your cart could not be read and was reset." };
   const input = parsed.data;
 
@@ -71,9 +74,12 @@ export async function quoteCart(rawInput: unknown, ctx: { ip: string }): Promise
     couponAllowed = limit.allowed;
   }
 
+  const activeCode = couponAllowed ? couponCode : null;
+  const customerKey = input.phone ? normalizePhone(input.phone) : null;
   const calculation = await priceCart({
     lines: toCartLineInputs(reconciled.lines),
-    couponCode: couponAllowed ? couponCode : null,
+    couponCode: activeCode,
+    coupon: await loadCoupon(activeCode, customerKey),
     zone: null,
     country: null,
   });

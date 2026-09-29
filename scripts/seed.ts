@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
+import { siteConfig } from "../src/config/site.config";
 import {
   ADMIN_DEFAULT_PERMISSIONS,
   PERMISSION_DESCRIPTIONS,
@@ -542,6 +543,16 @@ async function seedSettings() {
       .onDuplicateKeyUpdate({ set: { value: JSON.stringify(value) } });
   }
   console.log(`Upserted ${Object.keys(values).length} settings keys: ${Object.keys(values).join(", ")}.`);
+
+  // PLACEHOLDER bank details (S7): the client hasn't sent the real ones. Created once and never
+  // overwritten, so the values entered in the S14 settings editor survive a reseed.
+  const [existingBank] = await db.select({ key: settings.key }).from(settings).where(eq(settings.key, "bank_accounts"));
+  if (existingBank) {
+    console.log("Settings key bank_accounts already exists, left untouched.");
+  } else {
+    await db.insert(settings).values({ key: "bank_accounts", value: JSON.stringify(siteConfig.bankAccounts) });
+    console.log("Created settings key bank_accounts with PLACEHOLDER values.");
+  }
 }
 
 async function main() {

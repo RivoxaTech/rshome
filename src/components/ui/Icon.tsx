@@ -24,4 +24,8 @@ export const ICON_PATHS = {
   menu: "M4 7h16M4 12h16M4 17h16",
   close: "M18 6L6 18M6 6l12 12",
   trash: "M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6",
+  chevronDown: "M6 9l6 6 6-6",
+  arrowUp: "M12 19V5M5 12l7-7 7 7",
+  copy: "M9 9h11v11H9zM15 9V4H4v11h5",
+  check: "M20 6L9 17l-5-5",
 } as const;

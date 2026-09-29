@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Jost } from "next/font/google";
 import { FocusModality } from "@/components/ui/FocusModality";
 import { siteConfig } from "@/config/site.config";
@@ -20,6 +20,13 @@ const jost = Jost({
 export const metadata: Metadata = {
   title: siteConfig.storeName,
   description: siteConfig.tagline,
+};
+
+// `viewportFit: "cover"` lets the floating buttons read the phone's safe-area insets.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

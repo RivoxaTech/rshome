@@ -5,7 +5,7 @@
  */
 import type { ProductImage } from "@/features/catalog/service";
 import { toDisplayPrice, type DisplayPrice } from "@/features/pricing/display";
-import { formatMoney, type Paisa } from "@/features/pricing/money";
+import { formatMoney, paisaToDecimal, type Paisa } from "@/features/pricing/money";
 import type { CartCalculation, CartLineInput, CouponRejectReason } from "@/features/pricing/pricing";
 import { MAX_LINE_QUANTITY, type CartInputLine } from "./schemas";
 
@@ -118,6 +118,11 @@ export type CartQuote = {
   coupon: CartQuoteCoupon;
   delivery: { status: "pending" } | { status: "priced"; amount: string };
   total: string;
+  /**
+   * The total as a DECIMAL string, echoed back by the checkout as `expectedTotal` so the order
+   * is refused if prices moved in between (ARCHITECTURE.md D11). Not for display.
+   */
+  expectedTotal: string;
   notices: CartNotice[];
   /** What the browser should now store: the reconciled lines and the code only while it applies. */
   storedLines: CartInputLine[];
@@ -167,6 +172,7 @@ export function formatCartQuote(
         ? { status: "priced", amount: formatMoney(calculation.shipping.amount) }
         : { status: "pending" },
     total: formatMoney(calculation.total),
+    expectedTotal: paisaToDecimal(calculation.total),
     notices: allNotices,
     storedLines: lines.map(({ variantId, quantity }) => ({ variantId, quantity })),
     storedCouponCode: coupon.status === "applied" ? coupon.code : null,

@@ -37,6 +37,7 @@
   --color-champagne: var(--champagne);
   --color-espresso: var(--espresso);
   --color-sand: var(--sand);
+  --color-whatsapp: var(--whatsapp);
   --font-serif: var(--font-cormorant-garamond);
   --font-sans: var(--font-jost);
 }
@@ -66,6 +67,8 @@
   --champagne: oklch(0.76 0.072 76);
   --espresso: oklch(0.245 0.016 45);
   --sand: oklch(0.935 0.017 82);
+  /* WhatsApp's brand green, only for the WhatsApp buttons. */
+  --whatsapp: #25d366;
   --shadow-soft: 0 30px 60px -30px oklch(0.4 0.03 60 / 0.35);
   --shadow-lift: 0 45px 80px -35px oklch(0.4 0.03 60 / 0.45);
 }

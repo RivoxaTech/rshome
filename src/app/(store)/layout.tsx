@@ -1,8 +1,10 @@
 import { CartDrawer } from "@/components/store/cart/CartDrawer";
 import { CartProvider } from "@/components/store/cart/CartProvider";
+import { FloatingActions } from "@/components/store/FloatingActions";
 import { Footer } from "@/components/store/Footer";
 import { Header } from "@/components/store/Header";
 import { STORE_NAV_ITEMS } from "@/components/store/nav-items";
+import { whatsAppHref } from "@/components/store/WhatsAppButton";
 import { siteConfig } from "@/config/site.config";
 import { getContactInfo, getSocialLinks } from "@/features/settings/service";
 
@@ -26,6 +28,7 @@ export default async function StoreLayout({ children }: { children: React.ReactN
           socialLinks={socialLinks}
         />
       </div>
+      <FloatingActions whatsappHref={whatsAppHref(contact.whatsapp)} />
       <CartDrawer deliveryNote={siteConfig.deliveryPendingNote} />
     </CartProvider>
   );

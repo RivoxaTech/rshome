@@ -43,7 +43,7 @@ Every product has at least one `product_variants` row; a simple product gets one
 | discounts | id, name, type ENUM('percent','fixed'), value DECIMAL(12,2), target_type ENUM('all','category','product'), starts_at NULL, ends_at NULL, is_active, created_at, updated_at |
 | discount_targets | discount_id (FK), target_id (category or product id, depending on target_type; no FK), PK (discount_id, target_id) |
 | coupons | id, code VARCHAR(50) unique (stored uppercase), type ENUM('percent','fixed'), value, min_order DECIMAL NULL, max_discount DECIMAL NULL, usage_limit INT NULL, per_customer_limit INT NULL, used_count INT UNSIGNED DEFAULT 0, starts_at NULL, ends_at NULL, is_active, created_at, updated_at |
-| coupon_usages | id, coupon_id (FK), order_id (FK, unique), customer_key VARCHAR(32) (normalised phone), created_at. Index (coupon_id, customer_key). Deleted, and `used_count` decremented, when the order is cancelled or rejected |
+| coupon_usages | id, coupon_id (FK), order_id (FK, unique), customer_key VARCHAR(32) (the normalised phone, e.g. `923218581969`, see `lib/phone.ts`), created_at. Index (coupon_id, customer_key). Deleted, and `used_count` decremented, when the order is cancelled or rejected |
 
 ## Shipping
 | Table | Columns |
@@ -59,7 +59,7 @@ Zone resolution: an exact (country, city) row, else (country, NULL), else the `i
 | Table | Columns | Indexes |
 |---|---|---|
 | orders | id, order_number VARCHAR(20) unique (`RSH-YYMMDD-XXXX`), checkout_token CHAR(36) unique, customer_name, phone VARCHAR(32) (normalised), email VARCHAR(191) NULL, address_line, city, state NULL, postal_code NULL, country CHAR(2), shipping_zone_id (FK NULL), payment_method ENUM('cod','bank_transfer'), order_status ENUM('pending','awaiting_shipping_quote','confirmed','processing','shipped','delivered','cancelled','rejected'), payment_status ENUM('unpaid','proof_submitted','verified','rejected','cod_pending','cod_collected'), rejection_reason TEXT NULL, subtotal, discount_total, coupon_id (FK NULL), coupon_code NULL, coupon_discount, shipping_total NULL (NULL while a quote is pending), shipping_note VARCHAR(255) NULL (staff's short courier/parcel note, set alongside shipping_total), total (PKR), display_currency CHAR(3), exchange_rate DECIMAL(12,4), display_total DECIMAL(12,2), customer_note TEXT NULL, courier NULL, tracking_note NULL, created_at, updated_at | order_number, checkout_token, (order_status, created_at), (payment_status, created_at), phone, created_at |
-| order_items | id, order_id (FK), product_id (FK), variant_id (FK product_variants), name_snapshot, variant_label_snapshot, sku_snapshot (the variant's sku), unit_price (base), discount_amount (per unit), quantity, line_total | order_id |
+| order_items | id, order_id (FK), product_id (FK), variant_id (FK product_variants), name_snapshot, variant_label_snapshot (empty string for a simple product's "Default" variant, which the customer never saw), sku_snapshot (the variant's sku), unit_price (base), discount_amount (per unit), quantity, line_total | order_id |
 | payment_proofs | id, order_id (FK), file_path (relative to `UPLOAD_DIR`), file_size INT, status ENUM('submitted','verified','rejected'), rejection_reason NULL, reviewed_by (FK users NULL), reviewed_at NULL, created_at | order_id |
 | order_status_history | id, order_id (FK), kind ENUM('order','payment','note'), from_status NULL, to_status NULL, note TEXT NULL (reason or internal note), changed_by (FK users NULL; NULL = customer/system), created_at | (order_id, created_at) |
 
@@ -70,14 +70,15 @@ Zone resolution: an exact (country, city) row, else (country, NULL), else the `i
 |---|---|
 | wholesale_inquiries | id, name, business NULL, business_type ENUM('retail','restaurant_cafe','hotel','event','other'), phone, email NULL, city, needed_by_date DATE NULL, message TEXT, status ENUM('new','contacted','closed'), created_at, updated_at |
 | wholesale_inquiry_items | id, inquiry_id (FK), product_id (FK NULL — set only when the row matches a catalogue product), item_name VARCHAR(200), quantity INT UNSIGNED | (inquiry_id) |
-| settings | `key` VARCHAR(100) PK, value TEXT (JSON, validated per key with Zod), updated_at. Keys seeded today: `contact` (phone, WhatsApp number, address), `social_links` (Facebook, Instagram URL and handle). Reserved for later: bank_accounts, announcement_text, home hero text |
+| settings | `key` VARCHAR(100) PK, value TEXT (JSON, validated per key with Zod), updated_at. Keys seeded today: `contact` (phone, WhatsApp number, address), `social_links` (Facebook, Instagram URL and handle), `bank_accounts` (array of bank name, account title, account number, IBAN, note; seeded with `[PLACEHOLDER]` values once, never overwritten). Reserved for later: announcement_text, home hero text |
 | audit_logs | id, user_id (FK NULL), action VARCHAR(50), entity VARCHAR(50), entity_id VARCHAR(50), old_values TEXT NULL, new_values TEXT NULL, created_at. Index (entity, entity_id), created_at |
 | static_pages | id, slug VARCHAR(191) unique, title, body TEXT (Markdown), is_published, created_at, updated_at |
 
 ## Seed data (idempotent; safe to run repeatedly)
 - Upsert permissions from the code `PERMISSIONS` const. Roles `developer` (is_system, all permissions) and `admin` (the default set above).
 - One developer and one admin user from `SEED_*` env vars (created if missing; existing passwords never overwritten).
-- Settings: `contact` and `social_links` (client decision, section 8 of the S2b brief).
+- Settings: `contact` and `social_links` (client decision, section 8 of the S2b brief), upserted on every run; `bank_accounts` with `[PLACEHOLDER]` values (S7), created once and never overwritten so real details entered later survive a reseed.
+- `orders.phone` and `coupon_usages.customer_key` hold the normalised phone (`lib/phone.ts`): a Pakistani mobile as `923XXXXXXXXX`, any other number as country code plus digits.
 - Shipping zones, all in `quote` mode with `flat_rate = 0.00`: Karachi (PK + city `karachi`, COD on), Pakistan (PK, COD on), International (fallback, COD off).
 - Sample categories (Tableware, Tea Sets, Trays, Decor) and 8 sample products for development, several with two or three `product_variants` (colour or size, some with `price_override`) and the rest with one "Default" variant.
 - Placeholder product images: the 4 images in `design-reference/src/assets/` (`hero.jpg`, `tableware.jpg`, `teaset.jpg`, `tray.jpg`), processed through the S4 media pipeline. Each sample product gets a 3-image gallery: its category's image first (primary), then the next two placeholders.
@@ -109,3 +110,4 @@ Zone resolution: an exact (country, city) row, else (country, NULL), else the `i
 | DB12 | `wholesale_inquiries.items_of_interest` replaced by `wholesale_inquiry_items`; `business_type`, `city`, `needed_by_date` added | Client decision: structured wholesale form (S2b). |
 | DB13 | `orders.shipping_note` added; all shipping zones seeded as `quote` with `flat_rate = 0.00`; new permission `wholesale.manage` | Client decisions: WhatsApp-quoted delivery is the default flow; Admin/Developer can action wholesale inquiries, not just view them. |
 | DB14 | `wholesale_inquiries.business` made nullable | Client decision: individuals and event inquiries may have no business name. |
+| DB15 (29 Sep) | Integration tests run against a second database, `rs_home_test` (`TEST_DATABASE_URL`, name must end in `_test`), created and migrated by `npm run db:migrate:test` | `createOrder` tests wipe and rebuild their fixtures; they must never touch the dev data. |

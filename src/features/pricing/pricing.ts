@@ -151,6 +151,9 @@ export type PricingCoupon = {
   maxDiscount: Paisa | null;
   usageLimit: number | null;
   usedCount: number;
+  perCustomerLimit: number | null;
+  /** This customer's past uses (by normalised phone), or null while the phone isn't known. */
+  customerUsedCount: number | null;
   isActive: boolean;
   startsAt: Date | null;
   endsAt: Date | null;
@@ -162,6 +165,7 @@ export type CouponRejectReason =
   | "COUPON_NOT_STARTED"
   | "COUPON_EXPIRED"
   | "COUPON_USAGE_LIMIT"
+  | "COUPON_PER_CUSTOMER_LIMIT"
   | "COUPON_BLOCKED_BY_DISCOUNT"
   | "COUPON_MIN_ORDER";
 
@@ -176,6 +180,7 @@ const COUPON_MESSAGES: Record<Exclude<CouponRejectReason, "COUPON_MIN_ORDER">, s
   COUPON_NOT_STARTED: "This coupon is not valid yet.",
   COUPON_EXPIRED: "This coupon has expired.",
   COUPON_USAGE_LIMIT: "This coupon has reached its usage limit.",
+  COUPON_PER_CUSTOMER_LIMIT: "You have already used this coupon.",
   COUPON_BLOCKED_BY_DISCOUNT: "Coupons cannot be combined with discounted items.",
 };
 
@@ -186,10 +191,10 @@ export function normalizeCouponCode(code: string): string {
 
 /**
  * Checks a coupon against the cart and returns its discount. Order of checks: the code exists,
- * is switched on, is within its dates, has uses left (total limit; the per-customer limit needs
- * the phone number and is enforced at checkout), no line is discounted (exclusivity), and the
- * subtotal reaches `min_order`. A percentage is rounded to whole rupees and capped by
- * `max_discount`; a fixed amount is clamped to the subtotal. Coupons never touch shipping.
+ * is switched on, is within its dates, has uses left (the total limit, then the per-customer
+ * limit once the phone is known), no line is discounted (exclusivity), and the subtotal reaches
+ * `min_order`. A percentage is rounded to whole rupees and capped by `max_discount`; a fixed
+ * amount is clamped to the subtotal. Coupons never touch shipping.
  */
 export function resolveCoupon(input: {
   couponCode: string | null;
@@ -215,6 +220,13 @@ export function resolveCoupon(input: {
   if (coupon.startsAt && coupon.startsAt.getTime() > now.getTime()) return reject("COUPON_NOT_STARTED");
   if (coupon.endsAt && coupon.endsAt.getTime() <= now.getTime()) return reject("COUPON_EXPIRED");
   if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) return reject("COUPON_USAGE_LIMIT");
+  if (
+    coupon.perCustomerLimit !== null &&
+    coupon.customerUsedCount !== null &&
+    coupon.customerUsedCount >= coupon.perCustomerLimit
+  ) {
+    return reject("COUPON_PER_CUSTOMER_LIMIT");
+  }
   if (input.hasDiscountedLine) return reject("COUPON_BLOCKED_BY_DISCOUNT");
   if (coupon.minOrder !== null && subtotal < coupon.minOrder) {
     return {

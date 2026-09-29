@@ -1,7 +1,14 @@
 import { cache } from "react";
 import { siteConfig } from "@/config/site.config";
 import { getSettingValue } from "@/features/settings/repo";
-import { type Contact, type SocialLinks, contactSchema, socialLinksSchema } from "@/features/settings/schemas";
+import {
+  type BankAccount,
+  type Contact,
+  type SocialLinks,
+  bankAccountsSchema,
+  contactSchema,
+  socialLinksSchema,
+} from "@/features/settings/schemas";
 
 // Falls back to config/site.config.ts when the settings row is missing or fails validation
 // (ARCHITECTURE.md §4.6), so a bad or absent row never breaks the storefront shell.
@@ -21,4 +28,8 @@ export const getContactInfo = cache((): Promise<Contact> =>
 
 export const getSocialLinks = cache((): Promise<SocialLinks> =>
   readSetting("social_links", socialLinksSchema, siteConfig.socialLinks),
+);
+
+export const getBankAccounts = cache((): Promise<BankAccount[]> =>
+  readSetting("bank_accounts", bankAccountsSchema, [...siteConfig.bankAccounts]),
 );

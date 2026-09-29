@@ -258,6 +258,8 @@ function coupon(overrides: Partial<PricingCoupon> = {}): PricingCoupon {
     maxDiscount: null,
     usageLimit: null,
     usedCount: 0,
+    perCustomerLimit: null,
+    customerUsedCount: null,
     isActive: true,
     startsAt: null,
     endsAt: null,
@@ -332,6 +334,15 @@ describe("resolveCoupon", () => {
       reason: "COUPON_USAGE_LIMIT",
     });
     expect(resolveCoupon({ ...base, coupon: coupon({ usageLimit: 5, usedCount: 4 }) })).toMatchObject({ status: "applied" });
+  });
+
+  it("rejects a coupon this customer has used up, only once the phone is known", () => {
+    expect(resolveCoupon({ ...base, coupon: coupon({ perCustomerLimit: 1, customerUsedCount: 1 }) })).toMatchObject({
+      reason: "COUPON_PER_CUSTOMER_LIMIT",
+      message: "You have already used this coupon.",
+    });
+    expect(resolveCoupon({ ...base, coupon: coupon({ perCustomerLimit: 2, customerUsedCount: 1 }) })).toMatchObject({ status: "applied" });
+    expect(resolveCoupon({ ...base, coupon: coupon({ perCustomerLimit: 1, customerUsedCount: null }) })).toMatchObject({ status: "applied" });
   });
 
   it("rejects a coupon below min_order and accepts one exactly at it", () => {

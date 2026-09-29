@@ -1,7 +1,8 @@
 import { cache } from "react";
 import { features } from "@/config/features";
-import { getCouponByCode } from "@/features/coupons/repo";
+import { countCouponUsagesByCustomer, getCouponByCode, type CouponRow } from "@/features/coupons/repo";
 import { getEnabledDiscountsWithTargets } from "@/features/discounts/repo";
+import { db, type DbClient } from "@/server/db/client";
 import { decimalToPaisa, type Paisa } from "./money";
 import {
   calculateCart,
@@ -46,10 +47,7 @@ export async function getVariantPricer(): Promise<VariantPricer> {
   return (product, priceOverride) => priceVariant(product, priceOverride, discounts, now);
 }
 
-async function loadCoupon(couponCode: string | null): Promise<PricingCoupon | null> {
-  if (!features.coupons || couponCode === null) return null;
-  const row = await getCouponByCode(normalizeCouponCode(couponCode));
-  if (!row) return null;
+function toPricingCoupon(row: CouponRow, customerUsedCount: number | null): PricingCoupon {
   return {
     id: row.id,
     code: row.code,
@@ -59,6 +57,8 @@ async function loadCoupon(couponCode: string | null): Promise<PricingCoupon | nu
     maxDiscount: row.maxDiscount === null ? null : decimalToPaisa(row.maxDiscount),
     usageLimit: row.usageLimit,
     usedCount: row.usedCount,
+    perCustomerLimit: row.perCustomerLimit,
+    customerUsedCount,
     isActive: row.isActive,
     startsAt: row.startsAt,
     endsAt: row.endsAt,
@@ -66,22 +66,43 @@ async function loadCoupon(couponCode: string | null): Promise<PricingCoupon | nu
 }
 
 /**
- * Prices a whole cart: loads the discounts and the coupon row, then runs the pure rules. The
- * cart quote (S6) and `createOrder` (S7) both go through here (ARCHITECTURE.md §4.1). `zone`
- * and `country` are null until checkout knows the address, so shipping stays pending.
+ * The coupon row behind a code, with this customer's usage count when the phone is known
+ * (`customerKey`, normalised) and the coupon has a per-customer limit. `createOrder` passes its
+ * transaction and `lock: true` so the row is read under `FOR UPDATE` (ARCHITECTURE.md §4.2).
+ */
+export async function loadCoupon(
+  couponCode: string | null,
+  customerKey: string | null,
+  options: { db?: DbClient; lock?: boolean } = {},
+): Promise<PricingCoupon | null> {
+  if (!features.coupons || couponCode === null) return null;
+  const dbc = options.db ?? db;
+  const row = await getCouponByCode(normalizeCouponCode(couponCode), dbc, options.lock === true);
+  if (!row) return null;
+  const customerUsedCount =
+    customerKey !== null && row.perCustomerLimit !== null ? await countCouponUsagesByCustomer(row.id, customerKey, dbc) : null;
+  return toPricingCoupon(row, customerUsedCount);
+}
+
+/**
+ * Prices a whole cart: loads the discounts, then runs the pure rules with the coupon the caller
+ * loaded through `loadCoupon`. The cart quote (S6) and `createOrder` (S7) both go through here
+ * (ARCHITECTURE.md §4.1). `zone` and `country` are null until checkout knows the address, so
+ * shipping stays pending.
  */
 export async function priceCart(input: {
   lines: CartLineInput[];
   couponCode: string | null;
+  coupon: PricingCoupon | null;
   zone: PricingZone | null;
   country: string | null;
 }): Promise<CartCalculation> {
-  const [discounts, coupon] = await Promise.all([getDiscounts(), loadCoupon(input.couponCode)]);
+  const discounts = await getDiscounts();
   return calculateCart({
     lines: input.lines,
     discounts,
     couponCode: input.couponCode,
-    coupon,
+    coupon: input.coupon,
     zone: input.zone,
     country: input.country,
     flags,

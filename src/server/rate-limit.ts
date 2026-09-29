@@ -36,29 +36,35 @@ export type RateLimitResult = { allowed: true } | { allowed: false; retryAfterSe
 /**
  * Consumes one attempt from `bucket` (e.g. `login:email:foo@bar.com`). Locks the row for the
  * duration of the transaction so concurrent Passenger processes can't both slip past the limit.
+ * READ COMMITTED: under the default REPEATABLE READ, locking a row that doesn't exist yet takes
+ * a gap lock, and two requests starting *different* new buckets at once then deadlock on their
+ * inserts (seen in the concurrent checkout test). Without gap locks each insert stands alone.
  */
 export async function consumeRateLimit(bucket: string, options: RateLimitOptions): Promise<RateLimitResult> {
   const now = new Date();
 
-  return db.transaction(async (tx) => {
-    const [existing] = await tx.select().from(rateLimits).where(eq(rateLimits.bucket, bucket)).for("update");
-    const decision = decideRateLimit(existing ?? null, now, options);
+  return db.transaction(
+    async (tx) => {
+      const [existing] = await tx.select().from(rateLimits).where(eq(rateLimits.bucket, bucket)).for("update");
+      const decision = decideRateLimit(existing ?? null, now, options);
 
-    if (decision.action === "block") {
-      return { allowed: false, retryAfterSeconds: decision.retryAfterSeconds };
-    }
+      if (decision.action === "block") {
+        return { allowed: false, retryAfterSeconds: decision.retryAfterSeconds };
+      }
 
-    if (decision.action === "start") {
-      await tx
-        .insert(rateLimits)
-        .values({ bucket, count: 1, windowEndsAt: decision.windowEndsAt })
-        .onDuplicateKeyUpdate({ set: { count: 1, windowEndsAt: decision.windowEndsAt } });
+      if (decision.action === "start") {
+        await tx
+          .insert(rateLimits)
+          .values({ bucket, count: 1, windowEndsAt: decision.windowEndsAt })
+          .onDuplicateKeyUpdate({ set: { count: 1, windowEndsAt: decision.windowEndsAt } });
+        return { allowed: true };
+      }
+
+      await tx.update(rateLimits).set({ count: decision.count }).where(eq(rateLimits.bucket, bucket));
       return { allowed: true };
-    }
-
-    await tx.update(rateLimits).set({ count: decision.count }).where(eq(rateLimits.bucket, bucket));
-    return { allowed: true };
-  });
+    },
+    { isolationLevel: "read committed" },
+  );
 }
 
 /** Clears a bucket, e.g. after a successful login so a correct password doesn't count against the limit. */

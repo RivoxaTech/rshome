@@ -15,3 +15,15 @@ export const socialLinksSchema = z.object({
   instagramHandle: z.string().min(1),
 });
 export type SocialLinks = z.infer<typeof socialLinksSchema>;
+
+/** Shown to bank-transfer customers on the order page. `iban` matters for international payers. */
+export const bankAccountSchema = z.object({
+  bankName: z.string().min(1),
+  accountTitle: z.string().min(1),
+  accountNumber: z.string().min(1),
+  iban: z.string().min(1).nullable().default(null),
+  note: z.string().min(1).nullable().default(null),
+});
+export type BankAccount = z.infer<typeof bankAccountSchema>;
+
+export const bankAccountsSchema = z.array(bankAccountSchema).min(1);

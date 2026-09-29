@@ -26,6 +26,7 @@ export function Button({
   href,
   variant = "solid",
   type = "button",
+  form,
   disabled = false,
   fullWidth = false,
   onClick,
@@ -34,6 +35,8 @@ export function Button({
   href?: string;
   variant?: ButtonVariant;
   type?: "button" | "submit";
+  /** Submits the form with this id from outside it (the checkout summary's Place order). */
+  form?: string;
   /** Only for the `<button>` form, e.g. "Sold out". */
   disabled?: boolean;
   /** Fills its container, sized for a product card. */
@@ -50,7 +53,7 @@ export function Button({
     );
   }
   return (
-    <button type={type} disabled={disabled} onClick={onClick} className={className}>
+    <button type={type} form={form} disabled={disabled} onClick={onClick} className={className}>
       {children}
     </button>
   );

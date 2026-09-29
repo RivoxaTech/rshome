@@ -28,3 +28,13 @@ export const cartInputSchema = z.object({
 
 export type CartInput = z.infer<typeof cartInputSchema>;
 export type CartInputLine = CartInput["lines"][number];
+
+/**
+ * A quote request: the stored cart plus, at checkout, the phone number the customer entered, so
+ * a coupon's per-customer limit can be checked before the order is placed.
+ */
+export const cartQuoteRequestSchema = cartInputSchema.extend({
+  phone: z.string().trim().max(32).nullable().default(null),
+});
+
+export type CartQuoteRequest = z.infer<typeof cartQuoteRequestSchema>;

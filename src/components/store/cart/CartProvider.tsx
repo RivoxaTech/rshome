@@ -33,6 +33,12 @@ type CartContextValue = {
   removeItem: (variantId: number) => void;
   applyCoupon: (code: string) => void;
   removeCoupon: () => void;
+  /** Checkout: the phone goes with every quote so a coupon's per-customer limit is checked early. */
+  setCustomerPhone: (phone: string | null) => void;
+  /** Re-quotes the stored cart, e.g. after the server refused an order because stock changed. */
+  refresh: () => void;
+  /** After a successful order. */
+  clearCart: () => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -67,12 +73,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const requestRef = useRef(0);
+  const phoneRef = useRef<string | null>(null);
 
   /** Sends a non-empty cart to the server; the reply replaces storage and the view. */
   const quoteRemote = useCallback((cart: CartInput) => {
     const requestId = ++requestRef.current;
     startTransition(async () => {
-      const result = await quoteCartAction(cart);
+      const result = await quoteCartAction({ ...cart, phone: phoneRef.current });
       if (requestId !== requestRef.current) return; // a newer change is already in flight
       if (result.ok) {
         cartStore.set({ lines: result.quote.storedLines, couponCode: result.quote.storedCouponCode });
@@ -134,6 +141,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     removeItem: (variantId) => runQuote(withLine(cartStore.get(), variantId, 0)),
     applyCoupon: (code) => runQuote({ ...cartStore.get(), couponCode: code.trim() || null }),
     removeCoupon: () => runQuote({ ...cartStore.get(), couponCode: null }),
+    setCustomerPhone: (phone) => {
+      const next = phone?.trim() || null;
+      if (next === phoneRef.current) return;
+      phoneRef.current = next;
+      // Only a stored coupon can be affected by the phone, so nothing else triggers a round trip.
+      const cart = cartStore.get();
+      if (cart.couponCode && cart.lines.length > 0) quoteRemote(cart);
+    },
+    refresh: () => {
+      const cart = cartStore.get();
+      if (cart.lines.length > 0) quoteRemote(cart);
+    },
+    clearCart: () => runQuote(EMPTY_CART),
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

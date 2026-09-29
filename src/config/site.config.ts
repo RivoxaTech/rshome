@@ -1,8 +1,8 @@
 /**
  * Build-time defaults (ARCHITECTURE.md §4.6). The `settings` table holds the runtime-editable
- * versions of `contact` and `socialLinks` (features/settings) and wins when a row exists;
- * these are the fallback when a settings row is missing, and the source for values that
- * aren't in `settings` yet (store name, logo text, nav copy, timezone).
+ * versions of `contact`, `socialLinks` and `bankAccounts` (features/settings) and wins when a
+ * row exists; these are the fallback when a settings row is missing, and the source for values
+ * that aren't in `settings` yet (store name, logo text, nav copy, timezone, order numbers).
  */
 export const siteConfig = {
   storeName: "RS Home",
@@ -14,6 +14,10 @@ export const siteConfig = {
   /** Shown wherever the delivery charge is still pending (client decision C13: quoted on WhatsApp). */
   deliveryPendingNote: "Delivery charge: to be confirmed, we will contact you on WhatsApp",
   timezone: "Asia/Karachi",
+  /** Order numbers are `PREFIX-YYMMDD-XXXX` (ARCHITECTURE.md D14). */
+  orderNumberPrefix: "RSH",
+  /** The customer-to-shop WhatsApp message on the order page; `{orderNumber}` is filled in. */
+  orderWhatsAppMessage: "Hello RS Home, I have a question about my order {orderNumber}.",
   contact: {
     phone: "03218581969",
     whatsapp: "923218581969",
@@ -24,4 +28,17 @@ export const siteConfig = {
     instagram: "https://www.instagram.com/reema_shamsi",
     instagramHandle: "@reema_shamsi",
   },
+  /**
+   * PLACEHOLDER until the client sends real details (REQUIREMENTS.md §16). The seeded
+   * `bank_accounts` settings row carries the same placeholders; S14 adds the panel editor.
+   */
+  bankAccounts: [
+    {
+      bankName: "[PLACEHOLDER] Bank name",
+      accountTitle: "[PLACEHOLDER] Account title",
+      accountNumber: "[PLACEHOLDER] 0000-0000000-0",
+      iban: "[PLACEHOLDER] PK00XXXX0000000000000000",
+      note: null,
+    },
+  ],
 } as const;
