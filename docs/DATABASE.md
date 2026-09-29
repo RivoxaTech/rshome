@@ -82,6 +82,7 @@ Zone resolution: an exact (country, city) row, else (country, NULL), else the `i
 - Sample categories (Tableware, Tea Sets, Trays, Decor) and 8 sample products for development, several with two or three `product_variants` (colour or size, some with `price_override`) and the rest with one "Default" variant.
 - Placeholder product images: the 4 images in `design-reference/src/assets/` (`hero.jpg`, `tableware.jpg`, `teaset.jpg`, `tray.jpg`), processed through the S4 media pipeline. Each sample product gets a 3-image gallery: its category's image first (primary), then the next two placeholders.
 - Sample discount (development only, S5): `[Sample] 10% off Trays`, percent 10.00, target category `trays`, active, no dates. Created once if missing and never overwritten, so editing it in the DB survives a reseed. Deactivate or delete it before launch.
+- Sample coupon (development only, S6): code `WELCOME10`, percent 10.00, `min_order` 3000.00, active, no dates or limits. Same rule: created once, never overwritten, remove before launch. With the sample discount active, any tray in the cart blocks it (the exclusivity rule).
 - Launch products are loaded from the client's spreadsheet (CSV) and image folder through `scripts/import-products.ts`.
 
 ## Rules the schema must support

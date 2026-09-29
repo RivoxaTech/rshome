@@ -1,3 +1,5 @@
+import { CartDrawer } from "@/components/store/cart/CartDrawer";
+import { CartProvider } from "@/components/store/cart/CartProvider";
 import { Footer } from "@/components/store/Footer";
 import { Header } from "@/components/store/Header";
 import { STORE_NAV_ITEMS } from "@/components/store/nav-items";
@@ -12,21 +14,19 @@ export default async function StoreLayout({ children }: { children: React.ReactN
   const [contact, socialLinks] = await Promise.all([getContactInfo(), getSocialLinks()]);
 
   return (
-    <div className="flex min-h-screen flex-1 flex-col">
-      <Header
-        logoText={siteConfig.logoText}
-        announcementText={siteConfig.announcementText}
-        navItems={STORE_NAV_ITEMS}
-        cartCount={0}
-      />
-      <main className="flex-1">{children}</main>
-      <Footer
-        storeName={siteConfig.storeName}
-        logoText={siteConfig.logoText}
-        footerTagline={siteConfig.footerTagline}
-        contact={contact}
-        socialLinks={socialLinks}
-      />
-    </div>
+    <CartProvider>
+      <div className="flex min-h-screen flex-1 flex-col">
+        <Header logoText={siteConfig.logoText} announcementText={siteConfig.announcementText} navItems={STORE_NAV_ITEMS} />
+        <main className="flex-1">{children}</main>
+        <Footer
+          storeName={siteConfig.storeName}
+          logoText={siteConfig.logoText}
+          footerTagline={siteConfig.footerTagline}
+          contact={contact}
+          socialLinks={socialLinks}
+        />
+      </div>
+      <CartDrawer deliveryNote={siteConfig.deliveryPendingNote} />
+    </CartProvider>
   );
 }

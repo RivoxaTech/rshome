@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { CardCartButton } from "@/components/store/cart/CardCartButton";
 import { DiscountBadge, PriceTag } from "@/components/store/catalog/PriceTag";
 import type { ProductCard } from "@/features/catalog/service";
 
@@ -15,7 +16,7 @@ export function ProductGrid({ cards, emptyMessage }: { cards: ProductCard[]; emp
   return (
     <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 lg:grid-cols-3 lg:gap-x-8 lg:gap-y-12 xl:grid-cols-4">
       {cards.map((card) => (
-        <article key={card.id} className="tilt-card bg-card group">
+        <article key={card.id} className="tilt-card bg-card group flex flex-col">
           <Link href={`/product/${card.slug}`} className="block">
             <div className="bg-muted relative aspect-[4/5] overflow-hidden">
               {card.image && (
@@ -31,14 +32,22 @@ export function ProductGrid({ cards, emptyMessage }: { cards: ProductCard[]; emp
               )}
               {card.price.badge && <DiscountBadge label={card.price.badge} className="absolute top-3 left-3" />}
             </div>
-            <div className="p-4 lg:p-6">
+            {/* Tighter side padding on phones: two cards share 327px there. */}
+            <div className="p-3 pb-0 sm:p-4 sm:pb-0 lg:p-6 lg:pb-0">
               <h3 className="font-serif text-xl leading-tight lg:text-2xl">{card.name}</h3>
               {card.shortDescription && (
                 <p className="text-muted-foreground mt-1 text-xs">{card.shortDescription}</p>
               )}
-              <PriceTag price={card.price} from={card.priceFrom} className="mt-3 text-xs lg:mt-4 lg:text-sm" />
+              <PriceTag
+                price={card.price}
+                from={card.priceFrom}
+                className="mt-3 text-xs tracking-[0.02em] sm:tracking-widest lg:mt-4 lg:text-sm"
+              />
             </div>
           </Link>
+          <div className="mt-auto p-3 sm:p-4 lg:p-6 lg:pt-5">
+            <CardCartButton card={card} fullWidth />
+          </div>
         </article>
       ))}
     </div>

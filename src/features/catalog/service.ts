@@ -13,8 +13,9 @@ import {
 } from "@/features/catalog/repo";
 import { paginate, sortProducts, type ShopSort } from "@/features/catalog/listing";
 import { variantAttributesSchema } from "@/features/catalog/schemas";
-import { decimalToPaisa, formatMoney, type Paisa } from "@/features/pricing/money";
-import { percentOff, type PricingProduct, type VariantPrice } from "@/features/pricing/pricing";
+import { toDisplayPrice, type DisplayPrice } from "@/features/pricing/display";
+import { decimalToPaisa, type Paisa } from "@/features/pricing/money";
+import type { PricingProduct, VariantPrice } from "@/features/pricing/pricing";
 import { getVariantPricer, type VariantPricer } from "@/features/pricing/service";
 
 export const SHOP_PAGE_SIZE = 12;
@@ -32,14 +33,6 @@ export type StoreCategory = {
   imagePath: string | null;
 };
 
-/** Server-formatted, so the browser never does money maths (CLAUDE.md #5). */
-export type DisplayPrice = {
-  amount: string;
-  /** The struck-through base price, set only when a discount applies. */
-  original: string | null;
-  badge: string | null;
-};
-
 export type ProductCard = {
   id: number;
   name: string;
@@ -50,6 +43,8 @@ export type ProductCard = {
   price: DisplayPrice;
   /** True when variants have different prices, so the card reads "From PKR …". */
   priceFrom: boolean;
+  /** The one variant a card can add directly; null when the customer must choose options first. */
+  singleVariant: { id: number; soldOut: boolean } | null;
 };
 
 export type StockState = "in_stock" | "low_stock" | "sold_out";
@@ -76,16 +71,6 @@ export type ProductDetail = {
 
 function toImage(row: ProductImageRow): ProductImage {
   return { path: row.path, width: row.width, height: row.height, alt: row.alt };
-}
-
-function toDisplayPrice(price: VariantPrice): DisplayPrice {
-  if (price.discountId === null) return { amount: formatMoney(price.unitPrice), original: null, badge: null };
-  const off = percentOff(price);
-  return {
-    amount: formatMoney(price.unitPrice),
-    original: formatMoney(price.basePrice),
-    badge: off > 0 ? `${off}% off` : "Sale",
-  };
 }
 
 function toPricingProduct(row: { id: number; price: string; categoryId: number; parentCategoryId: number | null }): PricingProduct {
@@ -127,6 +112,7 @@ type PricedListingProduct = {
   fromPrice: Paisa;
   cheapest: VariantPrice;
   priceFrom: boolean;
+  singleVariant: ProductCard["singleVariant"];
 };
 
 /** Prices every active variant; a product with no active variant has nothing to sell and is dropped. */
@@ -143,18 +129,21 @@ async function priceListingProducts(rows: ListingProductRow[]): Promise<PricedLi
 
   return rows.flatMap((row) => {
     const product = toPricingProduct(row);
-    const prices = (variantsByProduct.get(row.id) ?? []).map((variant) => priceOf(pricer, product, variant));
+    const productVariants = variantsByProduct.get(row.id) ?? [];
+    const prices = productVariants.map((variant) => priceOf(pricer, product, variant));
     if (prices.length === 0) return [];
 
     const cheapest = prices.reduce((best, price) => (price.unitPrice < best.unitPrice ? price : best));
     const priceFrom = prices.some((price) => price.unitPrice !== cheapest.unitPrice);
-    return [{ row, id: row.id, createdAt: row.createdAt, fromPrice: cheapest.unitPrice, cheapest, priceFrom }];
+    const singleVariant =
+      productVariants.length === 1 ? { id: productVariants[0].id, soldOut: productVariants[0].stock <= 0 } : null;
+    return [{ row, id: row.id, createdAt: row.createdAt, fromPrice: cheapest.unitPrice, cheapest, priceFrom, singleVariant }];
   });
 }
 
 async function toCards(items: PricedListingProduct[]): Promise<ProductCard[]> {
   const images = await getPrimaryImagesByProductId(items.map((item) => item.id));
-  return items.map(({ row, cheapest, priceFrom }) => {
+  return items.map(({ row, cheapest, priceFrom, singleVariant }) => {
     const image = images.get(row.id);
     return {
       id: row.id,
@@ -164,6 +153,7 @@ async function toCards(items: PricedListingProduct[]): Promise<ProductCard[]> {
       image: image ? toImage(image) : null,
       price: toDisplayPrice(cheapest),
       priceFrom,
+      singleVariant,
     };
   });
 }

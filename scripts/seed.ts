@@ -18,7 +18,7 @@ import {
   roles,
   users,
 } from "../src/server/db/schema/access-control";
-import { discounts, discountTargets } from "../src/server/db/schema/promotions";
+import { coupons, discounts, discountTargets } from "../src/server/db/schema/promotions";
 import { settings } from "../src/server/db/schema/settings";
 import { shippingZoneAreas, shippingZones } from "../src/server/db/schema/shipping";
 import { processMediaImage, type ProcessedMediaImage } from "../src/server/storage/images";
@@ -497,6 +497,28 @@ async function seedSampleDiscount() {
   console.log(`Created sample discount "${SAMPLE_DISCOUNT_NAME}".`);
 }
 
+// SAMPLE DATA for development (S6): a coupon to exercise the cart's coupon field. 10% off orders
+// of PKR 3,000 or more, no dates, no limits. Created once and never overwritten, like the sample
+// discount above, so edits to it survive a reseed. Deactivate or delete it before launch.
+const SAMPLE_COUPON_CODE = "WELCOME10";
+
+async function seedSampleCoupon() {
+  const [existing] = await db.select().from(coupons).where(eq(coupons.code, SAMPLE_COUPON_CODE));
+  if (existing) {
+    console.log(`Sample coupon "${SAMPLE_COUPON_CODE}" already exists, left untouched.`);
+    return;
+  }
+
+  await db.insert(coupons).values({
+    code: SAMPLE_COUPON_CODE,
+    type: "percent",
+    value: "10.00",
+    minOrder: "3000.00",
+    isActive: true,
+  });
+  console.log(`Created sample coupon "${SAMPLE_COUPON_CODE}" (10% off, min order PKR 3,000).`);
+}
+
 // Contact and social values from the client (S2b #8); logo text "RS Home" is a build-time
 // default in config/site.config.ts (added in S3), not a runtime setting.
 async function seedSettings() {
@@ -531,6 +553,7 @@ async function main() {
   const media = await seedMediaImages();
   await seedCatalog(media);
   await seedSampleDiscount();
+  await seedSampleCoupon();
   await seedSettings();
   console.log("Seed complete.");
 }

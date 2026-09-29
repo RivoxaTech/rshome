@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/store/Button";
+import { useCart } from "@/components/store/cart/CartProvider";
 import { DiscountBadge, PriceTag } from "@/components/store/catalog/PriceTag";
+import { QuantityStepper } from "@/components/store/QuantityStepper";
 import type { VariantOption } from "@/features/catalog/service";
 
 /**
@@ -10,6 +12,7 @@ import type { VariantOption } from "@/features/catalog/service";
  * priced by the server; this only chooses which one to show (CLAUDE.md #5).
  */
 export function ProductPurchase({ optionName, variants }: { optionName: string; variants: VariantOption[] }) {
+  const { addItem } = useCart();
   const [selectedId, setSelectedId] = useState(
     () => (variants.find((variant) => variant.stockState !== "sold_out") ?? variants[0]).id,
   );
@@ -24,7 +27,7 @@ export function ProductPurchase({ optionName, variants }: { optionName: string; 
   return (
     <div className="mt-8">
       <div className="flex flex-wrap items-center gap-4">
-        <PriceTag price={selected.price} className="text-lg" />
+        <PriceTag price={selected.price} className="text-lg tracking-widest" />
         {selected.price.badge && <DiscountBadge label={selected.price.badge} />}
       </div>
 
@@ -58,32 +61,11 @@ export function ProductPurchase({ optionName, variants }: { optionName: string; 
       </p>
 
       <div className="mt-6 flex flex-wrap gap-4">
-        <div className="border-espresso/30 flex items-center border" aria-label="Quantity" role="group">
-          <button
-            type="button"
-            aria-label="Decrease quantity"
-            disabled={soldOut || shownQuantity <= 1}
-            onClick={() => setQuantity(shownQuantity - 1)}
-            className="hover:text-champagne px-4 py-3 transition-colors disabled:opacity-30"
-          >
-            −
-          </button>
-          <span className="w-10 text-center text-sm" aria-live="polite">
-            {soldOut ? 0 : shownQuantity}
-          </span>
-          <button
-            type="button"
-            aria-label="Increase quantity"
-            disabled={soldOut || shownQuantity >= maxQuantity}
-            onClick={() => setQuantity(shownQuantity + 1)}
-            className="hover:text-champagne px-4 py-3 transition-colors disabled:opacity-30"
-          >
-            +
-          </button>
-        </div>
+        <QuantityStepper value={soldOut ? 0 : shownQuantity} min={soldOut ? 0 : 1} max={maxQuantity} disabled={soldOut} onChange={setQuantity} />
         <div className="grid min-w-48 flex-1">
-          {/* Inert until S6 wires up the cart. */}
-          <Button disabled={soldOut}>{soldOut ? "Sold out" : "Add to Cart"}</Button>
+          <Button disabled={soldOut} onClick={() => addItem(selected.id, shownQuantity)}>
+            {soldOut ? "Sold out" : "Add to Cart"}
+          </Button>
         </div>
       </div>
     </div>

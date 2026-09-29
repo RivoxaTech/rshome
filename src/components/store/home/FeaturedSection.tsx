@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Button } from "@/components/store/Button";
+import { CardCartButton } from "@/components/store/cart/CardCartButton";
 import { DiscountBadge, PriceTag } from "@/components/store/catalog/PriceTag";
 import { Section } from "@/components/store/Section";
 import type { ProductCard } from "@/features/catalog/service";
@@ -55,10 +55,9 @@ export function FeaturedSection({
               {product.shortDescription && (
                 <p className="text-muted-foreground mt-1 text-xs">{product.shortDescription}</p>
               )}
-              <PriceTag price={product.price} from={product.priceFrom} className="mt-4 text-sm" />
+              <PriceTag price={product.price} from={product.priceFrom} className="mt-4 text-sm tracking-[0.02em] sm:tracking-widest" />
               <div className="mt-5">
-                {/* Inert until S6 wires up the cart (BUILD_PLAN.md S4). */}
-                <Button variant="outline">Add to Cart</Button>
+                <CardCartButton card={product} />
               </div>
             </div>
           </article>

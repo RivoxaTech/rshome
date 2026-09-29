@@ -11,6 +11,8 @@ export const siteConfig = {
     "RS HOME curates luxury tableware, tea sets, trays and decor in DHA Phase 6, Karachi. Nationwide delivery, wholesale and bulk orders available.",
   announcementText: "Nationwide Delivery • Wholesale & Bulk Orders Available",
   footerTagline: "Home Essentials · Elegant Tableware · Tea Sets · Trays · Decor",
+  /** Shown wherever the delivery charge is still pending (client decision C13: quoted on WhatsApp). */
+  deliveryPendingNote: "Delivery charge: to be confirmed, we will contact you on WhatsApp",
   timezone: "Asia/Karachi",
   contact: {
     phone: "03218581969",
