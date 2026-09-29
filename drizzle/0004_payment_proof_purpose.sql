@@ -1,0 +1,1 @@
+ALTER TABLE `payment_proofs` ADD `purpose` enum('goods','delivery') NOT NULL;

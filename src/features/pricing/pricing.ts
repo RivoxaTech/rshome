@@ -289,6 +289,14 @@ export type CartCalculation = {
 };
 
 /**
+ * What the goods cost after discounts and coupon, for a cart or a stored order: the amount a
+ * bank-transfer customer pays at checkout (owner decision, S8; the delivery charge follows).
+ */
+export function goodsTotalOf(amounts: { subtotal: Paisa; discountTotal: Paisa; couponDiscount: Paisa }): Paisa {
+  return amounts.subtotal - amounts.discountTotal - amounts.couponDiscount;
+}
+
+/**
  * The whole cart on plain data: every line through `priceVariant`, then the coupon, shipping,
  * COD and totals. The browser only ever supplies variant ids and quantities; every amount here
  * comes from the loaded rows.
@@ -328,7 +336,7 @@ export function calculateCart(input: {
   });
   const couponDiscount = coupon.status === "applied" ? coupon.discount : 0;
 
-  const goodsTotal = subtotal - discountTotal - couponDiscount;
+  const goodsTotal = goodsTotalOf({ subtotal, discountTotal, couponDiscount });
   const shipping = calculateShipping(input.zone, goodsTotal);
   const total = goodsTotal + (shipping.status === "priced" ? shipping.amount : 0);
 

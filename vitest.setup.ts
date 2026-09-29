@@ -1,4 +1,5 @@
 import { config } from "dotenv";
+import os from "node:os";
 import path from "node:path";
 
 // Runs before each test file's imports. Integration suites hit a database, and only ever the
@@ -9,3 +10,5 @@ config({ path: path.resolve(process.cwd(), ".env.local") });
 if (process.env.TEST_DATABASE_URL) {
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 }
+// Uploaded test screenshots go to a temp folder, never the real UPLOAD_DIR.
+process.env.UPLOAD_DIR = path.join(os.tmpdir(), "rshome-test-uploads");

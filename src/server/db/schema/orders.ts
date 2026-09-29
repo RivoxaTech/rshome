@@ -115,6 +115,8 @@ export const paymentProofs = mysqlTable(
     orderId: bigint("order_id", { mode: "number", unsigned: true })
       .notNull()
       .references(() => orders.id),
+    /** What the transfer paid for: the goods (at checkout) or the delivery charge quoted later. */
+    purpose: mysqlEnum("purpose", ["goods", "delivery"]).notNull(),
     filePath: varchar("file_path", { length: 255 }).notNull(),
     fileSize: int("file_size", { unsigned: true }).notNull(),
     status: mysqlEnum("status", ["submitted", "verified", "rejected"]).notNull().default("submitted"),

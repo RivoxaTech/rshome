@@ -4,6 +4,7 @@ import {
   calculateCart,
   calculateShipping,
   discountMatchesProduct,
+  goodsTotalOf,
   isCodAvailable,
   isDiscountActive,
   isDiscounted,
@@ -393,6 +394,13 @@ describe("calculateShipping", () => {
     const freeOver = { ...flatZone, freeOverAmount: 500000 };
     expect(calculateShipping(freeOver, 500000)).toEqual({ status: "priced", amount: 0 });
     expect(calculateShipping(freeOver, 499900)).toEqual({ status: "priced", amount: 30000 });
+  });
+});
+
+describe("goodsTotalOf", () => {
+  it("takes the discounts and the coupon off the subtotal, never the delivery charge", () => {
+    expect(goodsTotalOf({ subtotal: 500000, discountTotal: 50000, couponDiscount: 0 })).toBe(450000);
+    expect(goodsTotalOf({ subtotal: 500000, discountTotal: 0, couponDiscount: 20000 })).toBe(480000);
   });
 });
 

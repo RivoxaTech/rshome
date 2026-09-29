@@ -16,7 +16,7 @@ Deployed to cPanel shared hosting (Passenger) as a `standalone` build. Never rel
 - `npm run dev` : local dev
 - `npm run build:standalone && npm run start:standalone` : test the production build
 - `npm run db:generate` / `npm run db:migrate` / `npm run db:seed`
-- `npm run db:migrate:test` : creates and migrates the integration-test database named by `TEST_DATABASE_URL` (must end in `_test`); `npm test` runs the checkout integration tests against it and skips them when the variable is unset. Never point it at the dev database.
+- `npm run db:migrate:test` : creates and migrates the integration-test database named by `TEST_DATABASE_URL` (must end in `_test`); `npm test` runs the integration tests (checkout, payment screenshots) against it, one file at a time, and skips them when the variable is unset. Tests write uploads to a temp folder, never `UPLOAD_DIR`. Never point it at the dev database.
 - `npm run lint` / `npm run typecheck` / `npm test`
 - On this Windows laptop, Smart App Control blocks Turbopack's native binary: use `npm run dev:webpack` for local dev. `build:standalone` already falls back to `next build --webpack` on win32 automatically.
 

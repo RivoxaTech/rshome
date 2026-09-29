@@ -20,6 +20,7 @@ export function CheckoutSummary({
   deliveryNote,
   formId,
   error,
+  blockedReason,
 }: {
   quote: CartQuote;
   pending: boolean;
@@ -28,6 +29,8 @@ export function CheckoutSummary({
   deliveryNote: string;
   formId: string;
   error: string | null;
+  /** Why the order can't be placed yet (the bank-transfer screenshot is missing), if it can't. */
+  blockedReason: string | null;
 }) {
   return (
     <aside className="bg-card h-fit p-6 lg:p-8">
@@ -77,10 +80,11 @@ export function CheckoutSummary({
       )}
 
       <div className="mt-8 grid">
-        <Button type="submit" form={formId} disabled={pending || submitting}>
+        <Button type="submit" form={formId} disabled={pending || submitting || blockedReason !== null}>
           {submitting ? "Placing your order…" : "Place order"}
         </Button>
       </div>
+      {blockedReason && <p className="text-muted-foreground mt-3 text-center text-xs leading-relaxed">{blockedReason}</p>}
     </aside>
   );
 }

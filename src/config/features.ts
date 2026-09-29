@@ -9,4 +9,10 @@ export const features = {
   coupons: true,
   /** Off: cash on delivery is never offered, whatever the zone says. */
   cod: true,
+  /**
+   * How a bank-transfer customer pays the delivery charge quoted after the order (owner decision,
+   * S8). On: a second transfer, with its screenshot uploaded on the order page. Off: in cash on
+   * delivery, so only the goods screenshot (at checkout) is needed.
+   */
+  deliveryChargeByTransfer: true,
 } as const;

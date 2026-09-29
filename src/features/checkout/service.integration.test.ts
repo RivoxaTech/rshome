@@ -1,17 +1,20 @@
 /**
  * createOrder against the test database (ARCHITECTURE.md §8). vitest.setup.ts points the app's
- * db client at TEST_DATABASE_URL; without that variable this suite skips. The fixtures are
- * rebuilt at the start of the run, so the tests never depend on the seed.
+ * db client at TEST_DATABASE_URL and UPLOAD_DIR at a temp folder; without TEST_DATABASE_URL this
+ * suite skips. The fixtures are rebuilt at the start of the run, so the tests never depend on the seed.
  */
 import { randomUUID } from "node:crypto";
+import { access } from "node:fs/promises";
+import path from "node:path";
 import { and, eq } from "drizzle-orm";
+import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { rateLimits } from "@/server/db/schema/access-control";
-import { categories, productImages, productVariants, products } from "@/server/db/schema/catalog";
+import { productVariants } from "@/server/db/schema/catalog";
 import { orderItems, orderStatusHistory, orders, paymentProofs } from "@/server/db/schema/orders";
 import { couponUsages, coupons } from "@/server/db/schema/promotions";
-import { shippingZoneAreas, shippingZones } from "@/server/db/schema/shipping";
-import { COD_PAKISTAN_ONLY_MESSAGE, PRICES_CHANGED_MESSAGE } from "./service";
+import { assertTestDatabase, checkoutInput, resetTables, seedFixtures, type FixtureIds } from "@/test/integration-fixtures";
+import { COD_PAKISTAN_ONLY_MESSAGE, PRICES_CHANGED_MESSAGE, PROOF_EXPIRED_MESSAGE, PROOF_REQUIRED_MESSAGE } from "./service";
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
@@ -19,6 +22,13 @@ type Db = typeof import("@/server/db/client");
 type Checkout = typeof import("./service");
 type Cart = typeof import("@/features/cart/service");
 type Orders = typeof import("@/features/orders/service");
+type Payments = typeof import("@/features/payments/service");
+
+const exists = (filePath: string) =>
+  access(filePath).then(
+    () => true,
+    () => false,
+  );
 
 describe.skipIf(!TEST_DATABASE_URL)("createOrder (integration)", () => {
   let db: Db["db"];
@@ -27,8 +37,12 @@ describe.skipIf(!TEST_DATABASE_URL)("createOrder (integration)", () => {
   let quoteCart: Cart["quoteCart"];
   let trackOrder: Orders["trackOrder"];
   let getCustomerOrder: Orders["getCustomerOrder"];
+  let uploadCheckoutProof: Payments["uploadCheckoutProof"];
+  let encodeProofToken: typeof import("@/features/payments/proof-token").encodeProofToken;
+  let savePendingProof: typeof import("@/server/storage/proofs").savePendingProof;
+  let env: typeof import("@/server/env").env;
 
-  const ids = { plate: 0, vaseWhite: 0, vaseBlack: 0, karachiZone: 0, internationalZone: 0, coupon: 0 };
+  let ids: FixtureIds;
   let ipCounter = 0;
   const nextIp = () => `test-ip-${++ipCounter}`;
 
@@ -36,87 +50,27 @@ describe.skipIf(!TEST_DATABASE_URL)("createOrder (integration)", () => {
     (await db.select({ stock: productVariants.stock }).from(productVariants).where(eq(productVariants.id, variantId)))[0].stock;
   const orderCount = async () => (await db.select({ id: orders.id }).from(orders)).length;
   const orderByNumber = async (orderNumber: string) => (await db.select().from(orders).where(eq(orders.orderNumber, orderNumber)))[0];
+  const input = (overrides: Record<string, unknown> = {}) => checkoutInput(ids, overrides);
 
-  function input(overrides: Record<string, unknown> = {}) {
-    return {
-      checkoutToken: randomUUID(),
-      name: "Test Customer",
-      phone: "0300 1234567",
-      email: "",
-      country: "PK",
-      city: "Karachi",
-      addressLine: "House 1, Street 2, DHA Phase 6",
-      postalCode: "",
-      note: "",
-      paymentMethod: "cod",
-      lines: [{ variantId: ids.plate, quantity: 2 }],
-      couponCode: null,
-      expectedTotal: "2000.00",
-      ...overrides,
-    };
-  }
-
-  async function resetTables() {
-    // Children before parents, so no foreign-key toggling is needed.
-    for (const table of [
-      orderStatusHistory,
-      paymentProofs,
-      couponUsages,
-      orderItems,
-      orders,
-      coupons,
-      productImages,
-      productVariants,
-      products,
-      categories,
-      shippingZoneAreas,
-      shippingZones,
-      rateLimits,
-    ]) {
-      await db.delete(table);
-    }
-  }
-
-  async function seedFixtures() {
-    const [category] = await db.insert(categories).values({ name: "Test Tableware", slug: "test-tableware" });
-    const [plate] = await db
-      .insert(products)
-      .values({ categoryId: category.insertId, name: "Test Plate", slug: "test-plate", price: "1000.00", status: "active" });
-    const [vase] = await db
-      .insert(products)
-      .values({ categoryId: category.insertId, name: "Test Vase", slug: "test-vase", price: "2500.00", status: "active" });
-
-    const variant = (values: typeof productVariants.$inferInsert) => db.insert(productVariants).values(values);
-    // Plenty of plates: most tests below take two each and share this one fixture.
-    ids.plate = (await variant({ productId: plate.insertId, sku: "TEST-PLATE", label: "Default", attributes: "{}", stock: 100 }))[0].insertId;
-    ids.vaseWhite = (
-      await variant({ productId: vase.insertId, sku: "TEST-VASE-WHT", label: "White", attributes: '{"Colour":"White"}', stock: 1 })
-    )[0].insertId;
-    ids.vaseBlack = (
-      await variant({ productId: vase.insertId, sku: "TEST-VASE-BLK", label: "Black", attributes: '{"Colour":"Black"}', stock: 5, isActive: false })
-    )[0].insertId;
-
-    const zone = (values: typeof shippingZones.$inferInsert) => db.insert(shippingZones).values(values);
-    ids.karachiZone = (await zone({ name: "Karachi", mode: "quote", flatRate: "0.00", codEnabled: true }))[0].insertId;
-    const pakistanZone = (await zone({ name: "Pakistan", mode: "quote", flatRate: "0.00", codEnabled: true }))[0].insertId;
-    ids.internationalZone = (await zone({ name: "International", mode: "quote", flatRate: "0.00", codEnabled: false, isFallback: true }))[0].insertId;
-    await db.insert(shippingZoneAreas).values([
-      { zoneId: ids.karachiZone, countryCode: "PK", city: "karachi" },
-      { zoneId: pakistanZone, countryCode: "PK", city: null },
-    ]);
-
-    ids.coupon = (
-      await db.insert(coupons).values({ code: "TESTCOUPON", type: "percent", value: "10.00", perCustomerLimit: 1, isActive: true })
-    )[0].insertId;
+  /** A real upload through the checkout step, as the browser does it before placing a bank order. */
+  async function proofToken(): Promise<string> {
+    const png = await sharp({ create: { width: 600, height: 1200, channels: 3, background: "#d8c8a8" } }).png().toBuffer();
+    const result = await uploadCheckoutProof(async () => new File([new Uint8Array(png)], "transfer.png", { type: "image/png" }), { ip: nextIp() });
+    if (!result.ok) throw new Error(result.error);
+    return result.token;
   }
 
   beforeAll(async () => {
     // Imported here, not at the top, so the file loads even where no database env exists.
-    const [client, checkout, cart, ordersService] = await Promise.all([
+    const [client, checkout, cart, ordersService, payments, token, proofs, envModule] = await Promise.all([
       import("@/server/db/client"),
       import("./service"),
       import("@/features/cart/service"),
       import("@/features/orders/service"),
+      import("@/features/payments/service"),
+      import("@/features/payments/proof-token"),
+      import("@/server/storage/proofs"),
+      import("@/server/env"),
     ]);
     db = client.db;
     pool = client.pool;
@@ -124,13 +78,14 @@ describe.skipIf(!TEST_DATABASE_URL)("createOrder (integration)", () => {
     quoteCart = cart.quoteCart;
     trackOrder = ordersService.trackOrder;
     getCustomerOrder = ordersService.getCustomerOrder;
+    uploadCheckoutProof = payments.uploadCheckoutProof;
+    encodeProofToken = token.encodeProofToken;
+    savePendingProof = proofs.savePendingProof;
+    env = envModule.env;
 
-    // Belt and braces: whatever the env says, only a *_test database gets wiped.
-    const databaseName = new URL(process.env.DATABASE_URL ?? "").pathname.slice(1);
-    if (!databaseName.endsWith("_test")) throw new Error(`Refusing to run integration tests against "${databaseName}".`);
-
-    await resetTables();
-    await seedFixtures();
+    assertTestDatabase();
+    await resetTables(db);
+    ids = await seedFixtures(db);
   });
 
   beforeEach(async () => {
@@ -141,7 +96,7 @@ describe.skipIf(!TEST_DATABASE_URL)("createOrder (integration)", () => {
     await pool.end();
   });
 
-  it("places a COD order in Karachi: quote pending, stock down, snapshots and history written", async () => {
+  it("places a COD order in Karachi: quote pending, stock down, snapshots and history written, no screenshot", async () => {
     const stockBefore = await stockOf(ids.plate);
     const result = await createOrder(input(), { ip: nextIp() });
     expect(result).toMatchObject({ ok: true });
@@ -188,24 +143,81 @@ describe.skipIf(!TEST_DATABASE_URL)("createOrder (integration)", () => {
       ["order", null, "awaiting_shipping_quote"],
       ["payment", null, "cod_pending"],
     ]);
+    expect(await db.select().from(paymentProofs).where(eq(paymentProofs.orderId, order.id))).toEqual([]);
   });
 
-  it("places a bank-transfer order abroad in the fallback zone with the phone normalised", async () => {
-    const result = await createOrder(
-      input({ country: "GB", city: "London", phone: "+44 7911 123456", email: "jo@example.com", paymentMethod: "bank_transfer" }),
-      { ip: nextIp() },
-    );
-    expect(result).toMatchObject({ ok: true });
-    if (!result.ok) return;
+  describe("bank transfer with the screenshot uploaded at checkout", () => {
+    it("places the order as proof_submitted with the goods proof moved into place", async () => {
+      const token = await proofToken();
+      const result = await createOrder(
+        input({ country: "GB", city: "London", phone: "+44 7911 123456", email: "jo@example.com", paymentMethod: "bank_transfer", proofToken: token }),
+        { ip: nextIp() },
+      );
+      expect(result).toMatchObject({ ok: true });
+      if (!result.ok) return;
 
-    expect(await orderByNumber(result.orderNumber)).toMatchObject({
-      orderStatus: "awaiting_shipping_quote",
-      paymentStatus: "unpaid",
-      paymentMethod: "bank_transfer",
-      shippingZoneId: ids.internationalZone,
-      phone: "447911123456",
-      email: "jo@example.com",
-      country: "GB",
+      const order = await orderByNumber(result.orderNumber);
+      expect(order).toMatchObject({
+        orderStatus: "awaiting_shipping_quote",
+        paymentStatus: "proof_submitted",
+        paymentMethod: "bank_transfer",
+        shippingZoneId: ids.internationalZone,
+        phone: "447911123456",
+        email: "jo@example.com",
+        country: "GB",
+      });
+
+      const proofs = await db.select().from(paymentProofs).where(eq(paymentProofs.orderId, order.id));
+      expect(proofs).toHaveLength(1);
+      expect(proofs[0]).toMatchObject({ purpose: "goods", status: "submitted", rejectionReason: null, reviewedBy: null });
+      expect(proofs[0].filePath).toMatch(/^proofs\/\d{4}\/\d{2}\/[a-f0-9]{32}\.webp$/);
+      const stored = path.join(env.UPLOAD_DIR, proofs[0].filePath);
+      expect(await exists(stored)).toBe(true);
+      expect(proofs[0].fileSize).toBeGreaterThan(0);
+      const pendingName = path.basename(proofs[0].filePath);
+      expect(await exists(path.join(env.UPLOAD_DIR, "proofs", "pending", pendingName))).toBe(false);
+
+      const history = await db.select().from(orderStatusHistory).where(eq(orderStatusHistory.orderId, order.id));
+      expect(history.map((row) => [row.kind, row.toStatus, row.note])).toEqual([
+        ["order", "awaiting_shipping_quote", "Order placed"],
+        ["payment", "proof_submitted", "Payment screenshot uploaded at checkout"],
+      ]);
+    });
+
+    it("refuses a bank order without a screenshot, writing nothing", async () => {
+      const [ordersBefore, stockBefore] = [await orderCount(), await stockOf(ids.plate)];
+      const result = await createOrder(input({ paymentMethod: "bank_transfer" }), { ip: nextIp() });
+      expect(result).toEqual({ ok: false, error: PROOF_REQUIRED_MESSAGE, fieldErrors: { proofToken: PROOF_REQUIRED_MESSAGE } });
+      expect(await orderCount()).toBe(ordersBefore);
+      expect(await stockOf(ids.plate)).toBe(stockBefore);
+    });
+
+    it("refuses an expired, a tampered and an already-used token", async () => {
+      const refused = { ok: false, error: PROOF_EXPIRED_MESSAGE, fieldErrors: { proofToken: PROOF_EXPIRED_MESSAGE } };
+      const ordersBefore = await orderCount();
+
+      const pending = await savePendingProof(Buffer.from("stand-in for a processed screenshot"));
+      const expired = encodeProofToken(pending, new Date(Date.now() - 1000), env.SESSION_SECRET);
+      expect(await createOrder(input({ paymentMethod: "bank_transfer", proofToken: expired }), { ip: nextIp() })).toEqual(refused);
+
+      const [, signature] = (await proofToken()).split(".");
+      const forgedBody = Buffer.from(JSON.stringify({ f: pending, e: Date.now() + 60_000 })).toString("base64url");
+      const tampered = `${forgedBody}.${signature}`;
+      expect(await createOrder(input({ paymentMethod: "bank_transfer", proofToken: tampered }), { ip: nextIp() })).toEqual(refused);
+      expect(await orderCount()).toBe(ordersBefore);
+
+      // One upload pays for one order: the second order finds the file already moved.
+      const token = await proofToken();
+      expect(await createOrder(input({ paymentMethod: "bank_transfer", proofToken: token }), { ip: nextIp() })).toMatchObject({ ok: true });
+      expect(await createOrder(input({ paymentMethod: "bank_transfer", proofToken: token }), { ip: nextIp() })).toEqual(refused);
+      expect(await orderCount()).toBe(ordersBefore + 1);
+    });
+
+    it("leaves the upload pending when the order is refused, so the next submit can use it", async () => {
+      const token = await proofToken();
+      const refused = await createOrder(input({ paymentMethod: "bank_transfer", proofToken: token, expectedTotal: "1.00" }), { ip: nextIp() });
+      expect(refused).toEqual({ ok: false, error: PRICES_CHANGED_MESSAGE });
+      expect(await createOrder(input({ paymentMethod: "bank_transfer", proofToken: token }), { ip: nextIp() })).toMatchObject({ ok: true });
     });
   });
 
@@ -311,7 +323,9 @@ describe.skipIf(!TEST_DATABASE_URL)("createOrder (integration)", () => {
     let orderNumber = "";
 
     beforeAll(async () => {
-      const placed = await createOrder(input({ phone: "0300 5555555", paymentMethod: "bank_transfer" }), { ip: nextIp() });
+      const placed = await createOrder(input({ phone: "0300 5555555", paymentMethod: "bank_transfer", proofToken: await proofToken() }), {
+        ip: nextIp(),
+      });
       if (!placed.ok) throw new Error(placed.error);
       orderNumber = placed.orderNumber;
     });
@@ -335,12 +349,16 @@ describe.skipIf(!TEST_DATABASE_URL)("createOrder (integration)", () => {
         orderNumber,
         headline: "Waiting for delivery charge",
         paymentMethod: "bank_transfer",
+        payment: { goods: "submitted", delivery: "awaiting_charge", goodsTotal: "PKR 2,000", deliveryCharge: null, upload: null },
         customer: { name: "Test Customer", phone: "+92 300 5555555", email: null },
         address: ["House 1, Street 2, DHA Phase 6", "Karachi", "Pakistan"],
         items: [{ name: "Test Plate", variantLabel: null, quantity: 2, unitPrice: "PKR 1,000", lineTotal: "PKR 2,000" }],
         totals: { subtotal: "PKR 2,000", discountTotal: null, coupon: null, delivery: { status: "pending" }, total: "PKR 2,000" },
       });
-      expect(view?.timeline[0]).toEqual({ label: "Waiting for delivery charge", state: "current", note: null });
+      expect(view?.timeline.slice(0, 2)).toEqual([
+        { label: "Payment under review", state: "current", note: null },
+        { label: "Waiting for delivery charge", state: "current", note: null },
+      ]);
       expect(await getCustomerOrder("RSH-260101-ZZZZ")).toBeNull();
     });
   });

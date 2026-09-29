@@ -28,4 +28,6 @@ export const ICON_PATHS = {
   arrowUp: "M12 19V5M5 12l7-7 7 7",
   copy: "M9 9h11v11H9zM15 9V4H4v11h5",
   check: "M20 6L9 17l-5-5",
+  // Payment screenshot picker (S8): a picture frame with a mountain and sun.
+  image: "M4 4h16v16H4zM4 16l5-5 4 4 2-2 5 5M15.5 9.5h.01",
 } as const;

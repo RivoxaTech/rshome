@@ -5,8 +5,12 @@ import type { CartLineInput } from "@/features/pricing/pricing";
 import { loadCoupon, priceCart } from "@/features/pricing/service";
 import { resolveShippingZone } from "@/features/shipping/service";
 import type { ResolvedZone } from "@/features/shipping/zones";
+import { decodeProofToken } from "@/features/payments/proof-token";
+import { insertPaymentProof } from "@/features/payments/repo";
 import { db } from "@/server/db/client";
+import { env } from "@/server/env";
 import { consumeRateLimit } from "@/server/rate-limit";
+import { promotePendingProof, returnProofToPending, type StoredProof } from "@/server/storage/proofs";
 import { generateOrderNumber } from "./order-number";
 import {
   decrementVariantStock,
@@ -29,13 +33,27 @@ const MYSQL_DEADLOCK = 1213;
 
 export const PRICES_CHANGED_MESSAGE = "Prices changed, please review your order before placing it.";
 export const COD_PAKISTAN_ONLY_MESSAGE = "Cash on delivery is available in Pakistan only. Please choose bank transfer.";
+export const PROOF_REQUIRED_MESSAGE = "Please upload your payment screenshot to place a bank transfer order.";
+export const PROOF_EXPIRED_MESSAGE = "Your payment screenshot upload has expired. Please upload it again.";
 
 export type CreateOrderResult =
   | { ok: true; orderNumber: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 /** A refusal with a message the customer sees; anything else thrown is a real failure. */
-class CheckoutError extends Error {}
+class CheckoutError extends Error {
+  /** The form field the message belongs to, if any. */
+  constructor(
+    message: string,
+    readonly field?: string,
+  ) {
+    super(message);
+  }
+}
+
+function refused(error: CheckoutError): CreateOrderResult {
+  return error.field ? { ok: false, error: error.message, fieldErrors: { [error.field]: error.message } } : { ok: false, error: error.message };
+}
 
 /** Drizzle wraps driver errors (`DrizzleQueryError.cause`); the mysql2 error carries `errno`. */
 function mysqlError(error: unknown): { errno?: number; sqlMessage?: string } | null {
@@ -72,8 +90,25 @@ function mergeLines(lines: CheckoutInput["lines"]): Map<number, number> {
 /**
  * The whole order in one transaction (ARCHITECTURE.md §4.2 steps 4–9). Throws `CheckoutError`
  * with a customer-facing message when the order must be refused; nothing is written then.
+ * `proofFile` is the bank-transfer screenshot waiting in `proofs/pending`: it is moved into place
+ * last, and moved back if the transaction fails afterwards, so a retry can still use it.
  */
-async function placeOrder(input: CheckoutInput, zone: ResolvedZone): Promise<string> {
+async function placeOrder(input: CheckoutInput, zone: ResolvedZone, proofFile: string | null): Promise<string> {
+  const moved: { proof: StoredProof | null } = { proof: null };
+  try {
+    return await insertOrderRows(input, zone, proofFile, moved);
+  } catch (error) {
+    if (proofFile && moved.proof) await returnProofToPending(proofFile, moved.proof);
+    throw error;
+  }
+}
+
+async function insertOrderRows(
+  input: CheckoutInput,
+  zone: ResolvedZone,
+  proofFile: string | null,
+  moved: { proof: StoredProof | null },
+): Promise<string> {
   return db.transaction(async (tx) => {
     const wanted = mergeLines(input.lines);
     const variants = await lockVariantRows(tx, [...wanted.keys()]);
@@ -121,7 +156,8 @@ async function placeOrder(input: CheckoutInput, zone: ResolvedZone): Promise<str
 
     const shippingPending = calculation.shipping.status === "pending";
     const orderStatus = shippingPending ? "awaiting_shipping_quote" : "pending";
-    const paymentStatus = input.paymentMethod === "cod" ? "cod_pending" : "unpaid";
+    // A bank order always arrives with its goods screenshot (owner decision, S8).
+    const paymentStatus = input.paymentMethod === "cod" ? "cod_pending" : "proof_submitted";
     const total = paisaToDecimal(calculation.total);
     const now = new Date();
 
@@ -190,9 +226,30 @@ async function placeOrder(input: CheckoutInput, zone: ResolvedZone): Promise<str
     for (const { variant, quantity } of snapshots) await decrementVariantStock(tx, variant.id, quantity);
     if (calculation.coupon.status === "applied") await recordCouponUsage(tx, calculation.coupon.couponId, orderId, input.phone);
 
+    if (proofFile) {
+      moved.proof = await promotePendingProof(proofFile, now);
+      if (!moved.proof) throw new CheckoutError(PROOF_EXPIRED_MESSAGE, "proofToken");
+      await insertPaymentProof(tx, {
+        orderId,
+        purpose: "goods",
+        filePath: moved.proof.relativePath,
+        fileSize: moved.proof.fileSize,
+        status: "submitted",
+        createdAt: now,
+      });
+    }
+
     await insertStatusHistory(tx, [
       { orderId, kind: "order", fromStatus: null, toStatus: orderStatus, note: "Order placed", changedBy: null, createdAt: now },
-      { orderId, kind: "payment", fromStatus: null, toStatus: paymentStatus, note: null, changedBy: null, createdAt: now },
+      {
+        orderId,
+        kind: "payment",
+        fromStatus: null,
+        toStatus: paymentStatus,
+        note: proofFile ? "Payment screenshot uploaded at checkout" : null,
+        changedBy: null,
+        createdAt: now,
+      },
     ]);
 
     return orderNumber;
@@ -218,14 +275,22 @@ export async function createOrder(rawInput: unknown, ctx: { ip: string }): Promi
   // The hard rule (§4.1): COD never leaves Pakistan, whatever zone the request claims.
   if (input.paymentMethod === "cod" && input.country !== "PK") return { ok: false, error: COD_PAKISTAN_ONLY_MESSAGE };
 
+  // Owner decision (S8): a bank transfer is paid, and its screenshot uploaded, before the order is placed.
+  let proofFile: string | null = null;
+  if (input.paymentMethod === "bank_transfer") {
+    if (!input.proofToken) return refused(new CheckoutError(PROOF_REQUIRED_MESSAGE, "proofToken"));
+    proofFile = decodeProofToken(input.proofToken, env.SESSION_SECRET, new Date());
+    if (!proofFile) return refused(new CheckoutError(PROOF_EXPIRED_MESSAGE, "proofToken"));
+  }
+
   const zone = await resolveShippingZone(input.country, input.city);
   if (!zone) return { ok: false, error: "We can't deliver to this address yet. Please contact us on WhatsApp." };
 
   try {
-    const orderNumber = await withDeadlockRetry(() => placeOrder(input, zone));
+    const orderNumber = await withDeadlockRetry(() => placeOrder(input, zone, proofFile));
     return { ok: true, orderNumber };
   } catch (error) {
-    if (error instanceof CheckoutError) return { ok: false, error: error.message };
+    if (error instanceof CheckoutError) return refused(error);
     // Two submits with the same token raced past the check above: the first one's order wins.
     if (isDuplicateOn(error, "checkout_token")) {
       const raced = await findOrderNumberByCheckoutToken(input.checkoutToken);

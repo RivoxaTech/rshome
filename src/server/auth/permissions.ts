@@ -18,6 +18,19 @@ export async function requirePermission(key: PermissionKey): Promise<SessionUser
   return session;
 }
 
+/**
+ * `requirePermission` for Route Handlers, which answer with a status instead of redirecting:
+ * 401 without a session, 403 when the session holds none of `keys`.
+ */
+export async function authorizeRequest(
+  ...keys: PermissionKey[]
+): Promise<{ ok: true; session: SessionUser } | { ok: false; status: 401 | 403 }> {
+  const session = await getSession();
+  if (!session) return { ok: false, status: 401 };
+  if (!keys.some((key) => hasPermission(session.permissions, key))) return { ok: false, status: 403 };
+  return { ok: true, session };
+}
+
 export async function requireSession(): Promise<SessionUser> {
   const session = await getSession();
   if (!session) redirect("/panel/login");

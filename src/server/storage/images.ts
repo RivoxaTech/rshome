@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, rename, stat } from "node:fs/promises";
 import path from "node:path";
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 import { env } from "@/server/env";
 
 // Shared hosting has small memory limits (CLAUDE.md #11): one image in flight at a time, no cache.
@@ -71,4 +71,45 @@ export async function processMediaImage(
   }
 
   return { path: `${subdir}/${basename}`, width, height };
+}
+
+/**
+ * Payment screenshots (ARCHITECTURE.md §4.4). A phone screenshot is a few megapixels and a 24 MP
+ * photo still fits; anything larger is refused from its header, before a pixel is decoded.
+ */
+export const PROOF_MAX_INPUT_PIXELS = 25_000_000;
+const PROOF_MAX_SIDE = 2000;
+const PROOF_FORMATS: ReadonlySet<string> = new Set(["jpeg", "png", "webp"]);
+
+export type ProofImageResult =
+  | { ok: true; webp: Buffer }
+  | { ok: false; reason: "unsupported_type" | "too_many_pixels" | "unreadable" };
+
+/**
+ * Re-encodes an uploaded payment screenshot: the real type comes from the file's own bytes
+ * (never its name or the browser's claim), EXIF orientation is applied, the longest side is
+ * capped at 2000 px, and the WebP output carries no metadata.
+ */
+export async function processProofImage(input: Buffer): Promise<ProofImageResult> {
+  let metadata: Metadata;
+  try {
+    metadata = await sharp(input).metadata();
+  } catch {
+    return { ok: false, reason: "unsupported_type" };
+  }
+  if (!metadata.format || !PROOF_FORMATS.has(metadata.format)) return { ok: false, reason: "unsupported_type" };
+  if (!metadata.width || !metadata.height) return { ok: false, reason: "unreadable" };
+  if (metadata.width * metadata.height > PROOF_MAX_INPUT_PIXELS) return { ok: false, reason: "too_many_pixels" };
+
+  try {
+    const webp = await sharp(input, { limitInputPixels: PROOF_MAX_INPUT_PIXELS })
+      .rotate()
+      .resize({ width: PROOF_MAX_SIDE, height: PROOF_MAX_SIDE, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 80 })
+      .toBuffer();
+    return { ok: true, webp };
+  } catch {
+    // A truncated or corrupt file that still had a valid header.
+    return { ok: false, reason: "unreadable" };
+  }
 }

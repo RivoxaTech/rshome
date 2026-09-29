@@ -117,6 +117,8 @@ export type CartQuote = {
   discountTotal: string | null;
   coupon: CartQuoteCoupon;
   delivery: { status: "pending" } | { status: "priced"; amount: string };
+  /** The goods after discounts and coupon: what a bank-transfer customer transfers at checkout. */
+  goodsTotal: string;
   total: string;
   /**
    * The total as a DECIMAL string, echoed back by the checkout as `expectedTotal` so the order
@@ -171,6 +173,7 @@ export function formatCartQuote(
       calculation.shipping.status === "priced"
         ? { status: "priced", amount: formatMoney(calculation.shipping.amount) }
         : { status: "pending" },
+    goodsTotal: formatMoney(calculation.goodsTotal),
     total: formatMoney(calculation.total),
     expectedTotal: paisaToDecimal(calculation.total),
     notices: allNotices,

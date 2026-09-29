@@ -48,6 +48,8 @@ export const checkoutInputSchema = z.object({
   postalCode: optionalText(20),
   note: optionalText(1000),
   paymentMethod: z.enum(["cod", "bank_transfer"], { error: "Choose a payment method." }),
+  /** From the screenshot upload (`/api/checkout/proof`); `createOrder` requires it for bank transfer. */
+  proofToken: optionalText(512),
   lines: cartInputSchema.shape.lines.min(1, "Your cart is empty."),
   couponCode: cartInputSchema.shape.couponCode,
   expectedTotal: z.string().regex(/^\d+\.\d{2}$/),

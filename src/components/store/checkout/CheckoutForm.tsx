@@ -6,6 +6,8 @@ import { createOrderAction } from "@/app/(store)/checkout/actions";
 import { useCart } from "@/components/store/cart/CartProvider";
 import { SelectField, TextAreaField, TextField } from "@/components/store/forms/fields";
 import { BankDetails } from "@/components/store/orders/BankDetails";
+import { ProofUpload } from "@/components/store/orders/ProofUpload";
+import { CopyButton } from "@/components/ui/CopyButton";
 import type { CountryOption } from "@/config/countries";
 import { checkoutInputSchema, fieldErrorsOf } from "@/features/checkout/schemas";
 import type { BankAccount } from "@/features/settings/schemas";
@@ -74,10 +76,16 @@ export function CheckoutForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, startSubmit] = useTransition();
   const placedRef = useRef(false);
+  // The bank-transfer screenshot (owner decision, S8): uploaded before the order is placed, and
+  // the goods total it was uploaded against, so a later change in the total can be pointed out.
+  const [proof, setProof] = useState<{ token: string; goodsTotal: string } | null>(null);
+  const [proofError, setProofError] = useState<string | null>(null);
+  const [proofPickerKey, setProofPickerKey] = useState(0);
 
   const isPakistan = form.country === PAKISTAN;
   const codOffered = codEnabled && isPakistan;
   const cityValue = isPakistan && form.cityChoice === "karachi" ? KARACHI : form.city;
+  const isBankTransfer = form.paymentMethod === "bank_transfer";
 
   // An empty cart has nothing to check out; the order just placed empties it too, hence the ref.
   useEffect(() => {
@@ -111,6 +119,7 @@ export function CheckoutForm({
       postalCode: form.postalCode,
       note: form.note,
       paymentMethod: form.paymentMethod,
+      proofToken: isBankTransfer ? (proof?.token ?? null) : null,
       lines: quote.storedLines,
       couponCode: quote.storedCouponCode,
       expectedTotal: quote.expectedTotal,
@@ -135,6 +144,12 @@ export function CheckoutForm({
       }
       setError(result.error);
       setFieldErrors(result.fieldErrors ?? {});
+      // An expired or missing upload: start the picker afresh with the reason under it.
+      if (result.fieldErrors?.proofToken) {
+        setProof(null);
+        setProofError(result.fieldErrors.proofToken);
+        setProofPickerKey((key) => key + 1);
+      }
       // Stock, prices or the coupon may have moved: show the cart as the server now sees it.
       refresh();
     });
@@ -277,7 +292,7 @@ export function CheckoutForm({
               <PaymentChoice
                 value="bank_transfer"
                 title="Bank transfer"
-                description="Transfer the total to our account once the delivery charge is confirmed, then upload your payment screenshot on the order page."
+                description="Transfer the products total to our account now and upload the screenshot below. The delivery charge is paid separately once confirmed."
                 selected={form.paymentMethod === "bank_transfer"}
                 onSelect={() => update({ paymentMethod: "bank_transfer" })}
               />
@@ -297,10 +312,43 @@ export function CheckoutForm({
               </p>
             )}
           </fieldset>
-          {form.paymentMethod === "bank_transfer" && (
-            <div className="border-espresso/30 mt-4 border-l-2 pl-5">
-              <p className="text-muted-foreground text-[10px] tracking-[0.28em] uppercase">Our bank details</p>
-              <BankDetails accounts={bankAccounts} className="mt-4" />
+          {isBankTransfer && (
+            <div className="border-espresso/30 mt-4 grid gap-6 border-l-2 pl-5">
+              <div>
+                <p className="text-muted-foreground text-[10px] tracking-[0.28em] uppercase">Our bank details</p>
+                <BankDetails accounts={bankAccounts} className="mt-4" />
+              </div>
+              <div>
+                <p className="text-muted-foreground text-[10px] tracking-[0.28em] uppercase">Amount to transfer now</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-2">
+                  <p className="font-serif text-2xl">{quote.goodsTotal}</p>
+                  <CopyButton value={quote.goodsTotal.replace(/\D/g, "")} label="Copy amount" />
+                </div>
+                <p className="text-muted-foreground mt-2 text-xs leading-relaxed">
+                  The products total. The delivery charge is paid separately, once we confirm it with you on WhatsApp.
+                </p>
+              </div>
+              <ProofUpload
+                key={proofPickerKey}
+                id="proofToken"
+                endpoint="/api/checkout/proof"
+                label="Payment screenshot"
+                error={proofError}
+                onChange={() => {
+                  setProof(null);
+                  setProofError(null);
+                }}
+                onUploaded={(body) => {
+                  const token = (body as { token?: unknown }).token;
+                  if (typeof token === "string") setProof({ token, goodsTotal: quote.goodsTotal });
+                }}
+              />
+              {proof && proof.goodsTotal !== quote.goodsTotal && (
+                <p role="status" className="border-champagne border-l-2 pl-4 text-xs leading-relaxed">
+                  Your products total changed from {proof.goodsTotal} to {quote.goodsTotal} after you uploaded your screenshot. If
+                  your transfer doesn&apos;t match the new amount, please upload a screenshot that does.
+                </p>
+              )}
             </div>
           )}
           <p className="text-muted-foreground mt-6 text-xs leading-relaxed">{deliveryNote}</p>
@@ -326,6 +374,7 @@ export function CheckoutForm({
         deliveryNote={deliveryNote}
         formId={FORM_ID}
         error={error}
+        blockedReason={isBankTransfer && !proof ? "Upload your payment screenshot to place your order." : null}
       />
     </div>
   );

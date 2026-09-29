@@ -1,10 +1,24 @@
+import { features } from "@/config/features";
 import { siteConfig } from "@/config/site.config";
 import { trackInputSchema } from "@/features/checkout/schemas";
+import { getProofSummaries } from "@/features/payments/repo";
 import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
+import { goodsTotalOf } from "@/features/pricing/pricing";
 import { formatPhone } from "@/lib/phone";
 import { consumeRateLimit } from "@/server/rate-limit";
 import { findOrderNumberByNumberAndPhone, getOrderByNumber, getOrderItems } from "./repo";
-import { buildTimeline, statusHeadline, type OrderStatus, type PaymentMethod, type PaymentStatus, type TimelineStep } from "./status";
+import {
+  buildTimeline,
+  paymentProgress,
+  proofRejectionReason,
+  statusHeadline,
+  uploadPurpose,
+  type OrderStatus,
+  type PaymentMethod,
+  type PaymentProgress,
+  type ProofPurpose,
+  type TimelineStep,
+} from "./status";
 
 const TRACK_RATE_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 };
 const TRACK_NOT_FOUND = "We couldn't find an order with that order number and phone number.";
@@ -42,8 +56,18 @@ export type CustomerOrderView = {
   headline: string;
   timeline: TimelineStep[];
   orderStatus: OrderStatus;
-  paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
+  /** Bank transfer only: where each of the two payments stands (owner decision, S8). */
+  payment: PaymentProgress & {
+    /** The goods after discounts and coupon, paid at checkout. */
+    goodsTotal: string;
+    /** Null until staff set the delivery charge. */
+    deliveryCharge: string | null;
+    /** How the delivery charge is paid (`features.deliveryChargeByTransfer`). */
+    deliveryChargeByTransfer: boolean;
+    /** What a new screenshot would pay for now, if anything, and why the last one was rejected. */
+    upload: { purpose: ProofPurpose; amount: string; rejectionReason: string | null } | null;
+  };
   customer: { name: string; phone: string; email: string | null };
   address: string[];
   note: string | null;
@@ -58,19 +82,40 @@ export type CustomerOrderView = {
 };
 
 export async function getCustomerOrder(orderNumber: string): Promise<CustomerOrderView | null> {
-  const order = await getOrderByNumber(orderNumber);
-  if (!order) return null;
-  const items = await getOrderItems(order.id);
+  const row = await getOrderByNumber(orderNumber);
+  if (!row) return null;
+  const [items, proofs] = await Promise.all([getOrderItems(row.id), getProofSummaries(row.id)]);
+  const order = { ...row, proofs };
   const countryName = new Intl.DisplayNames(["en"], { type: "region" }).of(order.country) ?? order.country;
+
+  const progress = paymentProgress(order, features.deliveryChargeByTransfer);
+  const goodsTotal = formatMoney(
+    goodsTotalOf({
+      subtotal: decimalToPaisa(order.subtotal),
+      discountTotal: decimalToPaisa(order.discountTotal),
+      couponDiscount: decimalToPaisa(order.couponDiscount),
+    }),
+  );
+  const deliveryCharge = order.shippingTotal === null ? null : formatMoney(decimalToPaisa(order.shippingTotal));
+  const purpose = uploadPurpose(order, progress);
+  // A delivery upload is only ever due once the charge is set, so its amount exists then.
+  const uploadAmount = purpose === "delivery" ? deliveryCharge : goodsTotal;
 
   return {
     orderNumber: order.orderNumber,
     placedAt: placedAtFormat.format(order.createdAt),
-    headline: statusHeadline(order),
-    timeline: buildTimeline(order),
+    headline: statusHeadline(order, progress),
+    timeline: buildTimeline(order, progress),
     orderStatus: order.orderStatus,
-    paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod,
+    payment: {
+      ...progress,
+      goodsTotal,
+      deliveryCharge,
+      deliveryChargeByTransfer: features.deliveryChargeByTransfer,
+      upload:
+        purpose && uploadAmount ? { purpose, amount: uploadAmount, rejectionReason: proofRejectionReason(order, purpose) } : null,
+    },
     customer: { name: order.customerName, phone: formatPhone(order.phone), email: order.email },
     address: [order.addressLine, [order.city, order.postalCode].filter(Boolean).join(" "), countryName],
     note: order.customerNote,
