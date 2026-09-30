@@ -1,14 +1,15 @@
 import { logoutAction } from "@/app/panel/actions";
+import { PanelIcon } from "./icons";
+import { ICON_BUTTON, Tooltip } from "./ui";
 
 export function LogoutButton() {
   return (
     <form action={logoutAction}>
-      <button
-        type="submit"
-        className="text-muted-foreground hover:text-foreground text-sm underline underline-offset-2 transition-colors hover:no-underline"
-      >
-        Log out
-      </button>
+      <Tooltip label="Log out">
+        <button type="submit" aria-label="Log out" className={ICON_BUTTON}>
+          <PanelIcon name="logout" />
+        </button>
+      </Tooltip>
     </form>
   );
 }

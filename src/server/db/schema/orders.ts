@@ -70,6 +70,8 @@ export const orders = mysqlTable(
     customerNote: text("customer_note"),
     courier: varchar("courier", { length: 100 }),
     trackingNote: varchar("tracking_note", { length: 255 }),
+    /** Set when a cancel or reject returns the stock; a second restore finds it set and does nothing. */
+    stockRestoredAt: datetime("stock_restored_at"),
     createdAt: datetime("created_at").notNull().$defaultFn(() => new Date()),
     updatedAt: datetime("updated_at")
       .notNull()

@@ -347,7 +347,7 @@ describe.skipIf(!TEST_DATABASE_URL)("createOrder (integration)", () => {
       const view = await getCustomerOrder(orderNumber);
       expect(view).toMatchObject({
         orderNumber,
-        headline: "Waiting for delivery charge",
+        headline: "Payment being checked",
         paymentMethod: "bank_transfer",
         payment: { goods: "submitted", delivery: "awaiting_charge", goodsTotal: "PKR 2,000", deliveryCharge: null, upload: null },
         customer: { name: "Test Customer", phone: "+92 300 5555555", email: null },
@@ -356,8 +356,8 @@ describe.skipIf(!TEST_DATABASE_URL)("createOrder (integration)", () => {
         totals: { subtotal: "PKR 2,000", discountTotal: null, coupon: null, delivery: { status: "pending" }, total: "PKR 2,000" },
       });
       expect(view?.timeline.slice(0, 2)).toEqual([
-        { label: "Payment under review", state: "current", note: null },
-        { label: "Waiting for delivery charge", state: "current", note: null },
+        { label: "Order placed", state: "done", note: null },
+        { label: "Payment checked", state: "current", note: "We're checking your payment screenshot." },
       ]);
       expect(await getCustomerOrder("RSH-260101-ZZZZ")).toBeNull();
     });

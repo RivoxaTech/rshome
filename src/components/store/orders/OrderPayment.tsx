@@ -11,7 +11,7 @@ const PROOF_LABEL: Record<Exclude<Payment["goods"] | Payment["delivery"], "not_d
   submitted: "Under review",
   verified: "Received",
   rejected: "Not accepted",
-  awaiting_charge: "Not set yet",
+  awaiting_charge: "After approval",
 };
 
 function PaymentRow({ label, amount, status }: { label: string; amount: string; status: string }) {
@@ -53,7 +53,6 @@ function UploadHeading({ upload }: { upload: NonNullable<Payment["upload"]> }) {
  */
 export function OrderPayment({ order, bankAccounts }: { order: CustomerOrderView; bankAccounts: BankAccount[] }) {
   const closed = order.orderStatus === "cancelled" || order.orderStatus === "rejected";
-  const awaitingQuote = order.orderStatus === "awaiting_shipping_quote";
   const { payment } = order;
 
   if (closed) {
@@ -67,8 +66,9 @@ export function OrderPayment({ order, bankAccounts }: { order: CustomerOrderView
   if (order.paymentMethod === "cod") {
     return (
       <p className="text-muted-foreground mt-4 text-sm leading-relaxed">
-        Pay {order.totals.total} in cash when your order arrives.
-        {awaitingQuote && " The delivery charge will be added once we confirm it with you on WhatsApp."}
+        {payment.deliveryCharge === null
+          ? "You pay in cash when your order arrives."
+          : `Pay ${order.totals.total} in cash when your order arrives: ${payment.goodsTotal} for the products and ${payment.deliveryCharge} for delivery.`}
       </p>
     );
   }
@@ -118,10 +118,10 @@ function nextStep(payment: Payment): string {
     parts.push(
       payment.deliveryCharge
         ? `Pay the delivery charge of ${payment.deliveryCharge} in cash when your order arrives.`
-        : "We'll confirm your delivery charge on WhatsApp. You pay it in cash when your order arrives.",
+        : "We'll set your delivery charge when we approve your order. You pay it in cash when your order arrives.",
     );
   } else if (payment.delivery === "awaiting_charge") {
-    parts.push("We'll confirm your delivery charge on WhatsApp, then you can pay it by bank transfer on this page.");
+    parts.push("Once we approve your order, you'll pay the delivery charge here by bank transfer.");
   }
-  return parts.length > 0 ? parts.join(" ") : "Thank you, your payment is complete. We'll confirm your order soon.";
+  return parts.length > 0 ? parts.join(" ") : "Thank you, your payment is complete.";
 }

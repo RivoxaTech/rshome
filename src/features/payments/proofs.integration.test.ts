@@ -10,9 +10,9 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { permissions, rateLimits, rolePermissions, roles, sessions, users } from "@/server/db/schema/access-control";
+import { rateLimits } from "@/server/db/schema/access-control";
 import { orderStatusHistory, orders, paymentProofs } from "@/server/db/schema/orders";
-import { assertTestDatabase, checkoutInput, resetTables, seedFixtures, type FixtureIds } from "@/test/integration-fixtures";
+import { assertTestDatabase, checkoutInput, createStaffSession, resetTables, seedFixtures, type FixtureIds } from "@/test/integration-fixtures";
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 const ORIGIN = new URL(process.env.APP_URL ?? "http://localhost:3000").origin;
@@ -279,18 +279,7 @@ describe.skipIf(!TEST_DATABASE_URL)("payment screenshots (integration)", () => {
     let proofId = 0;
 
     async function signIn(permissionKeys: string[]): Promise<void> {
-      const [role] = await db.insert(roles).values({ key: `test-${randomBytes(4).toString("hex")}`, name: "Test role" });
-      for (const key of permissionKeys) {
-        const [existing] = await db.select().from(permissions).where(eq(permissions.key, key));
-        const permissionId = existing?.id ?? (await db.insert(permissions).values({ key }))[0].insertId;
-        await db.insert(rolePermissions).values({ roleId: role.insertId, permissionId });
-      }
-      const [user] = await db
-        .insert(users)
-        .values({ name: "Staff", email: `${randomBytes(4).toString("hex")}@test.local`, passwordHash: "unused", roleId: role.insertId });
-      const token = randomBytes(32).toString("hex");
-      await db.insert(sessions).values({ id: hashToken(token), userId: user.insertId, expiresAt: new Date(Date.now() + 60_000) });
-      current.cookies.set("panel_session", token);
+      current.cookies.set("panel_session", (await createStaffSession(db, hashToken, permissionKeys)).token);
     }
 
     const get = (id: string | number) => serveProof(new Request(`${ORIGIN}/api/files/proof/${id}`), { params: Promise.resolve({ id: String(id) }) });

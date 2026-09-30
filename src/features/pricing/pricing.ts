@@ -297,6 +297,17 @@ export function goodsTotalOf(amounts: { subtotal: Paisa; discountTotal: Paisa; c
 }
 
 /**
+ * A stored order's new total once staff set the delivery charge (S9, client decision C13): the
+ * goods total plus the charge. Coupons never reduce the delivery charge.
+ */
+export function totalWithDeliveryCharge(
+  amounts: { subtotal: Paisa; discountTotal: Paisa; couponDiscount: Paisa },
+  deliveryCharge: Paisa,
+): Paisa {
+  return goodsTotalOf(amounts) + deliveryCharge;
+}
+
+/**
  * The whole cart on plain data: every line through `priceVariant`, then the coupon, shipping,
  * COD and totals. The browser only ever supplies variant ids and quantities; every amount here
  * comes from the loaded rows.

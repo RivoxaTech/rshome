@@ -1,11 +1,11 @@
-/** The demo's stroke-icon style (design-reference/src/components/site.tsx): thin outline, no fill. */
-export function Icon({ d, className = "h-[18px] w-[18px]" }: { d: string; className?: string }) {
+/** The demo's stroke-icon style (design-reference/src/components/site.tsx): thin outline, no fill. The panel draws a heavier stroke (C21). */
+export function Icon({ d, className = "h-[18px] w-[18px]", strokeWidth = 1.2 }: { d: string; className?: string; strokeWidth?: number }) {
   return (
     <svg
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.2"
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}

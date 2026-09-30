@@ -38,8 +38,29 @@
   --color-espresso: var(--espresso);
   --color-sand: var(--sand);
   --color-whatsapp: var(--whatsapp);
+  --color-link: var(--link);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-status-review: var(--status-review);
+  --color-status-review-foreground: var(--status-review-foreground);
+  --color-status-pending: var(--status-pending);
+  --color-status-pending-foreground: var(--status-pending-foreground);
+  --color-status-processing: var(--status-processing);
+  --color-status-processing-foreground: var(--status-processing-foreground);
+  --color-status-delivery: var(--status-delivery);
+  --color-status-delivery-foreground: var(--status-delivery-foreground);
+  --color-status-completed: var(--status-completed);
+  --color-status-completed-foreground: var(--status-completed-foreground);
+  --color-status-cancelled: var(--status-cancelled);
+  --color-status-cancelled-foreground: var(--status-cancelled-foreground);
+  --color-status-rejected: var(--status-rejected);
+  --color-status-rejected-foreground: var(--status-rejected-foreground);
   --font-serif: var(--font-cormorant-garamond);
   --font-sans: var(--font-jost);
+  --font-panel: var(--font-inter);
 }
 
 :root {
@@ -73,6 +94,82 @@
   --shadow-lift: 0 45px 80px -35px oklch(0.4 0.03 60 / 0.45);
 }
 
+/*
+ * The admin panel (owner decision C21): the same palette on lighter cards, softer corners and an
+ * espresso sidebar, plus a dark mode chosen with the header toggle (the `panel_theme` cookie, so
+ * the server renders the right one). Scoped to the panel's root element; the storefront never
+ * sees these. Status colours: need review yellow, pending delivery charge orange, processing
+ * blue, delivery purple, completed green, cancelled grey, rejected red; each foreground keeps at
+ * least 4.5:1 contrast on its fill in both modes.
+ */
+[data-panel] {
+  --radius: 0.5rem;
+  --background: oklch(0.968 0.006 85);
+  --card: oklch(0.995 0.002 85);
+  --popover: oklch(0.995 0.002 85);
+  --muted: oklch(0.955 0.009 82);
+  --border: oklch(0.91 0.012 82);
+  --link: oklch(0.5 0.09 60);
+  --sidebar: oklch(0.245 0.016 45);
+  --sidebar-foreground: oklch(0.94 0.01 85);
+  --sidebar-muted: oklch(0.74 0.02 70);
+  --sidebar-accent: oklch(0.315 0.02 45);
+  --sidebar-border: oklch(0.34 0.018 45);
+  --status-review: oklch(0.955 0.07 95);
+  --status-review-foreground: oklch(0.44 0.09 75);
+  --status-pending: oklch(0.945 0.05 60);
+  --status-pending-foreground: oklch(0.49 0.14 45);
+  --status-processing: oklch(0.945 0.03 250);
+  --status-processing-foreground: oklch(0.46 0.13 258);
+  --status-delivery: oklch(0.945 0.035 305);
+  --status-delivery-foreground: oklch(0.46 0.15 305);
+  --status-completed: oklch(0.945 0.045 155);
+  --status-completed-foreground: oklch(0.45 0.1 155);
+  --status-cancelled: oklch(0.94 0.004 85);
+  --status-cancelled-foreground: oklch(0.47 0.01 60);
+  --status-rejected: oklch(0.945 0.035 25);
+  --status-rejected-foreground: oklch(0.5 0.17 27);
+}
+
+[data-panel][data-theme="dark"] {
+  color-scheme: dark;
+  --background: oklch(0.185 0.008 50);
+  --foreground: oklch(0.93 0.008 85);
+  --card: oklch(0.225 0.009 50);
+  --card-foreground: oklch(0.93 0.008 85);
+  --popover: oklch(0.25 0.01 50);
+  --popover-foreground: oklch(0.93 0.008 85);
+  --primary: oklch(0.82 0.07 78);
+  --primary-foreground: oklch(0.2 0.015 45);
+  --secondary: oklch(0.28 0.01 50);
+  --secondary-foreground: oklch(0.93 0.008 85);
+  --muted: oklch(0.265 0.01 50);
+  --muted-foreground: oklch(0.72 0.014 70);
+  --destructive: oklch(0.66 0.19 25);
+  --border: oklch(0.31 0.01 50);
+  --input: oklch(0.36 0.01 50);
+  --link: oklch(0.82 0.08 78);
+  --sidebar: oklch(0.16 0.008 50);
+  --sidebar-foreground: oklch(0.93 0.008 85);
+  --sidebar-muted: oklch(0.68 0.014 70);
+  --sidebar-accent: oklch(0.24 0.01 50);
+  --sidebar-border: oklch(0.26 0.01 50);
+  --status-review: oklch(0.32 0.055 90);
+  --status-review-foreground: oklch(0.9 0.11 95);
+  --status-pending: oklch(0.32 0.06 55);
+  --status-pending-foreground: oklch(0.86 0.1 60);
+  --status-processing: oklch(0.31 0.05 255);
+  --status-processing-foreground: oklch(0.86 0.07 250);
+  --status-delivery: oklch(0.31 0.055 305);
+  --status-delivery-foreground: oklch(0.86 0.08 305);
+  --status-completed: oklch(0.31 0.05 155);
+  --status-completed-foreground: oklch(0.87 0.09 155);
+  --status-cancelled: oklch(0.3 0.006 60);
+  --status-cancelled-foreground: oklch(0.82 0.01 70);
+  --status-rejected: oklch(0.31 0.06 25);
+  --status-rejected-foreground: oklch(0.85 0.09 25);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -90,6 +187,12 @@
   h3 {
     font-family: var(--font-serif);
     font-weight: 300;
+  }
+
+  /* The panel is sans-serif throughout (C21). */
+  [data-panel] :where(h1, h2, h3) {
+    font-family: inherit;
+    font-weight: 600;
   }
 
   html {

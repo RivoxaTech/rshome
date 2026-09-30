@@ -1,23 +1,32 @@
-import { requireSession } from "@/server/auth/permissions";
-import { PanelSidebar } from "@/components/panel/PanelSidebar";
-import { LogoutButton } from "@/components/panel/LogoutButton";
+import { PanelFrame, type PanelNavItem } from "@/components/panel/PanelFrame";
 import { siteConfig } from "@/config/site.config";
+import { PERMISSIONS } from "@/features/auth/permissions";
+import { getOrderCounts } from "@/features/orders/staff-service";
+import { METHOD_PAGES, ordersPath } from "@/features/orders/transitions";
+import { requireSession } from "@/server/auth/permissions";
+import { readPanelTheme } from "../panel-theme";
 
-export default async function ProtectedPanelLayout({ children }: { children: React.ReactNode }) {
+/**
+ * The signed-in panel (C21). The menu is built from permissions, never role names: Dashboard and
+ * the two orders pages, each with the number of orders needing staff (new orders to review and
+ * delivery charge screenshots to check).
+ */
+export default async function ProtectedPanelLayout({ children }: LayoutProps<"/panel">) {
   const session = await requireSession();
+  const counts = session.permissions.has(PERMISSIONS.ORDER_VIEW) ? await getOrderCounts() : null;
+
+  const nav: PanelNavItem[] = [];
+  if (session.permissions.has(PERMISSIONS.DASHBOARD_VIEW)) nav.push({ label: "Dashboard", href: "/panel", icon: "dashboard", badge: 0 });
+  if (counts) {
+    nav.push(
+      { label: METHOD_PAGES.bank_transfer.navLabel, href: ordersPath("bank_transfer"), icon: "bank", badge: counts.bank_transfer.needsAction },
+      { label: METHOD_PAGES.cod.navLabel, href: ordersPath("cod"), icon: "cash", badge: counts.cod.needsAction },
+    );
+  }
 
   return (
-    <div className="bg-background flex min-h-screen flex-1">
-      <PanelSidebar permissions={session.permissions} logoText={siteConfig.logoText} />
-      <div className="flex flex-1 flex-col">
-        <header className="border-border flex items-center justify-between border-b px-6 py-3">
-          <span className="text-muted-foreground text-sm">
-            {session.name} &middot; {session.roleKey}
-          </span>
-          <LogoutButton />
-        </header>
-        <main className="flex-1 p-6">{children}</main>
-      </div>
-    </div>
+    <PanelFrame nav={nav} userName={session.name} logoText={siteConfig.logoText} theme={await readPanelTheme()}>
+      {children}
+    </PanelFrame>
   );
 }

@@ -4,7 +4,10 @@
  * these fixtures, never depending on the seed. Suites run one file at a time
  * (`fileParallelism: false`), since they share the database.
  */
+import { randomBytes } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { permissions, rateLimits, rolePermissions, roles, sessions, users } from "@/server/db/schema/access-control";
+import { auditLogs } from "@/server/db/schema/audit";
 import { categories, productImages, productVariants, products } from "@/server/db/schema/catalog";
 import { orderItems, orderStatusHistory, orders, paymentProofs } from "@/server/db/schema/orders";
 import { couponUsages, coupons } from "@/server/db/schema/promotions";
@@ -23,6 +26,7 @@ export function assertTestDatabase(): void {
 export async function resetTables(db: Db): Promise<void> {
   // Children before parents, so no foreign-key toggling is needed.
   for (const table of [
+    auditLogs,
     orderStatusHistory,
     paymentProofs,
     couponUsages,
@@ -109,4 +113,28 @@ export function checkoutInput(ids: FixtureIds, overrides: Record<string, unknown
     expectedTotal: "2000.00",
     ...overrides,
   };
+}
+
+/**
+ * A signed-in panel user whose role holds exactly `permissionKeys`. Returns the user id and the
+ * `panel_session` cookie value; `hashToken` comes from server/auth/session (imported lazily by
+ * the suites, like every app module).
+ */
+export async function createStaffSession(
+  db: Db,
+  hashToken: (token: string) => string,
+  permissionKeys: string[],
+): Promise<{ userId: number; token: string }> {
+  const [role] = await db.insert(roles).values({ key: `test-${randomBytes(4).toString("hex")}`, name: "Test role" });
+  for (const key of permissionKeys) {
+    const [existing] = await db.select().from(permissions).where(eq(permissions.key, key));
+    const permissionId = existing?.id ?? (await db.insert(permissions).values({ key }))[0].insertId;
+    await db.insert(rolePermissions).values({ roleId: role.insertId, permissionId });
+  }
+  const [user] = await db
+    .insert(users)
+    .values({ name: "Staff", email: `${randomBytes(4).toString("hex")}@test.local`, passwordHash: "unused", roleId: role.insertId });
+  const token = randomBytes(32).toString("hex");
+  await db.insert(sessions).values({ id: hashToken(token), userId: user.insertId, expiresAt: new Date(Date.now() + 60_000) });
+  return { userId: user.insertId, token };
 }

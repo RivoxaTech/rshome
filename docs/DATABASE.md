@@ -58,12 +58,12 @@ Zone resolution: an exact (country, city) row, else (country, NULL), else the `i
 ## Orders
 | Table | Columns | Indexes |
 |---|---|---|
-| orders | id, order_number VARCHAR(20) unique (`RSH-YYMMDD-XXXX`), checkout_token CHAR(36) unique, customer_name, phone VARCHAR(32) (normalised), email VARCHAR(191) NULL, address_line, city, state NULL, postal_code NULL, country CHAR(2), shipping_zone_id (FK NULL), payment_method ENUM('cod','bank_transfer'), order_status ENUM('pending','awaiting_shipping_quote','confirmed','processing','shipped','delivered','cancelled','rejected'), payment_status ENUM('unpaid','proof_submitted','verified','rejected','cod_pending','cod_collected'), rejection_reason TEXT NULL, subtotal, discount_total, coupon_id (FK NULL), coupon_code NULL, coupon_discount, shipping_total NULL (NULL while a quote is pending), shipping_note VARCHAR(255) NULL (staff's short courier/parcel note, set alongside shipping_total), total (PKR), display_currency CHAR(3), exchange_rate DECIMAL(12,4), display_total DECIMAL(12,2), customer_note TEXT NULL, courier NULL, tracking_note NULL, created_at, updated_at | order_number, checkout_token, (order_status, created_at), (payment_status, created_at), phone, created_at |
+| orders | id, order_number VARCHAR(20) unique (`RSH-YYMMDD-XXXX`), checkout_token CHAR(36) unique, customer_name, phone VARCHAR(32) (normalised), email VARCHAR(191) NULL, address_line, city, state NULL, postal_code NULL, country CHAR(2), shipping_zone_id (FK NULL), payment_method ENUM('cod','bank_transfer'), order_status ENUM('pending','awaiting_shipping_quote','confirmed','processing','shipped','delivered','cancelled','rejected'), payment_status ENUM('unpaid','proof_submitted','verified','rejected','cod_pending','cod_collected'), rejection_reason TEXT NULL, subtotal, discount_total, coupon_id (FK NULL), coupon_code NULL, coupon_discount, shipping_total NULL (NULL while a quote is pending), shipping_note VARCHAR(255) NULL (staff's short courier/parcel note, set alongside shipping_total), total (PKR), display_currency CHAR(3), exchange_rate DECIMAL(12,4), display_total DECIMAL(12,2), customer_note TEXT NULL, courier NULL, tracking_note NULL, stock_restored_at DATETIME NULL (set once when a cancel or reject returns the stock), created_at, updated_at | order_number, checkout_token, (order_status, created_at), (payment_status, created_at), phone, created_at |
 | order_items | id, order_id (FK), product_id (FK), variant_id (FK product_variants), name_snapshot, variant_label_snapshot (empty string for a simple product's "Default" variant, which the customer never saw), sku_snapshot (the variant's sku), unit_price (base), discount_amount (per unit), quantity, line_total | order_id |
 | payment_proofs | id, order_id (FK), purpose ENUM('goods','delivery') (what the transfer paid for: the goods at checkout, or the delivery charge quoted later), file_path (relative to `UPLOAD_DIR`), file_size INT, status ENUM('submitted','verified','rejected'), rejection_reason NULL, reviewed_by (FK users NULL), reviewed_at NULL, created_at | order_id |
 | order_status_history | id, order_id (FK), kind ENUM('order','payment','note'), from_status NULL, to_status NULL, note TEXT NULL (reason or internal note), changed_by (FK users NULL; NULL = customer/system), created_at | (order_id, created_at) |
 
-`awaiting_shipping_quote` is used by zones in `quote` mode (not listed in REQUIREMENTS §6.2, but required by §6.4).
+`awaiting_shipping_quote` is used by zones in `quote` mode (not listed in REQUIREMENTS §6.2, but required by §6.4). Owner decisions C20, C21: the panel shows orders as status tabs per payment method over these enums (ARCHITECTURE.md §4.3); `confirmed` is no longer entered (an approved order is `processing`) but stays in the enum.
 
 ## Other
 | Table | Columns |
@@ -88,7 +88,7 @@ Zone resolution: an exact (country, city) row, else (country, NULL), else the `i
 
 ## Rules the schema must support
 1. A payment can be rejected many times; every proof is kept.
-2. An order can be rejected with a reason without deleting anything; stock is restored and the coupon use released.
+2. An order can be rejected with a reason without deleting anything; stock is restored (once, guarded by `stock_restored_at`) and the coupon use released.
 3. Discount and coupon exclusivity is enforced in `features/pricing`, tested, and recorded on the order (`coupon_id` is set only when no line was discounted).
 4. Old orders never change when prices, rates or products change (snapshots).
 5. A repeated checkout submit never creates a second order (`checkout_token`).
@@ -112,3 +112,4 @@ Zone resolution: an exact (country, city) row, else (country, NULL), else the `i
 | DB14 | `wholesale_inquiries.business` made nullable | Client decision: individuals and event inquiries may have no business name. |
 | DB15 (29 Sep) | Integration tests run against a second database, `rs_home_test` (`TEST_DATABASE_URL`, name must end in `_test`), created and migrated by `npm run db:migrate:test` | `createOrder` tests wipe and rebuild their fixtures; they must never touch the dev data. |
 | DB16 (29 Sep) | `payment_proofs.purpose` (migration `0004_payment_proof_purpose`); a bank order's `payment_status` starts `proof_submitted` | Owner decision (S8, ARCHITECTURE.md D32): the goods screenshot comes with the order and the delivery charge gets its own; staff must tell them apart. |
+| DB17 (30 Sep) | `orders.stock_restored_at` (migration `0005_order_stock_restored`) | S9: a second guard against restoring stock twice on cancel/reject (ARCHITECTURE.md D37). |
