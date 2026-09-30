@@ -10,6 +10,8 @@ const extraServerActionOrigins = (process.env.ALLOWED_ORIGINS ?? "")
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Dev only: the "N" indicator sits bottom-left by default, over the panel's profile block.
+  devIndicators: { position: "bottom-right" },
   // ARCHITECTURE.md §5, D8: pre-generated WebP sizes served from /media, no runtime optimizer.
   images: {
     loader: "custom",

@@ -45,10 +45,10 @@ export function Dialog({
     >
       <div className="border-border flex items-start justify-between gap-3 border-b py-3 pr-2 pl-4 sm:pl-5">
         <div className="min-w-0 pt-1.5">
-          <h2 id={titleId} className="text-base">
+          <h2 id={titleId} className="text-[15px]">
             {title}
           </h2>
-          {description && <p className="text-muted-foreground mt-0.5 text-sm">{description}</p>}
+          {description && <p className="text-muted-foreground mt-0.5 text-[13px]">{description}</p>}
         </div>
         <button type="button" onClick={() => ref.current?.close()} aria-label="Close" className={ICON_BUTTON}>
           <PanelIcon name="close" />

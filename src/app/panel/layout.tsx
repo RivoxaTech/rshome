@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { siteConfig } from "@/config/site.config";
-import { readPanelTheme } from "./panel-theme";
+import { readPanelTheme } from "./panel-prefs";
 
 // The panel's own sans-serif (owner decision C21); the storefront keeps its fonts.
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });

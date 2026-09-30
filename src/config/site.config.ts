@@ -24,6 +24,8 @@ export const siteConfig = {
    */
   staffWhatsAppMessages: {
     general: "Hello {name}, this is {store} about your order {orderNumber}.",
+    screenshotMissing:
+      "Hello {name}, this is {store} about your order {orderNumber}. We haven't received your payment screenshot yet. Please upload it here: {orderUrl}",
     screenshotRejected:
       "Hello {name}, this is {store}. We couldn't accept the payment screenshot for your order {orderNumber}. Please upload a new one here: {orderUrl}",
     approvedDeliveryDue:

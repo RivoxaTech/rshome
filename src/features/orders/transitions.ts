@@ -6,6 +6,7 @@
 import type { orders } from "@/server/db/schema/orders";
 import {
   paymentProgress,
+  type LatestProofs,
   type OrderStatus,
   type PaymentMethod,
   type PaymentStatus,
@@ -80,9 +81,12 @@ export function canMovePayment(from: PaymentStatus, to: PaymentStatus): boolean 
   return PAYMENT_TRANSITIONS[from].includes(to);
 }
 
-/** Before approval is complete: staff review screenshots and the customer can still upload them. */
-export function canReviewProofs(orderStatus: OrderStatus): boolean {
-  return orderStatus === "awaiting_shipping_quote" || orderStatus === "pending";
+/**
+ * A screenshot waiting for staff can be checked whatever tab its order is in, as long as the
+ * order is open (C22). In Need review the products screenshot is approved by "Approve order".
+ */
+export function canReviewProof(orderStatus: OrderStatus): boolean {
+  return orderStatus !== "cancelled" && orderStatus !== "rejected";
 }
 
 /**
@@ -173,29 +177,57 @@ export function orderTab(order: QueueOrder): OrderTab {
   }
 }
 
-/** A delivery charge screenshot waiting for staff: the alert dot, and part of the sidebar badge. */
-export function deliveryScreenshotToCheck(order: QueueOrder): boolean {
-  return order.paymentMethod === "bank_transfer" && order.orderStatus === "pending" && order.paymentStatus === "proof_submitted";
-}
+/** An order with each payment's latest screenshot (products and delivery charge), as the flags need it. */
+export type FlagOrder = QueueOrder & { latest: LatestProofs };
 
-/** An order waiting for staff: a new one to review, or a delivery charge screenshot to check (the sidebar badge). */
-export function needsAction(order: QueueOrder): boolean {
-  return order.orderStatus === "awaiting_shipping_quote" || deliveryScreenshotToCheck(order);
-}
+const PROOF_PURPOSES: readonly ProofPurpose[] = ["goods", "delivery"];
 
-/** A step the status dropdown offers; each opens a dialog. */
-export type StatusAction = "approve" | "check_delivery" | "ship" | "complete" | "cancel" | "reject";
+/** The products screenshot of a bank order, or `not_due` for cash on delivery. */
+export function goodsState(order: FlagOrder): ProofState | "not_due" {
+  return order.paymentMethod === "bank_transfer" ? order.latest.goods : "not_due";
+}
 
 /**
- * What staff can do next (C21): only forward moves this order can make now, never back, then
- * cancel and reject until it is out for delivery. A bank order waiting for a new products
- * screenshot, or for its delivery charge screenshot, offers nothing forward. The Server Action
- * checks the move again under the order lock.
+ * The screenshots staff still have to check (C22), products first: a payment whose latest
+ * screenshot is `submitted`, on an open bank order. In Need review the products screenshot is
+ * part of the order review ("Approve order"), so it doesn't count here.
  */
-export function statusActions(order: QueueOrder, goods: ProofState | "not_due"): StatusAction[] {
+export function screenshotsToCheck(order: FlagOrder): ProofPurpose[] {
+  if (order.paymentMethod !== "bank_transfer" || !canReviewProof(order.orderStatus)) return [];
+  return PROOF_PURPOSES.filter(
+    (purpose) => order.latest[purpose] === "submitted" && !(purpose === "goods" && order.orderStatus === "awaiting_shipping_quote"),
+  );
+}
+
+/** The alert dot on the row and the tab, and part of the sidebar badge. */
+export function screenshotToCheck(order: FlagOrder): boolean {
+  return screenshotsToCheck(order).length > 0;
+}
+
+/**
+ * An order waiting for staff (the sidebar badge): a new order they can approve, or a screenshot
+ * to check. A bank order still waiting for its first or a new products screenshot waits for the
+ * customer, not for staff.
+ */
+export function needsAction(order: FlagOrder): boolean {
+  const approvable = order.orderStatus === "awaiting_shipping_quote" && approvalRefusal(order, goodsState(order)) === null;
+  return approvable || screenshotToCheck(order);
+}
+
+/** A step the status menu offers; each opens a dialog. */
+export type StatusAction = "approve" | "check_screenshot" | "ship" | "complete" | "cancel" | "reject";
+
+/**
+ * What staff can do next (C21, C22): only forward moves this order can make now, never back, then
+ * cancel and reject until it is out for delivery. Pending delivery charge moves on to Processing
+ * by checking the screenshots, once both payments are in. A bank order waiting for the customer
+ * offers nothing forward. The Server Action checks the move again under the order lock.
+ */
+export function statusActions(order: FlagOrder): StatusAction[] {
   const actions: StatusAction[] = [];
-  if (order.orderStatus === "awaiting_shipping_quote" && approvalRefusal(order, goods) === null) actions.push("approve");
-  if (deliveryScreenshotToCheck(order)) actions.push("check_delivery");
+  if (order.orderStatus === "awaiting_shipping_quote" && approvalRefusal(order, goodsState(order)) === null) actions.push("approve");
+  const bothIn = PROOF_PURPOSES.every((purpose) => order.latest[purpose] === "submitted" || order.latest[purpose] === "verified");
+  if (order.orderStatus === "pending" && screenshotToCheck(order) && bothIn) actions.push("check_screenshot");
   const targets = fulfilmentTargets(order.orderStatus);
   if (targets.includes("shipped")) actions.push("ship");
   if (targets.includes("delivered")) actions.push("complete");
@@ -203,12 +235,12 @@ export function statusActions(order: QueueOrder, goods: ProofState | "not_due"):
   return actions;
 }
 
-/** The tab an action takes the order to, which the dropdown shows as the option. */
+/** The tab an action takes the order to, which the status menu shows as the option. */
 export function actionTarget(action: StatusAction, paymentMethod: PaymentMethod, deliveryChargeByTransfer: boolean): OrderTab {
   switch (action) {
     case "approve":
       return paymentMethod === "bank_transfer" && deliveryChargeByTransfer ? "pending_delivery" : "processing";
-    case "check_delivery":
+    case "check_screenshot":
       return "processing";
     case "ship":
       return "delivery";
@@ -231,9 +263,8 @@ export function actionTarget(action: StatusAction, paymentMethod: PaymentMethod,
 export function approvalRefusal(order: QueueOrder, goods: ProofState | "not_due"): string | null {
   if (order.orderStatus === "cancelled" || order.orderStatus === "rejected") return "This order is closed.";
   if (order.orderStatus !== "awaiting_shipping_quote") return "This order is already approved.";
-  if (order.paymentMethod === "bank_transfer" && goods !== "submitted" && goods !== "verified") {
-    return "Waiting for a new payment screenshot from the customer.";
-  }
+  if (order.paymentMethod === "bank_transfer" && goods === "missing") return "The customer hasn't uploaded a payment screenshot yet.";
+  if (order.paymentMethod === "bank_transfer" && goods === "rejected") return "Waiting for a new payment screenshot from the customer.";
   return null;
 }
 
@@ -246,9 +277,23 @@ export function approvedStatus(paymentMethod: PaymentMethod, deliveryCharge: num
   return paymentMethod === "bank_transfer" && deliveryChargeByTransfer && deliveryCharge > 0 ? "pending" : "processing";
 }
 
-/** Once the delivery charge screenshot is approved, the order moves to Processing. */
+/** Once every due payment is approved, an order in Pending delivery charge moves to Processing. */
 export function statusAfterPaymentReview(orderStatus: OrderStatus, paymentStatus: PaymentStatus): OrderStatus {
   return orderStatus === "pending" && paymentStatus === "verified" ? "processing" : orderStatus;
+}
+
+/**
+ * Where approving the latest `purpose` screenshot would leave the order, for the review dialog's
+ * wording: the same recompute `reviewProof` runs. `proofs` are newest first.
+ */
+export function orderStatusIfApproved(
+  order: TimelineOrder & Pick<OrderRow, "paymentStatus">,
+  purpose: ProofPurpose,
+  deliveryChargeByTransfer: boolean,
+): OrderStatus {
+  const latest = order.proofs.findIndex((proof) => proof.purpose === purpose);
+  const proofs = order.proofs.map((proof, index) => (index === latest ? { ...proof, status: "verified" as const } : proof));
+  return statusAfterPaymentReview(order.orderStatus, recomputePaymentStatus({ ...order, proofs }, deliveryChargeByTransfer));
 }
 
 // ── Fulfilment: Delivery (`shipped`) and Completed (`delivered`), forward only ───────────────

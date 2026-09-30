@@ -6,7 +6,7 @@ import { DIALOG_BODY, DIALOG_FOOTER, Dialog } from "@/components/panel/Dialog";
 import { ActionMessage, BUTTON, INPUT, LABEL, TEXTAREA } from "@/components/panel/ui";
 import type { OrderControl } from "@/features/orders/staff-service";
 import type { CloseAction, StatusAction } from "@/features/orders/transitions";
-import { ApproveDialog, DeliveryCheckDialog } from "./ReviewDialogs";
+import { ApproveDialog, ScreenshotCheckDialog } from "./ReviewDialogs";
 import { useStaffAction } from "./use-staff-action";
 
 type Props = { control: OrderControl; onClose: () => void };
@@ -38,7 +38,7 @@ function FulfilDialog({ control, onClose, status }: Props & { status: "shipped" 
               </label>
             </>
           ) : (
-            <p className="text-sm leading-relaxed">
+            <p className="text-[13px] leading-relaxed">
               The order has reached the customer.
               {control.isCod && (
                 <>
@@ -48,7 +48,7 @@ function FulfilDialog({ control, onClose, status }: Props & { status: "shipped" 
               )}
             </p>
           )}
-          <p className="text-muted-foreground text-sm">This can&apos;t be undone.</p>
+          <p className="text-muted-foreground text-[13px]">This can&apos;t be undone.</p>
           <ActionMessage state={state} />
         </div>
         <div className={DIALOG_FOOTER}>
@@ -88,7 +88,7 @@ function CloseDialog({ control, onClose, initial }: Props & { initial: CloseActi
               {(Object.keys(CLOSE_CHOICES) as CloseAction[]).map((key) => (
                 <label
                   key={key}
-                  className={`flex min-h-10 cursor-pointer items-center justify-center rounded-md text-sm font-medium transition-colors ${
+                  className={`flex min-h-10 cursor-pointer items-center justify-center rounded-md text-[13px] font-medium transition-colors ${
                     choice === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -103,7 +103,7 @@ function CloseDialog({ control, onClose, initial }: Props & { initial: CloseActi
             <textarea name="reason" required maxLength={500} rows={3} className={TEXTAREA} placeholder="e.g. Out of stock" />
             <span className="text-muted-foreground mt-1.5 block text-xs">The customer sees this on their order page.</span>
           </label>
-          <p className="bg-muted text-muted-foreground rounded-md px-3 py-2 text-sm leading-relaxed">
+          <p className="bg-muted text-muted-foreground rounded-md px-3 py-2 text-[13px] leading-relaxed">
             The items go back into stock and any coupon use is released. The order and its history are kept.
           </p>
           <ActionMessage state={state} />
@@ -126,8 +126,8 @@ export function ActionDialog({ action, control, onClose }: Props & { action: Sta
   switch (action) {
     case "approve":
       return <ApproveDialog control={control} onClose={onClose} />;
-    case "check_delivery":
-      return <DeliveryCheckDialog control={control} onClose={onClose} />;
+    case "check_screenshot":
+      return control.toCheck[0] ? <ScreenshotCheckDialog control={control} proof={control.toCheck[0]} onClose={onClose} /> : null;
     case "ship":
       return <FulfilDialog control={control} onClose={onClose} status="shipped" />;
     case "complete":

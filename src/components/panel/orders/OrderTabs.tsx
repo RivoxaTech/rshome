@@ -4,37 +4,33 @@ import type { PaymentMethod } from "@/features/orders/status";
 import { TAB_INFO, ordersPath, tabsFor, type OrderTab } from "@/features/orders/transitions";
 
 /**
- * The status tabs (C21, like the reference's): All then each tab with its count. Pending delivery
- * charge also shows how many delivery charge screenshots wait to be checked. The search stays.
+ * The status tabs (C21, C22): All then each tab with its one count. A tab holding orders with a
+ * screenshot to check shows a small dot, not a second number. The search stays.
  */
 export function OrderTabs({ method, active, counts, q }: { method: PaymentMethod; active: OrderTab | "all"; counts: TabCounts; q?: string }) {
   const tabs: { key: OrderTab | "all"; label: string }[] = [{ key: "all", label: "All" }, ...tabsFor(method).map((tab) => ({ key: tab, label: TAB_INFO[tab].label }))];
 
   return (
-    <nav aria-label="Order status" className="border-border no-scrollbar -mx-4 flex overflow-x-auto border-b px-2 sm:-mx-5 sm:px-3">
+    <nav aria-label="Order status" className="border-border no-scrollbar flex overflow-x-auto border-b px-2">
       {tabs.map(({ key, label }) => {
         const selected = key === active;
-        const alert = key === "pending_delivery" ? counts.toCheck : 0;
+        const toCheck = key === "all" ? 0 : counts.toCheck[key];
         return (
           <Link
             key={key}
             href={ordersPath(method, key, { q })}
             aria-current={selected ? "page" : undefined}
-            className={`relative flex min-h-12 shrink-0 items-center gap-2 px-3 text-sm font-medium whitespace-nowrap transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full ${
+            className={`relative flex h-10 shrink-0 items-center gap-1.5 px-2.5 text-[13px] font-medium whitespace-nowrap transition-colors after:absolute after:inset-x-2.5 after:bottom-0 after:h-0.5 after:rounded-full ${
               selected ? "text-foreground after:bg-primary" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {label}
-            <span className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+            <span className={`h-5 min-w-5 rounded-full px-1.5 text-center text-[11px] leading-5 tabular-nums ${selected ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
               {counts[key]}
             </span>
-            {alert > 0 && (
-              <span
-                title={`${alert} delivery charge ${alert === 1 ? "screenshot" : "screenshots"} to check`}
-                className="bg-status-pending-foreground text-card flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums"
-              >
-                <span className="sr-only">, screenshots to check: </span>
-                {alert}
+            {toCheck > 0 && (
+              <span title={`${toCheck} with a screenshot to check`} className="bg-status-pending-foreground size-1.5 rounded-full">
+                <span className="sr-only">, {toCheck} with a screenshot to check</span>
               </span>
             )}
           </Link>

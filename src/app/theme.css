@@ -200,6 +200,14 @@
   }
 
   /*
+   * The signed-in panel is a fixed, full-screen frame whose content area is the one scrollbar
+   * (C22): the document itself never scrolls, whatever the zoom.
+   */
+  html:has([data-panel-frame]) {
+    overflow: hidden;
+  }
+
+  /*
    * Keyboard focus only: a soft champagne ring when tabbing, nothing after a mouse or touch
    * interaction. `data-input` comes from components/ui/FocusModality.tsx; before it hydrates,
    * plain :focus-visible applies.

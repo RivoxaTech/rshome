@@ -9,6 +9,8 @@ import { ProofImage } from "./ProofImage";
 import { useStaffAction } from "./use-staff-action";
 
 type Props = { control: OrderControl; onClose: () => void };
+/** A screenshot waiting to be checked, with the amount it should show and what approving it does. */
+export type ProofToCheck = OrderControl["toCheck"][number];
 
 /** Reject a screenshot with the reason the customer sees on their order page; they can upload again. */
 function RejectProofForm({ proof, onBack, onDone }: { proof: ProofView; onBack: () => void; onDone: () => void }) {
@@ -39,7 +41,7 @@ function RejectProofForm({ proof, onBack, onDone }: { proof: ProofView; onBack: 
 
 function ScreenshotCaption({ proof, amount }: { proof: ProofView; amount: string | null }) {
   return (
-    <p className="text-muted-foreground text-sm">
+    <p className="text-muted-foreground text-[13px]">
       {amount && (
         <>
           Should show <strong className="text-foreground font-semibold">{amount}</strong> ·{" "}
@@ -54,14 +56,15 @@ function ScreenshotCaption({ proof, amount }: { proof: ProofView; amount: string
  * Need review → approve (C21): the delivery charge in whole rupees (0 allowed) and an optional
  * note; for bank transfer the products screenshot too, which can be rejected instead. Approve
  * stays disabled until a charge is typed. One tap sets the charge, approves the screenshot and
- * moves the order on (`approveOrder`).
+ * moves the order on (`approveOrder`). The detail page, which already shows the screenshot large,
+ * opens it without the picture, or straight at the rejection.
  */
-export function ApproveDialog({ control, onClose }: Props) {
+export function ApproveDialog({ control, onClose, showProof = true, startRejecting = false }: Props & { showProof?: boolean; startRejecting?: boolean }) {
   const [state, action, pending] = useStaffAction(approveOrderAction, onClose);
   const [amount, setAmount] = useState("");
-  const [rejecting, setRejecting] = useState(false);
+  const [rejecting, setRejecting] = useState(startRejecting);
   const proof = control.isCod ? null : control.goodsProof;
-  const canReject = proof?.status === "submitted" && control.canRejectProof;
+  const canReject = proof?.status === "submitted" && control.canReviewProofs;
   const entered = /^\d[\d,]*$/.test(amount.trim());
 
   const hint = control.isCod
@@ -73,14 +76,14 @@ export function ApproveDialog({ control, onClose }: Props) {
   return (
     <Dialog title={rejecting ? "Reject payment screenshot" : "Approve order"} description={`Order ${control.orderNumber}`} onClose={onClose}>
       {rejecting && proof ? (
-        <RejectProofForm proof={proof} onBack={() => setRejecting(false)} onDone={onClose} />
+        <RejectProofForm proof={proof} onBack={startRejecting ? onClose : () => setRejecting(false)} onDone={onClose} />
       ) : (
         <form action={action}>
           <input type="hidden" name="orderNumber" value={control.orderNumber} />
           <div className={DIALOG_BODY}>
-            {proof && (
+            {proof && showProof && (
               <div className="grid gap-2">
-                <p className="text-sm font-medium">Products payment screenshot</p>
+                <p className="text-[13px] font-medium">Products payment screenshot</p>
                 <ProofImage proofId={proof.id} alt="Products payment screenshot" />
                 <ScreenshotCaption proof={proof} amount={control.goodsTotal} />
               </div>
@@ -90,6 +93,7 @@ export function ApproveDialog({ control, onClose }: Props) {
               <input
                 name="amount"
                 required
+                autoFocus={!showProof}
                 inputMode="numeric"
                 autoComplete="off"
                 maxLength={9}
@@ -105,11 +109,11 @@ export function ApproveDialog({ control, onClose }: Props) {
               </span>
               <input name="note" maxLength={255} className={INPUT} placeholder="e.g. 2 cartons, TCS" />
             </label>
-            <p className="text-muted-foreground text-sm leading-relaxed">{hint}</p>
+            <p className="text-muted-foreground text-[13px] leading-relaxed">{hint}</p>
             <ActionMessage state={state} />
           </div>
-          <div className={`${DIALOG_FOOTER} ${canReject ? "sm:justify-between" : ""}`}>
-            {canReject && (
+          <div className={`${DIALOG_FOOTER} ${canReject && showProof ? "sm:justify-between" : ""}`}>
+            {canReject && showProof && (
               <button type="button" onClick={() => setRejecting(true)} className={BUTTON.dangerOutline}>
                 Reject screenshot
               </button>
@@ -125,27 +129,27 @@ export function ApproveDialog({ control, onClose }: Props) {
 }
 
 /**
- * Pending delivery charge with a screenshot in (C21): approve it (the order moves to Processing)
- * or reject it with a reason.
+ * Check a screenshot that is waiting (C22), products or delivery charge, whatever tab the order is
+ * in: approve it (the payment summary is recomputed, and the order moves to Processing once both
+ * payments are in) or reject it with a reason.
  */
-export function DeliveryCheckDialog({ control, onClose }: Props) {
+export function ScreenshotCheckDialog({ control, proof, onClose, startRejecting = false }: Props & { proof: ProofToCheck; startRejecting?: boolean }) {
   const [state, action, pending] = useStaffAction(reviewProofAction, onClose);
-  const [rejecting, setRejecting] = useState(false);
-  const proof = control.deliveryProof;
-  if (!proof) return null;
+  const [rejecting, setRejecting] = useState(startRejecting);
+  const what = `${proof.purposeLabel.toLowerCase()} screenshot`;
 
   return (
-    <Dialog title={rejecting ? "Reject delivery charge screenshot" : "Check delivery charge"} description={`Order ${control.orderNumber}`} onClose={onClose}>
+    <Dialog title={rejecting ? `Reject ${what}` : `Check ${what}`} description={`Order ${control.orderNumber}`} onClose={onClose}>
       {rejecting ? (
-        <RejectProofForm proof={proof} onBack={() => setRejecting(false)} onDone={onClose} />
+        <RejectProofForm proof={proof} onBack={startRejecting ? onClose : () => setRejecting(false)} onDone={onClose} />
       ) : (
         <form action={action}>
           <input type="hidden" name="proofId" value={proof.id} />
           <input type="hidden" name="decision" value="approve" />
           <div className={DIALOG_BODY}>
-            <ProofImage proofId={proof.id} alt="Delivery charge payment screenshot" />
-            <ScreenshotCaption proof={proof} amount={control.deliveryCharge} />
-            <p className="text-muted-foreground text-sm">Approving moves the order to Processing.</p>
+            <ProofImage proofId={proof.id} alt={`${proof.purposeLabel} payment screenshot`} />
+            <ScreenshotCaption proof={proof} amount={proof.amount} />
+            {proof.effect && <p className="text-muted-foreground text-[13px]">{proof.effect}</p>}
             <ActionMessage state={state} />
           </div>
           <div className={`${DIALOG_FOOTER} sm:justify-between`}>
@@ -153,11 +157,26 @@ export function DeliveryCheckDialog({ control, onClose }: Props) {
               Reject
             </button>
             <button type="submit" disabled={pending} className={BUTTON.primary}>
-              {pending ? "Approving…" : "Approve delivery charge"}
+              {pending ? "Approving…" : "Approve screenshot"}
             </button>
           </div>
         </form>
       )}
     </Dialog>
+  );
+}
+
+/** Approve a waiting screenshot in one tap, from the detail page where it is already shown large. */
+export function ApproveProofButton({ proof }: { proof: ProofToCheck }) {
+  const [state, action, pending] = useStaffAction(reviewProofAction, () => {});
+  return (
+    <form action={action} className="grid gap-2">
+      <input type="hidden" name="proofId" value={proof.id} />
+      <input type="hidden" name="decision" value="approve" />
+      <button type="submit" disabled={pending} className={BUTTON.primary}>
+        {pending ? "Approving…" : "Approve screenshot"}
+      </button>
+      <ActionMessage state={state} />
+    </form>
   );
 }

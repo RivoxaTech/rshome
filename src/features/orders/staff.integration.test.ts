@@ -16,8 +16,8 @@ import { orderStatusHistory, orders, paymentProofs } from "@/server/db/schema/or
 import { couponUsages, coupons } from "@/server/db/schema/promotions";
 import { assertTestDatabase, checkoutInput, createStaffSession, resetTables, seedFixtures, type FixtureIds } from "@/test/integration-fixtures";
 import type { PermissionKey } from "@/features/auth/permissions";
-import type { PaymentMethod } from "./status";
-import { deliveryScreenshotToCheck, needsAction, orderTab, tabsFor, type OrderTab } from "./transitions";
+import { latestProofStates, type PaymentMethod } from "./status";
+import { needsAction, orderTab, screenshotToCheck, tabsFor, type OrderTab } from "./transitions";
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
@@ -203,7 +203,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     await customerUploads(order.orderNumber, "delivery");
     expect(await tabOf(order.orderNumber, "bank_transfer")).toBe("pending_delivery");
     expect((await rowOf(order.orderNumber, "bank_transfer")).screenshotToCheck).toBe(true);
-    expect(await stepsOf(order.orderNumber, "bank_transfer")).toEqual(["check_delivery", "cancel", "reject"]);
+    expect(await stepsOf(order.orderNumber, "bank_transfer")).toEqual(["check_screenshot", "cancel", "reject"]);
     expect(await review(await latestProofId(order.id, "delivery"), "approve")).toEqual({ ok: true });
     expect(await orderRow(order.orderNumber)).toMatchObject({ orderStatus: "processing", paymentStatus: "verified" });
     expect(await tabOf(order.orderNumber, "bank_transfer")).toBe("processing");
@@ -256,7 +256,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     expect(await orderRow(order.orderNumber)).toMatchObject({ orderStatus: "awaiting_shipping_quote", paymentStatus: "rejected" });
     expect(await tabOf(order.orderNumber, "bank_transfer")).toBe("need_review");
     expect(await stepsOf(order.orderNumber, "bank_transfer")).toEqual(["cancel", "reject"]);
-    expect((await rowOf(order.orderNumber, "bank_transfer")).control.waiting).toBe("Waiting for a new payment screenshot");
+    expect((await rowOf(order.orderNumber, "bank_transfer")).control.waiting).toBe("Screenshot rejected, waiting for a new one");
     expect(await approve(order.orderNumber, "450")).toEqual({ ok: false, error: "Waiting for a new payment screenshot from the customer." });
     expect((await getCustomerOrder(order.orderNumber))?.payment.upload).toMatchObject({ purpose: "goods", rejectionReason: "Amount does not match" });
 
@@ -281,6 +281,101 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
       "delivery:rejected",
       "delivery:submitted",
     ]);
+  });
+
+  it("reviews a products screenshot waiting in Pending delivery charge, products first, and moves on once both are approved (C22)", async () => {
+    const order = await placeBankOrder();
+    expect(await approve(order.orderNumber, "450")).toEqual({ ok: true });
+    // The state order RSH-260930-5YD7 was in: a products screenshot waiting after approval, which
+    // the flow no longer produces, then the customer's delivery charge screenshot.
+    await insertProof(order.id, "goods", "submitted");
+    await db.update(orders).set({ paymentStatus: "proof_submitted" }).where(eq(orders.id, order.id));
+    await customerUploads(order.orderNumber, "delivery");
+    const goodsId = await latestProofId(order.id, "goods");
+    const deliveryId = await latestProofId(order.id, "delivery");
+
+    // The dialog shows the waiting screenshots, products first, never the approved one.
+    let row = await rowOf(order.orderNumber, "bank_transfer");
+    expect(row.screenshotToCheck).toBe(true);
+    expect(row.control.toCheck.map((proof) => [proof.id, proof.purpose])).toEqual([
+      [goodsId, "goods"],
+      [deliveryId, "delivery"],
+    ]);
+    expect(row.control.toCheck[0].effect).toBe("Then check the delivery charge screenshot.");
+    expect(row.control.waiting).toBe("Both screenshots to check");
+    expect(await stepsOf(order.orderNumber, "bank_transfer")).toEqual(["check_screenshot", "cancel", "reject"]);
+
+    // The delivery charge first: the products are still waiting, so the order stays.
+    expect(await review(deliveryId, "approve")).toEqual({ ok: true });
+    expect(await orderRow(order.orderNumber)).toMatchObject({ orderStatus: "pending", paymentStatus: "proof_submitted" });
+    row = await rowOf(order.orderNumber, "bank_transfer");
+    expect(row.control.toCheck.map((proof) => proof.id)).toEqual([goodsId]);
+    expect(row.control.toCheck[0]).toMatchObject({ amount: "PKR 2,000", effect: "Approving moves the order to Processing." });
+    expect((await staff.getOrderCounts()).bank_transfer.toCheck.pending_delivery).toBeGreaterThan(0);
+
+    // The products screenshot on its own, past Need review: both payments are in, on to Processing.
+    expect(await review(goodsId, "approve")).toEqual({ ok: true });
+    expect(await orderRow(order.orderNumber)).toMatchObject({ orderStatus: "processing", paymentStatus: "verified" });
+    expect(await tabOf(order.orderNumber, "bank_transfer")).toBe("processing");
+    expect((await rowOf(order.orderNumber, "bank_transfer")).screenshotToCheck).toBe(false);
+    expect((await historyOf(order.id)).filter((entry) => entry.kind === "order").at(-1)).toMatchObject({
+      fromStatus: "pending",
+      toStatus: "processing",
+      note: "All payments approved",
+      changedBy: adminId,
+    });
+    const audits = await db.select().from(auditLogs).where(eq(auditLogs.action, "payment.approve"));
+    expect(audits.filter((entry) => [goodsId, deliveryId].map(String).includes(entry.entityId))).toHaveLength(2);
+  });
+
+  it("refuses a products screenshot approved on its own in Need review, and allows it after (C22)", async () => {
+    const order = await placeBankOrder();
+    const firstGoods = await latestProofId(order.id, "goods");
+    expect(await review(firstGoods, "approve")).toEqual({ ok: false, error: "Enter the delivery charge and tap Approve order." });
+    expect((await proofsOf(order.id))[0].status).toBe("submitted");
+
+    expect(await approve(order.orderNumber, "450")).toEqual({ ok: true });
+    await insertProof(order.id, "goods", "submitted");
+    await db.update(orders).set({ paymentStatus: "proof_submitted" }).where(eq(orders.id, order.id));
+    const secondGoods = await latestProofId(order.id, "goods");
+    expect((await rowOf(order.orderNumber, "bank_transfer")).control.toCheck[0]).toMatchObject({
+      id: secondGoods,
+      effect: "The order stays in Pending delivery charge until both payments are approved.",
+    });
+    // No delivery charge screenshot yet, so the menu doesn't offer Processing.
+    expect(await stepsOf(order.orderNumber, "bank_transfer")).toEqual(["cancel", "reject"]);
+
+    expect(await review(secondGoods, "approve")).toEqual({ ok: true });
+    expect(await orderRow(order.orderNumber)).toMatchObject({ orderStatus: "pending", paymentStatus: "unpaid" });
+    expect((await rowOf(order.orderNumber, "bank_transfer")).control.waiting).toBe("Waiting for the delivery charge");
+
+    // A closed order's screenshots can't be checked.
+    await insertProof(order.id, "delivery", "submitted");
+    expect(await close(order.orderNumber, "cancel", "Customer changed their mind")).toEqual({ ok: true });
+    expect(await review(await latestProofId(order.id, "delivery"), "approve")).toEqual({
+      ok: false,
+      error: "This order is closed, so its screenshots can't be checked.",
+    });
+  });
+
+  it("never approves a bank order in Need review without a payment screenshot (C22)", async () => {
+    const orderNumber = "NOP-000000-0001";
+    const orderId = await insertOrder({ orderNumber, customerName: "No Screenshot", paymentMethod: "bank_transfer", orderStatus: "awaiting_shipping_quote", paymentStatus: "unpaid" });
+    const before = await staff.getOrderCounts();
+
+    expect(await approve(orderNumber, "450")).toEqual({ ok: false, error: "The customer hasn't uploaded a payment screenshot yet." });
+    expect(await orderRow(orderNumber)).toMatchObject({ orderStatus: "awaiting_shipping_quote", paymentStatus: "unpaid", shippingTotal: null });
+    const row = await rowOf(orderNumber, "bank_transfer");
+    expect(row.control).toMatchObject({ tab: "need_review", statusLabel: "Waiting for payment screenshot", waiting: null, toCheck: [] });
+    expect(row.control.actions.map(({ action }) => action)).toEqual(["cancel", "reject"]);
+
+    const detail = await staff.getStaffOrder(orderNumber, adminPermissions);
+    expect(detail?.customerWait?.title).toBe("No payment screenshot yet");
+    expect(detail?.whatsApp.message).toContain("We haven't received your payment screenshot yet");
+
+    // Waiting for the customer, not for staff: not in the sidebar count.
+    await db.delete(orders).where(eq(orders.id, orderId));
+    expect((await staff.getOrderCounts()).bank_transfer.needsAction).toBe(before.bank_transfer.needsAction);
   });
 
   it("rejects an order with a reason: the stock comes back once and the coupon use is released", async () => {
@@ -334,18 +429,33 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     return result.insertId;
   }
 
-  /** Every order number a tab lists for a search, across all its pages. */
-  async function listedIn(method: PaymentMethod, tab: OrderTab | "all", q: string): Promise<string[]> {
-    const listed: string[] = [];
+  /** A screenshot row inserted straight into the table, for states the upload flow can't reach. */
+  const insertProof = (orderId: number, purpose: "goods" | "delivery", status: "submitted" | "verified" | "rejected", createdAt?: Date) =>
+    db.insert(paymentProofs).values({ orderId, purpose, status, filePath: `proofs/test/${randomUUID()}.webp`, fileSize: 1, createdAt });
+
+  /** Every row a tab lists for a search, across all its pages. */
+  async function rowsIn(method: PaymentMethod, tab: OrderTab | "all", q: string) {
+    const rows = [];
     for (let page = 1, pageCount = 1; page <= pageCount; page += 1) {
       const result = await staff.listStaffOrders(method, tab, { q, page }, adminPermissions);
       pageCount = result.pageCount;
-      listed.push(...result.items.map((item) => item.orderNumber));
+      rows.push(...result.items);
     }
-    return listed;
+    return rows;
   }
 
   it("lists every combination of method, order status and payment status in exactly one tab of its method's page, and counts them", async () => {
+    // Each bank order also gets one of these screenshot histories (oldest first), so the flags
+    // are checked against the latest screenshot per payment, stale ones included.
+    const histories: [purpose: "goods" | "delivery", status: "submitted" | "verified" | "rejected"][][] = [
+      [],
+      [["goods", "submitted"]],
+      [["goods", "verified"], ["delivery", "submitted"]],
+      [["delivery", "verified"], ["goods", "submitted"]],
+      [["goods", "rejected"]],
+      [["goods", "submitted"], ["goods", "verified"]],
+      [["goods", "verified"], ["delivery", "rejected"], ["delivery", "submitted"]],
+    ];
     const before = await staff.getOrderCounts();
     const expected = new Map<string, { method: PaymentMethod; tab: OrderTab; toCheck: boolean; needsAction: boolean }>();
     let n = 0;
@@ -353,9 +463,12 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
       for (const orderStatus of orders.orderStatus.enumValues) {
         for (const paymentStatus of orders.paymentStatus.enumValues) {
           const orderNumber = `QQQ-000000-${String(++n).padStart(4, "0")}`;
-          const state = { paymentMethod, orderStatus, paymentStatus };
-          expected.set(orderNumber, { method: paymentMethod, tab: orderTab(state), toCheck: deliveryScreenshotToCheck(state), needsAction: needsAction(state) });
-          await insertOrder({ orderNumber, customerName: "Tab Combination", ...state });
+          const history = paymentMethod === "bank_transfer" ? histories[n % histories.length] : [];
+          const newestFirst = history.map(([purpose, status]) => ({ purpose, status })).reverse();
+          const state = { paymentMethod, orderStatus, paymentStatus, latest: latestProofStates(newestFirst) };
+          expected.set(orderNumber, { method: paymentMethod, tab: orderTab(state), toCheck: screenshotToCheck(state), needsAction: needsAction(state) });
+          const orderId = await insertOrder({ orderNumber, customerName: "Tab Combination", paymentMethod, orderStatus, paymentStatus });
+          for (const [index, [purpose, status]] of history.entries()) await insertProof(orderId, purpose, status, new Date(Date.UTC(2026, 8, 1, 9, index)));
         }
       }
     }
@@ -364,13 +477,20 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     for (const method of orders.paymentMethod.enumValues) {
       const mine = [...expected].filter(([, order]) => order.method === method);
       for (const tab of [...tabsFor(method), "all"] as const) {
-        const wanted = mine.filter(([, order]) => tab === "all" || order.tab === tab).map(([orderNumber]) => orderNumber);
-        expect((await listedIn(method, tab, "Tab Combination")).sort(), `${method} ${tab}`).toEqual(wanted.sort());
+        const wanted = mine.filter(([, order]) => tab === "all" || order.tab === tab);
+        const rows = await rowsIn(method, tab, "Tab Combination");
+        expect(rows.map((row) => row.orderNumber).sort(), `${method} ${tab}`).toEqual(wanted.map(([orderNumber]) => orderNumber).sort());
         expect(after[method][tab] - before[method][tab], `${method} ${tab} count`).toBe(wanted.length);
+        if (tab === "all") {
+          for (const row of rows) expect(row.screenshotToCheck, `${row.orderNumber} dot`).toBe(expected.get(row.orderNumber)!.toCheck);
+        } else {
+          expect(after[method].toCheck[tab] - before[method].toCheck[tab], `${method} ${tab} screenshots to check`).toBe(wanted.filter(([, order]) => order.toCheck).length);
+        }
       }
-      expect(after[method].toCheck - before[method].toCheck, `${method} screenshots to check`).toBe(mine.filter(([, order]) => order.toCheck).length);
       expect(after[method].needsAction - before[method].needsAction, `${method} needing action`).toBe(mine.filter(([, order]) => order.needsAction).length);
     }
+    // The histories make the flags vary, so the checks above aren't all "false".
+    expect([...expected.values()].filter((order) => order.toCheck).length).toBeGreaterThan(5);
     // Every order sits in one tab: the tabs' counts add up to All.
     for (const method of orders.paymentMethod.enumValues) {
       expect(tabsFor(method).reduce((sum, tab) => sum + after[method][tab], 0)).toBe(after[method].all);
@@ -379,8 +499,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
 
   it("lists Pending delivery charge with the screenshots to check first, oldest upload first, then the rest newest first", async () => {
     const at = (minutes: number) => new Date(Date.UTC(2026, 8, 1, 10, minutes));
-    const proof = (orderId: number, status: "submitted" | "rejected", minutes: number) =>
-      db.insert(paymentProofs).values({ orderId, purpose: "delivery", status, filePath: `proofs/test/${randomUUID()}.webp`, fileSize: 1, createdAt: at(minutes) });
+    const proof = (orderId: number, status: "submitted" | "rejected", minutes: number) => insertProof(orderId, "delivery", status, at(minutes));
     const pending = (orderNumber: string, paymentStatus: "unpaid" | "rejected" | "proof_submitted", createdMinutes: number) =>
       insertOrder({ orderNumber, customerName: "Sort Check", paymentMethod: "bank_transfer", orderStatus: "pending", paymentStatus, createdAt: at(createdMinutes) });
 

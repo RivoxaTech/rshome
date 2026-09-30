@@ -1,3 +1,4 @@
+import { PanelPage } from "@/components/panel/PanelPage";
 import { requirePermission } from "@/server/auth/permissions";
 import { PERMISSIONS } from "@/features/auth/permissions";
 
@@ -7,9 +8,8 @@ export default async function ProductsPage() {
   await requirePermission(PERMISSIONS.PRODUCT_CREATE);
 
   return (
-    <div className="flex flex-col gap-2">
-      <h1 className="text-xl font-semibold">Products</h1>
-      <p className="text-muted-foreground text-sm">Catalogue management arrives in slice S10.</p>
-    </div>
+    <PanelPage crumbs={[{ label: "Products" }]}>
+      <p className="text-muted-foreground text-[13px]">Catalogue management arrives in slice S10.</p>
+    </PanelPage>
   );
 }

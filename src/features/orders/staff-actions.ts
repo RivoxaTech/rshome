@@ -32,7 +32,7 @@ import {
   approvalRefusal,
   approvedStatus,
   canMovePayment,
-  canReviewProofs,
+  canReviewProof,
   closeRefusal,
   closedStatus,
   planFulfilment,
@@ -151,9 +151,10 @@ export async function approveOrder(rawInput: unknown, actor: Actor): Promise<Sta
 }
 
 /**
- * Reject a screenshot (products or delivery charge) with a reason the customer sees, who can then
- * upload again; or approve a delivery charge screenshot, which makes the order good to go once
- * every payment is in. The products screenshot is approved by "Approve order" instead.
+ * Approve a screenshot, or reject it with a reason the customer sees (who can then upload again),
+ * whatever tab its open order is in (C22). In Need review the products screenshot is approved by
+ * "Approve order" with the delivery charge instead. Every review recomputes the payment summary,
+ * and an order in Pending delivery charge moves to Processing once every due payment is in.
  */
 export async function reviewProof(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = reviewProofSchema.safeParse(rawInput);
@@ -167,8 +168,10 @@ export async function reviewProof(rawInput: unknown, actor: Actor): Promise<Staf
     const proof = await getProof(tx, input.proofId);
     if (!proof || proof.orderId !== order.id) throw new StaffActionError("Screenshot not found.");
     if (proof.status !== "submitted") throw new StaffActionError("This screenshot has already been checked.");
-    if (!canReviewProofs(order.orderStatus)) throw new StaffActionError("This order's screenshots can't be checked any more.");
-    if (input.decision === "approve" && proof.purpose === "goods") throw new StaffActionError("Enter the delivery charge and tap Approve order.");
+    if (!canReviewProof(order.orderStatus)) throw new StaffActionError("This order is closed, so its screenshots can't be checked.");
+    if (input.decision === "approve" && proof.purpose === "goods" && order.orderStatus === "awaiting_shipping_quote") {
+      throw new StaffActionError("Enter the delivery charge and tap Approve order.");
+    }
 
     const status = input.decision === "approve" ? "verified" : "rejected";
     const rejectionReason = input.decision === "reject" ? input.reason : null;
@@ -184,7 +187,7 @@ export async function reviewProof(rawInput: unknown, actor: Actor): Promise<Staf
     const orderStatus = statusAfterPaymentReview(order.orderStatus, paymentStatus);
     if (orderStatus !== order.orderStatus) {
       await updateOrder(tx, order.id, { orderStatus });
-      await writeOrderStatus(tx, order, orderStatus, "Delivery charge paid", actor, now);
+      await writeOrderStatus(tx, order, orderStatus, "All payments approved", actor, now);
     }
 
     await insertAuditLog(tx, {

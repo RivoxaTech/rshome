@@ -19,7 +19,7 @@ export function ActivityTimeline({ rows }: { rows: StaffOrderView["history"] }) 
               index === 0 ? "border-primary bg-primary" : row.kind === "note" ? "border-accent bg-card" : "border-border bg-card"
             }`}
           />
-          <div className="min-w-0 text-sm">
+          <div className="min-w-0 text-[13px]">
             <p className="font-medium">{title(row)}</p>
             {row.note && <p className="text-foreground/85 mt-0.5 leading-relaxed break-words whitespace-pre-line">{row.note}</p>}
             <p className="text-muted-foreground mt-0.5 text-xs">

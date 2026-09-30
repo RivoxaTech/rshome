@@ -7,7 +7,7 @@ export function LogoutButton() {
     <form action={logoutAction}>
       <Tooltip label="Log out">
         <button type="submit" aria-label="Log out" className={ICON_BUTTON}>
-          <PanelIcon name="logout" />
+          <PanelIcon name="logout" className="size-[18px]" />
         </button>
       </Tooltip>
     </form>

@@ -3,18 +3,19 @@ import type { PaymentStatus } from "@/features/orders/status";
 import type { OrderTab } from "@/features/orders/transitions";
 
 /**
- * Panel primitives (C21): the storefront's palette in a clean admin style: white cards with soft
- * corners, a sans-serif, 44 px touch targets on phones. Classes are exported for native
- * controls, so forms stay plain HTML that works before hydration.
+ * Panel primitives (C21, C22): the storefront's palette in a compact admin style: white cards with
+ * soft corners, a sans-serif at 13 px, 36 px controls on a desktop and 44 px touch targets on
+ * phones. Classes are exported for native controls, so forms stay plain HTML that works before
+ * hydration.
  */
-export const LABEL = "mb-1.5 block text-sm font-medium";
+export const LABEL = "mb-1 block text-[13px] font-medium";
 const FIELD =
-  "border-input bg-card placeholder:text-muted-foreground focus:border-primary focus:ring-primary/15 w-full rounded-md border px-3 text-base outline-none transition focus:ring-4 sm:text-sm";
-export const INPUT = `${FIELD} h-11 sm:h-10`;
+  "border-input bg-card placeholder:text-muted-foreground focus:border-primary focus:ring-primary/15 w-full rounded-md border px-3 text-base outline-none transition focus:ring-4 sm:text-[13px]";
+export const INPUT = `${FIELD} h-11 sm:h-9`;
 export const TEXTAREA = `${FIELD} py-2`;
 
 const BUTTON_BASE =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-50 sm:h-10";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-md px-3.5 text-sm font-medium whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-50 sm:h-9 sm:text-[13px]";
 export const BUTTON = {
   primary: `${BUTTON_BASE} bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm`,
   secondary: `${BUTTON_BASE} border-border bg-card hover:bg-muted border`,
@@ -22,7 +23,7 @@ export const BUTTON = {
   dangerOutline: `${BUTTON_BASE} border-status-rejected-foreground/30 text-status-rejected-foreground hover:bg-status-rejected border`,
 } as const;
 export const ICON_BUTTON =
-  "text-muted-foreground hover:bg-muted hover:text-foreground inline-flex h-10 w-10 items-center justify-center rounded-md transition-colors";
+  "text-muted-foreground hover:bg-muted hover:text-foreground inline-flex size-10 shrink-0 items-center justify-center rounded-md transition-colors lg:size-9";
 
 export function Card({
   title,
@@ -36,14 +37,14 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={`bg-card border-border rounded-xl border shadow-sm ${className}`}>
+    <section className={`bg-card border-border rounded-lg border shadow-xs ${className}`}>
       {title && (
-        <header className="flex min-h-12 items-center justify-between gap-3 px-4 pt-4 sm:px-5">
-          <h2 className="text-base">{title}</h2>
+        <header className="flex min-h-10 items-center justify-between gap-3 px-4 pt-3">
+          <h2 className="text-sm">{title}</h2>
           {action}
         </header>
       )}
-      <div className="p-4 sm:p-5">{children}</div>
+      <div className="p-4 text-[13px]">{children}</div>
     </section>
   );
 }
@@ -61,6 +62,17 @@ export const TONE_CLASSES: Record<Tone, string> = {
   rejected: "bg-status-rejected text-status-rejected-foreground",
 };
 
+/** A status colour as a solid dot, for menus. */
+export const DOT_CLASSES: Record<Tone, string> = {
+  need_review: "bg-status-review-foreground",
+  pending_delivery: "bg-status-pending-foreground",
+  processing: "bg-status-processing-foreground",
+  delivery: "bg-status-delivery-foreground",
+  completed: "bg-status-completed-foreground",
+  cancelled: "bg-status-cancelled-foreground",
+  rejected: "bg-status-rejected-foreground",
+};
+
 export const PAYMENT_TONES: Record<PaymentStatus, Tone> = {
   unpaid: "pending_delivery",
   proof_submitted: "need_review",
@@ -70,7 +82,7 @@ export const PAYMENT_TONES: Record<PaymentStatus, Tone> = {
   cod_collected: "completed",
 };
 
-const PILL = "ring-current/15 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ring-1 ring-inset";
+export const PILL = "ring-current/15 inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset";
 
 export function Pill({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
@@ -98,7 +110,7 @@ export function Avatar({ name, className = "" }: { name: string; className?: str
 export function ActionMessage({ state }: { state: { ok: boolean; error?: string } | null }) {
   if (!state || state.ok) return null;
   return (
-    <p role="alert" className="bg-status-rejected text-status-rejected-foreground rounded-md px-3 py-2 text-sm leading-relaxed">
+    <p role="alert" className="bg-status-rejected text-status-rejected-foreground rounded-md px-3 py-2 text-[13px] leading-relaxed">
       {state.error}
     </p>
   );

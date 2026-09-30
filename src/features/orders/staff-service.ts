@@ -14,7 +14,7 @@ import { goodsTotalOf } from "@/features/pricing/pricing";
 import { formatPhone } from "@/lib/phone";
 import { env } from "@/server/env";
 import { getOrderByNumber, getOrderItems } from "./repo";
-import { paymentProgress, type PaymentMethod, type ProofState, type TimelineOrder } from "./status";
+import { latestProofStates, type LatestProofs, type PaymentMethod, type ProofPurpose, type TimelineOrder } from "./status";
 import { countOrdersByState, getOrderHistory, getProofsForStaff, listOrders } from "./staff-repo";
 import {
   ORDER_STATUS_LABELS,
@@ -22,12 +22,17 @@ import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_STATUS_LABELS,
   PROOF_PURPOSE_LABELS,
+  TAB_INFO,
   actionTarget,
-  deliveryScreenshotToCheck,
+  goodsState,
   needsAction,
+  orderStatusIfApproved,
   orderTab,
   ordersPath,
+  screenshotToCheck,
+  screenshotsToCheck,
   statusActions,
+  type FlagOrder,
   type OrderTab,
   type QueueOrder,
   type StatusAction,
@@ -39,7 +44,7 @@ const PAGE_SIZE = 20;
 export const ACTION_PERMISSIONS: Record<StatusAction, PermissionKey[]> = {
   // Approving sets the delivery charge, approves the payment screenshot and moves the order on.
   approve: [PERMISSIONS.ORDER_SET_SHIPPING, PERMISSIONS.ORDER_VERIFY_PAYMENT, PERMISSIONS.ORDER_UPDATE_STATUS],
-  check_delivery: [PERMISSIONS.ORDER_VERIFY_PAYMENT],
+  check_screenshot: [PERMISSIONS.ORDER_VERIFY_PAYMENT],
   ship: [PERMISSIONS.ORDER_UPDATE_STATUS],
   complete: [PERMISSIONS.ORDER_UPDATE_STATUS],
   cancel: [PERMISSIONS.ORDER_UPDATE_STATUS],
@@ -59,25 +64,33 @@ function fill(template: string, values: Record<string, string>): string {
 
 // ── Counts ──────────────────────────────────────────────────────────────────────────────────
 
-export type TabCounts = Record<OrderTab | "all", number> & { toCheck: number; needsAction: number };
+export type TabCounts = Record<OrderTab | "all", number> & {
+  /** Per tab, the orders with a screenshot to check (the tab's dot). */
+  toCheck: Record<OrderTab, number>;
+  needsAction: number;
+};
+
+const zeroPerTab = () => Object.fromEntries(ORDER_TABS.map((tab) => [tab, 0])) as Record<OrderTab, number>;
 
 function emptyCounts(): TabCounts {
-  const counts = Object.fromEntries([...ORDER_TABS, "all"].map((tab) => [tab, 0])) as Record<OrderTab | "all", number>;
-  return { ...counts, toCheck: 0, needsAction: 0 };
+  return { ...zeroPerTab(), all: 0, toCheck: zeroPerTab(), needsAction: 0 };
 }
 
 /**
- * Per payment method: orders per tab, every order, the delivery charge screenshots to check and
- * the orders needing staff (the sidebar badge). Once per request: the layout and page share it.
+ * Per payment method: orders per tab, every order, the orders with a screenshot to check per tab
+ * and the orders needing staff (the sidebar badge), the flags read from each payment's latest
+ * screenshot (C22). Once per request: the layout and page share it.
  */
 export const getOrderCounts = cache(async (): Promise<Record<PaymentMethod, TabCounts>> => {
   const counts: Record<PaymentMethod, TabCounts> = { bank_transfer: emptyCounts(), cod: emptyCounts() };
   for (const row of await countOrdersByState()) {
+    const order: FlagOrder = { ...row, latest: { goods: row.goods ?? "missing", delivery: row.delivery ?? "missing" } };
     const method = counts[row.paymentMethod];
+    const tab = orderTab(order);
     method.all += row.count;
-    method[orderTab(row)] += row.count;
-    if (deliveryScreenshotToCheck(row)) method.toCheck += row.count;
-    if (needsAction(row)) method.needsAction += row.count;
+    method[tab] += row.count;
+    if (screenshotToCheck(order)) method.toCheck[tab] += row.count;
+    if (needsAction(order)) method.needsAction += row.count;
   }
   return counts;
 });
@@ -106,49 +119,81 @@ export type ProofView = ReturnType<typeof proofView>;
 type ControlOrder = QueueOrder &
   Omit<TimelineOrder, "proofs"> & { orderNumber: string; subtotal: string; discountTotal: string; couponDiscount: string; total: string };
 
-/** Under the status pill: what a bank order that offers nothing forward is waiting for. */
-function waitingNote(order: QueueOrder, goods: ProofState | "not_due"): string | null {
+/** The status pill's words: the tab, except a bank order in Need review that has no products screenshot yet. */
+function statusLabel(order: FlagOrder): string {
   const tab = orderTab(order);
-  if (tab === "need_review" && order.paymentMethod === "bank_transfer" && (goods === "rejected" || goods === "missing")) {
-    return "Waiting for a new payment screenshot";
+  return tab === "need_review" && goodsState(order) === "missing" ? "Waiting for payment screenshot" : TAB_INFO[tab].label;
+}
+
+/** Under the status pill: a screenshot to check, or what a bank order that offers nothing forward waits for. */
+function waitingNote(order: FlagOrder): string | null {
+  const toCheck = screenshotsToCheck(order);
+  if (toCheck.length > 1) return "Both screenshots to check";
+  if (toCheck.length === 1) return `${PROOF_PURPOSE_LABELS[toCheck[0]]} screenshot to check`;
+  if (order.paymentMethod !== "bank_transfer") return null;
+  const { goods, delivery } = order.latest;
+  switch (orderTab(order)) {
+    case "need_review":
+      return goods === "rejected" ? "Screenshot rejected, waiting for a new one" : null;
+    case "pending_delivery":
+      if (goods === "missing" || goods === "rejected") return "Waiting for a new products screenshot";
+      if (delivery === "rejected") return "Screenshot rejected, waiting for a new one";
+      return delivery === "submitted" ? null : "Waiting for the delivery charge";
+    default:
+      return null;
   }
-  if (tab !== "pending_delivery") return null;
-  if (order.paymentStatus === "proof_submitted") return "Delivery charge screenshot to check";
-  return order.paymentStatus === "rejected" ? "Screenshot rejected, waiting for a new one" : "Waiting for the delivery charge";
+}
+
+/** What approving a waiting screenshot does, for its dialog. */
+function reviewEffect(order: ControlOrder, proofs: StaffProof[], purpose: ProofPurpose, waiting: ProofPurpose[]): string | null {
+  const next = orderStatusIfApproved({ ...order, proofs }, purpose, features.deliveryChargeByTransfer);
+  if (next !== order.orderStatus) return `Approving moves the order to ${ORDER_STATUS_LABELS[next]}.`;
+  const other = waiting.find((waitingPurpose) => waitingPurpose !== purpose);
+  if (other) return `Then check the ${PROOF_PURPOSE_LABELS[other].toLowerCase()} screenshot.`;
+  return order.orderStatus === "pending" ? "The order stays in Pending delivery charge until both payments are approved." : null;
 }
 
 /**
  * The status pill, its next steps and what their dialogs show, for one order. `proofs` are the
- * order's screenshots, newest first.
+ * order's screenshots, newest first; every flag reads each payment's latest one (C22).
  */
 function orderControl(order: ControlOrder, proofs: StaffProof[], permissions: ReadonlySet<PermissionKey>) {
-  const progress = paymentProgress({ ...order, proofs }, features.deliveryChargeByTransfer);
+  const flags: FlagOrder = { ...order, latest: latestProofStates(proofs) };
   const allowed = (action: StatusAction) => ACTION_PERMISSIONS[action].every((key) => permissions.has(key));
-  const latest = (purpose: "goods" | "delivery") => {
-    const proof = proofs.find((row) => row.purpose === purpose);
-    return proof ? proofView(proof) : null;
-  };
-  const goodsTotal = goodsTotalOf({
-    subtotal: decimalToPaisa(order.subtotal),
-    discountTotal: decimalToPaisa(order.discountTotal),
-    couponDiscount: decimalToPaisa(order.couponDiscount),
-  });
+  const latest = (purpose: ProofPurpose) => proofs.find((row) => row.purpose === purpose);
+  const goodsTotal = formatMoney(
+    goodsTotalOf({
+      subtotal: decimalToPaisa(order.subtotal),
+      discountTotal: decimalToPaisa(order.discountTotal),
+      couponDiscount: decimalToPaisa(order.couponDiscount),
+    }),
+  );
+  const deliveryCharge = order.shippingTotal === null ? null : money(order.shippingTotal);
+  const waiting = screenshotsToCheck(flags);
+  const goodsProof = latest("goods");
 
   return {
     orderNumber: order.orderNumber,
     isCod: order.paymentMethod === "cod",
     tab: orderTab(order),
-    waiting: waitingNote(order, progress.goods),
-    actions: statusActions(order, progress.goods)
+    statusLabel: statusLabel(flags),
+    waiting: waitingNote(flags),
+    actions: statusActions(flags)
       .filter(allowed)
       .map((action) => ({ action, target: actionTarget(action, order.paymentMethod, features.deliveryChargeByTransfer) })),
-    goodsTotal: formatMoney(goodsTotal),
-    deliveryCharge: order.shippingTotal === null ? null : money(order.shippingTotal),
+    goodsTotal,
+    deliveryCharge,
     total: money(order.total),
-    goodsProof: latest("goods"),
-    deliveryProof: latest("delivery"),
-    /** Rejecting a screenshot is a review, not a status step. */
-    canRejectProof: permissions.has(PERMISSIONS.ORDER_VERIFY_PAYMENT),
+    /** The products screenshot the Approve dialog shows (bank transfer). */
+    goodsProof: goodsProof ? proofView(goodsProof) : null,
+    /** The screenshots waiting to be checked outside Need review, products first: the check dialog shows the first. */
+    toCheck: waiting.map((purpose) => ({
+      ...proofView(latest(purpose)!),
+      amount: purpose === "goods" ? goodsTotal : deliveryCharge,
+      effect: reviewEffect(order, proofs, purpose, waiting),
+    })),
+    /** Checking a screenshot is a review, not a status step: it needs only the payment permission. */
+    canReviewProofs: permissions.has(PERMISSIONS.ORDER_VERIFY_PAYMENT),
     deliveryChargeByTransfer: features.deliveryChargeByTransfer,
   };
 }
@@ -166,20 +211,23 @@ export async function listStaffOrders(
   const offset = (query.page - 1) * PAGE_SIZE;
   const { rows, total } = await listOrders(method, tab, query.q, { limit: PAGE_SIZE, offset });
   const proofs = await getProofsForStaff(rows.map((row) => row.id));
-  const items = rows.map((row, index) => ({
-    serial: offset + index + 1,
-    orderNumber: row.orderNumber,
-    placedDate: dateOnly.format(row.createdAt),
-    placedTime: timeOnly.format(row.createdAt),
-    customerName: row.customerName,
-    total: money(row.total),
-    screenshotToCheck: deliveryScreenshotToCheck(row),
-    control: orderControl(
+  const items = rows.map((row, index) => {
+    const control = orderControl(
       row,
       proofs.filter((proof) => proof.orderId === row.id),
       permissions,
-    ),
-  }));
+    );
+    return {
+      serial: offset + index + 1,
+      orderNumber: row.orderNumber,
+      placedDate: dateOnly.format(row.createdAt),
+      placedTime: timeOnly.format(row.createdAt),
+      customerName: row.customerName,
+      total: money(row.total),
+      screenshotToCheck: control.toCheck.length > 0,
+      control,
+    };
+  });
   return { items, total, page: query.page, pageSize: PAGE_SIZE, pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
 }
 
@@ -193,18 +241,21 @@ function historyLabel(kind: "order" | "payment" | "note", status: string | null)
   return labels[status] ?? status;
 }
 
-/** The shop-to-customer WhatsApp message for the order's stage (C13). */
-function whatsAppMessage(order: NonNullable<Awaited<ReturnType<typeof getOrderByNumber>>>, deliveryCharge: string | null): string {
+type StaffOrderRow = NonNullable<Awaited<ReturnType<typeof getOrderByNumber>>>;
+
+/** The shop-to-customer WhatsApp message for the order's stage (C13), from each payment's latest screenshot. */
+function whatsAppMessage(order: StaffOrderRow, latest: LatestProofs, deliveryCharge: string | null): string {
   const messages = siteConfig.staffWhatsAppMessages;
-  const rejected = order.paymentStatus === "rejected";
+  const bank = order.paymentMethod === "bank_transfer";
   let message: string = messages.general;
   switch (orderTab(order)) {
     case "need_review":
-      if (rejected) message = messages.screenshotRejected;
+      if (bank && latest.goods === "missing") message = messages.screenshotMissing;
+      else if (bank && latest.goods === "rejected") message = messages.screenshotRejected;
       break;
     case "pending_delivery":
-      if (rejected) message = messages.screenshotRejected;
-      else if (order.paymentStatus === "unpaid") message = messages.approvedDeliveryDue;
+      if (latest.goods === "rejected" || latest.delivery === "rejected") message = messages.screenshotRejected;
+      else if (latest.delivery === "missing") message = messages.approvedDeliveryDue;
       break;
     case "processing":
       message = order.paymentMethod === "cod" ? messages.approvedCod : messages.approved;
@@ -223,6 +274,32 @@ function whatsAppMessage(order: NonNullable<Awaited<ReturnType<typeof getOrderBy
   });
 }
 
+/**
+ * On the detail page: what a bank order waits for from the customer (C22), with staff's reason
+ * when a screenshot was rejected. Null when nothing waits on the customer.
+ */
+function customerWait(order: FlagOrder, proofs: StaffProof[], deliveryCharge: string | null): { title: string; text: string } | null {
+  if (order.paymentMethod !== "bank_transfer") return null;
+  const tab = orderTab(order);
+  if (tab !== "need_review" && tab !== "pending_delivery") return null;
+  const rejected = (purpose: ProofPurpose, what: string) => {
+    const reason = proofs.find((proof) => proof.purpose === purpose)?.rejectionReason;
+    return `The ${what} screenshot was rejected${reason ? `: ${reason}` : "."} The customer can upload a new one from their order page.`;
+  };
+  const { goods, delivery } = order.latest;
+  if (goods === "missing") {
+    return {
+      title: "No payment screenshot yet",
+      text: "The customer hasn't uploaded the products payment screenshot yet, so the order can't be approved. You can remind them on WhatsApp.",
+    };
+  }
+  if (goods === "rejected") return { title: "Waiting for a new payment screenshot", text: rejected("goods", "products payment") };
+  if (tab === "need_review") return null;
+  if (delivery === "missing") return { title: "Waiting for the delivery charge", text: `The customer has to transfer ${deliveryCharge} and upload the screenshot.` };
+  if (delivery === "rejected") return { title: "Waiting for a new delivery charge screenshot", text: rejected("delivery", "delivery charge") };
+  return null;
+}
+
 export type StaffOrderView = NonNullable<Awaited<ReturnType<typeof getStaffOrder>>>;
 
 export async function getStaffOrder(orderNumber: string, permissions: ReadonlySet<PermissionKey>) {
@@ -232,6 +309,7 @@ export async function getStaffOrder(orderNumber: string, permissions: ReadonlySe
   const images = await getPrimaryImagesByProductId([...new Set(items.map((item) => item.productId))]);
 
   const control = orderControl(order, proofs, permissions);
+  const latest = latestProofStates(proofs);
   const countryName = new Intl.DisplayNames(["en"], { type: "region" }).of(order.country) ?? order.country;
 
   return {
@@ -247,7 +325,8 @@ export async function getStaffOrder(orderNumber: string, permissions: ReadonlySe
     rejectionReason: order.rejectionReason,
     delivery: { charge: control.deliveryCharge, note: order.shippingNote, courier: order.courier, trackingNote: order.trackingNote },
     proofs: proofs.map(proofView),
-    whatsApp: { phone: order.phone, message: whatsAppMessage(order, control.deliveryCharge) },
+    customerWait: customerWait({ ...order, latest }, proofs, control.deliveryCharge),
+    whatsApp: { phone: order.phone, message: whatsAppMessage(order, latest, control.deliveryCharge) },
     customer: { name: order.customerName, phone: formatPhone(order.phone), phoneDigits: order.phone, email: order.email },
     address: [order.addressLine, [order.city, order.state, order.postalCode].filter(Boolean).join(" "), countryName].filter(Boolean),
     customerNote: order.customerNote,

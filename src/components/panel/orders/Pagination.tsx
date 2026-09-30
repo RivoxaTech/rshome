@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PanelIcon } from "@/components/panel/icons";
 
-const STEP = "border-border inline-flex h-10 w-10 items-center justify-center rounded-md border transition-colors";
+const STEP = "border-border inline-flex size-10 items-center lg:size-8 justify-center rounded-md border transition-colors";
 
 /** "Showing 21–40 of 45" and previous / next, 20 a page. */
 export function Pagination({
@@ -22,8 +22,8 @@ export function Pagination({
   const last = Math.min(page * pageSize, total);
 
   return (
-    <nav aria-label="Pages" className="border-border flex items-center justify-between gap-4 border-t px-4 py-3 sm:px-5">
-      <p className="text-muted-foreground text-sm tabular-nums">
+    <nav aria-label="Pages" className="border-border flex items-center justify-between gap-4 border-t px-4 py-2.5">
+      <p className="text-muted-foreground text-[13px] tabular-nums">
         {first}–{last} of {total} {total === 1 ? "order" : "orders"}
       </p>
       {pageCount > 1 && (
@@ -37,7 +37,7 @@ export function Pagination({
               <PanelIcon name="chevronLeft" className="h-4 w-4" />
             </span>
           )}
-          <span className="text-muted-foreground px-1 text-sm tabular-nums">
+          <span className="text-muted-foreground px-1 text-[13px] tabular-nums">
             {page} / {pageCount}
           </span>
           {page < pageCount ? (

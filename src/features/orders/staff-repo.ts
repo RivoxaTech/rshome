@@ -1,4 +1,5 @@
 import { and, asc, count, desc, eq, gt, inArray, isNull, like, or, sql, type SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/mysql-core";
 import { normalizePhone } from "@/lib/phone";
 import { db, type DbClient } from "@/server/db/client";
 import { users } from "@/server/db/schema/access-control";
@@ -31,8 +32,25 @@ const TAB_CONDITIONS: Record<OrderTab, SQL | undefined> = {
   rejected: eq(orders.orderStatus, "rejected"),
 };
 
-/** When the order's screenshot now waiting for review was uploaded (NULL when none waits). */
-const submittedProofAt = sql`(select max(${paymentProofs.createdAt}) from ${paymentProofs} where ${paymentProofs.orderId} = ${orders.id} and ${paymentProofs.status} = 'submitted')`;
+type ProofPurpose = ProofRow["purpose"];
+
+/**
+ * The status of the order's latest screenshot for one payment (NULL when there is none), as
+ * `latestProofStates` reads it. Written out with qualified names: in a one-table select list
+ * Drizzle prints columns unqualified, which would correlate `id` to the proof's own id.
+ */
+const latestProofStatus = (purpose: ProofPurpose) =>
+  sql<ProofRow["status"] | null>`(select latest.status from payment_proofs latest where latest.order_id = orders.id and latest.purpose = ${purpose} order by latest.created_at desc, latest.id desc limit 1)`;
+
+const proof = alias(paymentProofs, "proof");
+const newer = alias(paymentProofs, "newer");
+
+/**
+ * When the order's oldest screenshot still waiting for review was uploaded: a `submitted` proof
+ * that is its payment's latest (NULL when none waits). Drizzle prints an alias by its name only,
+ * so the FROM clauses name the table and the alias themselves.
+ */
+const waitingProofAt = sql`(select min(${proof.createdAt}) from ${paymentProofs} proof where ${proof.orderId} = ${orders.id} and ${proof.status} = 'submitted' and not exists (select 1 from ${paymentProofs} newer where ${newer.orderId} = ${proof.orderId} and ${newer.purpose} = ${proof.purpose} and (${newer.createdAt} > ${proof.createdAt} or (${newer.createdAt} = ${proof.createdAt} and ${newer.id} > ${proof.id}))))`;
 
 function searchCondition(text: string): SQL | undefined {
   const digits = text.replace(/\D/g, "");
@@ -47,8 +65,8 @@ function searchCondition(text: string): SQL | undefined {
 
 /**
  * One page of a method's orders, in one tab or all of them, and how many match in all. Newest
- * first, except Pending delivery charge: the delivery charge screenshots to check come first,
- * oldest upload first, then the orders still waiting for the customer.
+ * first, except Pending delivery charge: the orders with a screenshot to check come first, oldest
+ * upload first, then the orders still waiting for the customer.
  */
 export async function listOrders(
   method: PaymentMethod,
@@ -59,7 +77,7 @@ export async function listOrders(
   const where = and(eq(orders.paymentMethod, method), tab === "all" ? undefined : TAB_CONDITIONS[tab], search ? searchCondition(search) : undefined);
   const order =
     tab === "pending_delivery"
-      ? [sql`${orders.paymentStatus} = 'proof_submitted' desc`, asc(submittedProofAt), desc(orders.createdAt), desc(orders.id)]
+      ? [sql`${waitingProofAt} is null`, asc(waitingProofAt), desc(orders.createdAt), desc(orders.id)]
       : [desc(orders.createdAt), desc(orders.id)];
   const [rows, [total]] = await Promise.all([
     db
@@ -91,12 +109,23 @@ export async function listOrders(
 }
 
 
-/** How many orders there are per (method, order status, payment status): a few dozen rows at most. */
+/**
+ * How many orders there are per method, order status, payment status and each payment's latest
+ * screenshot status: a few dozen rows at most. Grouped by the aliases, which MySQL and MariaDB
+ * both accept.
+ */
 export function countOrdersByState() {
   return db
-    .select({ paymentMethod: orders.paymentMethod, orderStatus: orders.orderStatus, paymentStatus: orders.paymentStatus, count: count() })
+    .select({
+      paymentMethod: orders.paymentMethod,
+      orderStatus: orders.orderStatus,
+      paymentStatus: orders.paymentStatus,
+      goods: latestProofStatus("goods").as("goods_status"),
+      delivery: latestProofStatus("delivery").as("delivery_status"),
+      count: count(),
+    })
     .from(orders)
-    .groupBy(orders.paymentMethod, orders.orderStatus, orders.paymentStatus);
+    .groupBy(orders.paymentMethod, orders.orderStatus, orders.paymentStatus, sql`goods_status`, sql`delivery_status`);
 }
 
 /** Every screenshot of these orders (one order, or one list page), newest first, with who reviewed it. */

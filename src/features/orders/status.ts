@@ -60,13 +60,21 @@ function latestProof(order: TimelineOrder, purpose: ProofPurpose): ProofSummary 
   return order.proofs.find((proof) => proof.purpose === purpose);
 }
 
+/** Each payment's latest screenshot, due or not. `proofs` are newest first. */
+export type LatestProofs = Record<ProofPurpose, ProofState>;
+
+export function latestProofStates(proofs: Pick<ProofSummary, "purpose" | "status">[]): LatestProofs {
+  const latest = (purpose: ProofPurpose) => proofs.find((proof) => proof.purpose === purpose)?.status ?? "missing";
+  return { goods: latest("goods"), delivery: latest("delivery") };
+}
+
 export function paymentProgress(order: TimelineOrder, deliveryChargeByTransfer: boolean): PaymentProgress {
   if (order.paymentMethod !== "bank_transfer") return { goods: "not_due", delivery: "not_due" };
-  const goods = latestProof(order, "goods")?.status ?? "missing";
+  const { goods, delivery } = latestProofStates(order.proofs);
   if (!deliveryChargeByTransfer) return { goods, delivery: "not_due" };
   if (order.shippingTotal === null) return { goods, delivery: "awaiting_charge" };
   if (decimalToPaisa(order.shippingTotal) === 0) return { goods, delivery: "not_due" };
-  return { goods, delivery: latestProof(order, "delivery")?.status ?? "missing" };
+  return { goods, delivery };
 }
 
 const needsUpload = (state: PaymentProgress[keyof PaymentProgress]) => state === "missing" || state === "rejected";

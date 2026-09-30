@@ -30,12 +30,12 @@ export function SearchBox({ action, tab, value }: { action: string; tab: string 
   }, [text, action, tab, router]);
 
   return (
-    <form action={action} role="search" className="relative w-full sm:max-w-sm">
+    <form action={action} role="search" className="relative w-full sm:max-w-xs">
       {tab && <input type="hidden" name="tab" value={tab} />}
       <label className="sr-only" htmlFor="order-search">
         Search orders
       </label>
-      <PanelIcon name="search" className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4.5 w-4.5 -translate-y-1/2" />
+      <PanelIcon name="search" className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
       <input
         id="order-search"
         type="search"
@@ -46,7 +46,7 @@ export function SearchBox({ action, tab, value }: { action: string; tab: string 
           setText(event.target.value);
         }}
         placeholder="Search order number, phone or name"
-        className={`${INPUT} pl-10`}
+        className={`${INPUT} pl-9`}
       />
     </form>
   );

@@ -2,44 +2,55 @@
 
 import { useState } from "react";
 import { PanelIcon } from "@/components/panel/icons";
-import { ICON_BUTTON, Pill, TONE_CLASSES, Tooltip } from "@/components/panel/ui";
+import { Menu, type MenuEntry } from "@/components/panel/Menu";
+import { DOT_CLASSES, ICON_BUTTON, PILL, Pill, TONE_CLASSES, Tooltip } from "@/components/panel/ui";
 import type { OrderControl } from "@/features/orders/staff-service";
 import { TAB_INFO, type StatusAction } from "@/features/orders/transitions";
 import { ActionDialog } from "./ActionDialog";
 
+const CLOSING: readonly StatusAction[] = ["cancel", "reject"];
+/** Widens the pill's tap area to about 44 px high without growing the pill. */
+const TAP_AREA = "relative before:absolute before:-inset-y-2.5 before:inset-x-0";
+
 /**
- * The coloured status pill of a list row (C21, like the reference's dropdowns): the current status
- * and, when staff can move the order on, only its next statuses. Choosing one opens that step's
- * dialog; nothing changes until the dialog is confirmed.
+ * The coloured status pill (C21, C22): when staff can move the order on, it opens a menu of only
+ * the next statuses under a "Change status to" caption, with Cancelled and Rejected in red below
+ * a divider. Choosing one opens that step's dialog; nothing changes until it is confirmed.
  */
-export function StatusSelect({ control }: { control: OrderControl }) {
+export function StatusMenu({ control }: { control: OrderControl }) {
   const [open, setOpen] = useState<StatusAction | null>(null);
-  const current = TAB_INFO[control.tab].label;
-  if (control.actions.length === 0) return <Pill tone={control.tab}>{current}</Pill>;
+  if (control.actions.length === 0) return <Pill tone={control.tab}>{control.statusLabel}</Pill>;
+
+  const entry = ({ action, target }: OrderControl["actions"][number]): MenuEntry => ({
+    key: action,
+    label: TAB_INFO[target].label,
+    dot: DOT_CLASSES[target],
+    danger: CLOSING.includes(action),
+    onSelect: () => setOpen(action),
+  });
+  const forward = control.actions.filter(({ action }) => !CLOSING.includes(action)).map(entry);
+  const closing = control.actions.filter(({ action }) => CLOSING.includes(action)).map(entry);
+  const entries = forward.length > 0 && closing.length > 0 ? [...forward, { divider: "close" }, ...closing] : [...forward, ...closing];
 
   return (
     <>
-      <span className={`ring-current/15 relative inline-flex items-center rounded-full ring-1 ring-inset transition hover:ring-current/40 ${TONE_CLASSES[control.tab]}`}>
-        <span aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 size-1.5 -translate-y-1/2 rounded-full bg-current" />
-        <select
-          value=""
-          onChange={(event) => setOpen(event.target.value as StatusAction)}
-          aria-label={`Status of ${control.orderNumber}: ${current}. Choose the next step`}
-          className="field-sizing-content min-h-8 cursor-pointer appearance-none rounded-full bg-transparent py-1 pr-7 pl-6 text-xs font-medium whitespace-nowrap"
-        >
-          <option value="" disabled>
-            {current}
-          </option>
-          <optgroup label="Move to">
-            {control.actions.map(({ action, target }) => (
-              <option key={action} value={action}>
-                {TAB_INFO[target].label}
-              </option>
-            ))}
-          </optgroup>
-        </select>
-        <PanelIcon name="chevronDown" className="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2" />
-      </span>
+      <Menu
+        label={`Change the status of ${control.orderNumber} to`}
+        caption="Change status to"
+        entries={entries}
+        trigger={(props) => (
+          <button
+            type="button"
+            {...props}
+            aria-label={`Status of ${control.orderNumber}: ${control.statusLabel}. Change status`}
+            className={`${PILL} ${TONE_CLASSES[control.tab]} ${TAP_AREA} cursor-pointer pr-1.5 transition hover:ring-current/40`}
+          >
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
+            {control.statusLabel}
+            <PanelIcon name="chevronDown" className="size-3.5" />
+          </button>
+        )}
+      />
       {open && <ActionDialog action={open} control={control} onClose={() => setOpen(null)} />}
     </>
   );
@@ -55,7 +66,7 @@ export function CloseOrderButton({ control }: { control: OrderControl }) {
     <>
       <Tooltip label="Cancel or reject">
         <button type="button" onClick={() => setOpen(true)} aria-label={label} className={`${ICON_BUTTON} hover:text-status-rejected-foreground hover:bg-status-rejected`}>
-          <PanelIcon name="trash" />
+          <PanelIcon name="trash" className="size-[18px]" />
         </button>
       </Tooltip>
       {open && <ActionDialog action="cancel" control={control} onClose={() => setOpen(false)} />}

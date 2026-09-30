@@ -4,12 +4,12 @@ import { PERMISSIONS } from "@/features/auth/permissions";
 import { getOrderCounts } from "@/features/orders/staff-service";
 import { METHOD_PAGES, ordersPath } from "@/features/orders/transitions";
 import { requireSession } from "@/server/auth/permissions";
-import { readPanelTheme } from "../panel-theme";
+import { readPanelTheme, readSidebarCollapsed } from "../panel-prefs";
 
 /**
- * The signed-in panel (C21). The menu is built from permissions, never role names: Dashboard and
- * the two orders pages, each with the number of orders needing staff (new orders to review and
- * delivery charge screenshots to check).
+ * The signed-in panel (C21, C22). The menu is built from permissions, never role names: Dashboard
+ * and the two orders pages, each with the number of orders needing staff (new orders to approve
+ * and screenshots to check). Each page renders its own header and content (PanelPage).
  */
 export default async function ProtectedPanelLayout({ children }: LayoutProps<"/panel">) {
   const session = await requireSession();
@@ -25,7 +25,7 @@ export default async function ProtectedPanelLayout({ children }: LayoutProps<"/p
   }
 
   return (
-    <PanelFrame nav={nav} userName={session.name} logoText={siteConfig.logoText} theme={await readPanelTheme()}>
+    <PanelFrame nav={nav} userName={session.name} logoText={siteConfig.logoText} theme={await readPanelTheme()} collapsed={await readSidebarCollapsed()}>
       {children}
     </PanelFrame>
   );

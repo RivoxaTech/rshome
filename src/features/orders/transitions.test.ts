@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { OrderStatus, PaymentMethod, PaymentStatus, ProofSummary } from "./status";
+import { latestProofStates, type LatestProofs, type OrderStatus, type PaymentMethod, type PaymentStatus, type ProofState, type ProofSummary } from "./status";
 import {
   ORDER_STATUS_LABELS,
   ORDER_TABS,
@@ -10,19 +10,21 @@ import {
   canClose,
   canMoveOrder,
   canMovePayment,
-  canReviewProofs,
+  canReviewProof,
   closeRefusal,
-  deliveryScreenshotToCheck,
   fulfilmentTargets,
   needsAction,
+  orderStatusIfApproved,
   orderTab,
   ordersPath,
   planFulfilment,
   recomputePaymentStatus,
+  screenshotToCheck,
+  screenshotsToCheck,
   statusActions,
   statusAfterPaymentReview,
   tabsFor,
-  type QueueOrder,
+  type FlagOrder,
 } from "./transitions";
 
 const ORDER_STATUSES = Object.keys(ORDER_STATUS_LABELS) as OrderStatus[];
@@ -69,8 +71,8 @@ describe("order status transitions", () => {
     expect(ORDER_STATUSES.filter(canClose)).toEqual(["awaiting_shipping_quote", "pending", "confirmed", "processing"]);
   });
 
-  it("reviews screenshots only before the order is good to go", () => {
-    expect(ORDER_STATUSES.filter(canReviewProofs)).toEqual(["awaiting_shipping_quote", "pending"]);
+  it("lets a waiting screenshot be checked in any open state, never on a closed order", () => {
+    expect(ORDER_STATUSES.filter(canReviewProof)).toEqual(["awaiting_shipping_quote", "pending", "confirmed", "processing", "shipped", "delivered"]);
   });
 });
 
@@ -94,10 +96,24 @@ describe("payment status transitions", () => {
   });
 });
 
-const bankOrder = (orderStatus: OrderStatus, paymentStatus: PaymentStatus): QueueOrder => ({ paymentMethod: "bank_transfer", orderStatus, paymentStatus });
-const codOrder = (orderStatus: OrderStatus, paymentStatus: PaymentStatus = "cod_pending"): QueueOrder => ({ paymentMethod: "cod", orderStatus, paymentStatus });
+const NO_PROOFS: LatestProofs = { goods: "missing", delivery: "missing" };
+const bankOrder = (orderStatus: OrderStatus, paymentStatus: PaymentStatus, latest: Partial<LatestProofs> = {}): FlagOrder => ({
+  paymentMethod: "bank_transfer",
+  orderStatus,
+  paymentStatus,
+  latest: { ...NO_PROOFS, ...latest },
+});
+const codOrder = (orderStatus: OrderStatus, paymentStatus: PaymentStatus = "cod_pending"): FlagOrder => ({
+  paymentMethod: "cod",
+  orderStatus,
+  paymentStatus,
+  latest: NO_PROOFS,
+});
 
 const ALL_PAYMENT_METHODS: PaymentMethod[] = ["bank_transfer", "cod"];
+const PROOF_STATES: ProofState[] = ["missing", "submitted", "verified", "rejected"];
+/** Every pair of latest screenshot states (products, delivery charge). */
+const ALL_LATEST: LatestProofs[] = PROOF_STATES.flatMap((goods) => PROOF_STATES.map((delivery) => ({ goods, delivery })));
 
 describe("order tabs (C21)", () => {
   it("puts every combination of order status and payment status in exactly one of its method's tabs", () => {
@@ -134,15 +150,35 @@ describe("order tabs (C21)", () => {
     expect(orderTab(codOrder("pending"))).toBe("need_review");
   });
 
-  it("flags only a bank order's delivery charge screenshot to check, and counts it with new orders as needing action", () => {
-    expect(deliveryScreenshotToCheck(bankOrder("pending", "proof_submitted"))).toBe(true);
-    expect(deliveryScreenshotToCheck(bankOrder("pending", "unpaid"))).toBe(false);
-    expect(deliveryScreenshotToCheck(bankOrder("awaiting_shipping_quote", "proof_submitted"))).toBe(false);
-    expect(deliveryScreenshotToCheck(codOrder("pending", "proof_submitted"))).toBe(false);
-    expect(needsAction(bankOrder("awaiting_shipping_quote", "rejected"))).toBe(true);
+  it("flags a screenshot to check from each payment's latest screenshot, not from payment_status (C22)", () => {
+    // Past Need review, whichever payment is waiting: products first, then delivery charge.
+    expect(screenshotsToCheck(bankOrder("pending", "proof_submitted", { goods: "verified", delivery: "submitted" }))).toEqual(["delivery"]);
+    expect(screenshotsToCheck(bankOrder("pending", "proof_submitted", { goods: "submitted", delivery: "verified" }))).toEqual(["goods"]);
+    expect(screenshotsToCheck(bankOrder("pending", "proof_submitted", { goods: "submitted", delivery: "submitted" }))).toEqual(["goods", "delivery"]);
+    // Whatever payment_status says, and in any open tab.
+    expect(screenshotToCheck(bankOrder("pending", "unpaid", { goods: "verified", delivery: "submitted" }))).toBe(true);
+    expect(screenshotToCheck(bankOrder("processing", "verified", { goods: "submitted", delivery: "verified" }))).toBe(true);
+    expect(screenshotToCheck(bankOrder("pending", "proof_submitted", { goods: "verified", delivery: "missing" }))).toBe(false);
+    // In Need review the products screenshot is the order review itself; closed orders and COD never.
+    expect(screenshotToCheck(bankOrder("awaiting_shipping_quote", "proof_submitted", { goods: "submitted" }))).toBe(false);
+    expect(screenshotToCheck(bankOrder("cancelled", "proof_submitted", { goods: "verified", delivery: "submitted" }))).toBe(false);
+    expect(screenshotToCheck(codOrder("pending", "proof_submitted"))).toBe(false);
+  });
+
+  it("reads the latest screenshot per payment, newest first", () => {
+    const proofs = [proof("goods", "submitted"), proof("delivery", "verified"), proof("goods", "rejected"), proof("delivery", "submitted")];
+    expect(latestProofStates(proofs)).toEqual({ goods: "submitted", delivery: "verified" });
+    expect(latestProofStates([proof("goods", "verified")])).toEqual({ goods: "verified", delivery: "missing" });
+    expect(latestProofStates([])).toEqual(NO_PROOFS);
+  });
+
+  it("counts as needing action an order staff can approve, or a screenshot to check, never one waiting for the customer", () => {
+    expect(needsAction(bankOrder("awaiting_shipping_quote", "proof_submitted", { goods: "submitted" }))).toBe(true);
     expect(needsAction(codOrder("awaiting_shipping_quote"))).toBe(true);
-    expect(needsAction(bankOrder("pending", "proof_submitted"))).toBe(true);
-    expect(needsAction(bankOrder("pending", "unpaid"))).toBe(false);
+    expect(needsAction(bankOrder("awaiting_shipping_quote", "unpaid"))).toBe(false);
+    expect(needsAction(bankOrder("awaiting_shipping_quote", "rejected", { goods: "rejected" }))).toBe(false);
+    expect(needsAction(bankOrder("pending", "proof_submitted", { goods: "verified", delivery: "submitted" }))).toBe(true);
+    expect(needsAction(bankOrder("pending", "unpaid", { goods: "verified" }))).toBe(false);
     expect(needsAction(codOrder("processing"))).toBe(false);
   });
 
@@ -154,21 +190,27 @@ describe("order tabs (C21)", () => {
   });
 });
 
-describe("status dropdown steps (C21)", () => {
+describe("status menu steps (C21, C22)", () => {
   it("offers only the next steps an order can take now", () => {
-    expect(statusActions(bankOrder("awaiting_shipping_quote", "proof_submitted"), "submitted")).toEqual(["approve", "cancel", "reject"]);
-    expect(statusActions(codOrder("awaiting_shipping_quote"), "not_due")).toEqual(["approve", "cancel", "reject"]);
-    // Waiting for a new products screenshot, or for the delivery charge: nothing forward.
-    expect(statusActions(bankOrder("awaiting_shipping_quote", "rejected"), "rejected")).toEqual(["cancel", "reject"]);
-    expect(statusActions(bankOrder("pending", "unpaid"), "verified")).toEqual(["cancel", "reject"]);
-    expect(statusActions(bankOrder("pending", "rejected"), "verified")).toEqual(["cancel", "reject"]);
-    expect(statusActions(bankOrder("pending", "proof_submitted"), "verified")).toEqual(["check_delivery", "cancel", "reject"]);
-    expect(statusActions(codOrder("processing"), "not_due")).toEqual(["ship", "complete", "cancel", "reject"]);
-    expect(statusActions(bankOrder("confirmed", "verified"), "verified")).toEqual(["ship", "complete", "cancel", "reject"]);
+    expect(statusActions(bankOrder("awaiting_shipping_quote", "proof_submitted", { goods: "submitted" }))).toEqual(["approve", "cancel", "reject"]);
+    expect(statusActions(codOrder("awaiting_shipping_quote"))).toEqual(["approve", "cancel", "reject"]);
+    // No products screenshot yet, or waiting for a new one: only cancel and reject.
+    expect(statusActions(bankOrder("awaiting_shipping_quote", "unpaid"))).toEqual(["cancel", "reject"]);
+    expect(statusActions(bankOrder("awaiting_shipping_quote", "rejected", { goods: "rejected" }))).toEqual(["cancel", "reject"]);
+    // Waiting for the delivery charge: nothing forward.
+    expect(statusActions(bankOrder("pending", "unpaid", { goods: "verified" }))).toEqual(["cancel", "reject"]);
+    expect(statusActions(bankOrder("pending", "rejected", { goods: "verified", delivery: "rejected" }))).toEqual(["cancel", "reject"]);
+    // A screenshot waiting with both payments in: check it, on to Processing (products or delivery charge).
+    expect(statusActions(bankOrder("pending", "proof_submitted", { goods: "verified", delivery: "submitted" }))).toEqual(["check_screenshot", "cancel", "reject"]);
+    expect(statusActions(bankOrder("pending", "proof_submitted", { goods: "submitted", delivery: "verified" }))).toEqual(["check_screenshot", "cancel", "reject"]);
+    // Approving the products alone can't reach Processing while the delivery charge is missing.
+    expect(statusActions(bankOrder("pending", "proof_submitted", { goods: "submitted" }))).toEqual(["cancel", "reject"]);
+    expect(statusActions(codOrder("processing"))).toEqual(["ship", "complete", "cancel", "reject"]);
+    expect(statusActions(bankOrder("confirmed", "verified", { goods: "verified" }))).toEqual(["ship", "complete", "cancel", "reject"]);
     // Out for delivery: only Completed; no cancel or reject any more.
-    expect(statusActions(codOrder("shipped"), "not_due")).toEqual(["complete"]);
+    expect(statusActions(codOrder("shipped"))).toEqual(["complete"]);
     for (const closed of ["delivered", "cancelled", "rejected"] as const) {
-      expect(statusActions(codOrder(closed), "not_due")).toEqual([]);
+      expect(statusActions(codOrder(closed))).toEqual([]);
     }
   });
 
@@ -176,29 +218,63 @@ describe("status dropdown steps (C21)", () => {
     expect(actionTarget("approve", "bank_transfer", true)).toBe("pending_delivery");
     expect(actionTarget("approve", "bank_transfer", false)).toBe("processing");
     expect(actionTarget("approve", "cod", true)).toBe("processing");
-    expect(actionTarget("check_delivery", "bank_transfer", true)).toBe("processing");
+    expect(actionTarget("check_screenshot", "bank_transfer", true)).toBe("processing");
     expect(actionTarget("ship", "cod", true)).toBe("delivery");
     expect(actionTarget("complete", "cod", true)).toBe("completed");
     expect(actionTarget("cancel", "cod", true)).toBe("cancelled");
     expect(actionTarget("reject", "cod", true)).toBe("rejected");
   });
 
-  it("never offers an earlier status, for any combination", () => {
+  it("never offers the current or an earlier status, for any combination", () => {
     const rank = (tab: string) => ORDER_TABS.indexOf(tab as (typeof ORDER_TABS)[number]);
     for (const paymentMethod of ALL_PAYMENT_METHODS) {
       for (const orderStatus of ORDER_STATUSES) {
         for (const paymentStatus of PAYMENT_STATUSES) {
-          const order = { paymentMethod, orderStatus, paymentStatus };
-          for (const goods of ["missing", "submitted", "verified", "rejected", "not_due"] as const) {
-            for (const action of statusActions(order, goods)) {
-              expect(rank(actionTarget(action, paymentMethod, true)), `${paymentMethod}/${orderStatus}/${paymentStatus}: ${action}`).toBeGreaterThan(
-                rank(orderTab(order)),
-              );
+          for (const latest of ALL_LATEST) {
+            const order: FlagOrder = { paymentMethod, orderStatus, paymentStatus, latest };
+            for (const byTransfer of [true, false]) {
+              const targets = statusActions(order).map((action) => actionTarget(action, paymentMethod, byTransfer));
+              const where = `${paymentMethod}/${orderStatus}/${paymentStatus}/${latest.goods}+${latest.delivery}`;
+              expect(targets, where).not.toContain(orderTab(order));
+              for (const target of targets) expect(rank(target), where).toBeGreaterThan(rank(orderTab(order)));
+              expect(new Set(targets).size, `${where}: one row per status`).toBe(targets.length);
             }
           }
         }
       }
     }
+  });
+
+  it("never approves a bank order without a products screenshot", () => {
+    for (const paymentStatus of PAYMENT_STATUSES) {
+      for (const delivery of PROOF_STATES) {
+        expect(statusActions(bankOrder("awaiting_shipping_quote", paymentStatus, { goods: "missing", delivery }))).not.toContain("approve");
+      }
+    }
+  });
+});
+
+describe("the screenshot a review dialog shows, and what approving it does (C22)", () => {
+  const order = (orderStatus: OrderStatus, proofs: ProofSummary[], shippingTotal: string | null = "450.00") => ({
+    ...paidOrder({ shippingTotal, proofs }),
+    orderStatus,
+    paymentStatus: "proof_submitted" as const,
+  });
+
+  it("moves Pending delivery charge to Processing when this approval completes both payments", () => {
+    expect(orderStatusIfApproved(order("pending", [proof("delivery", "submitted"), proof("goods", "verified")]), "delivery", true)).toBe("processing");
+    expect(orderStatusIfApproved(order("pending", [proof("goods", "submitted"), proof("delivery", "verified")]), "goods", true)).toBe("processing");
+  });
+
+  it("keeps the order where it is while another payment is still missing or waiting", () => {
+    expect(orderStatusIfApproved(order("pending", [proof("goods", "submitted")]), "goods", true)).toBe("pending");
+    expect(orderStatusIfApproved(order("pending", [proof("delivery", "submitted"), proof("goods", "submitted")]), "goods", true)).toBe("pending");
+    expect(orderStatusIfApproved(order("processing", [proof("goods", "submitted")], "0.00"), "goods", true)).toBe("processing");
+  });
+
+  it("approves only the latest screenshot of that payment", () => {
+    const stale = order("pending", [proof("delivery", "submitted"), proof("goods", "submitted"), proof("goods", "rejected")]);
+    expect(orderStatusIfApproved(stale, "delivery", true)).toBe("pending");
   });
 });
 
@@ -207,9 +283,8 @@ describe("approve order", () => {
     expect(approvalRefusal(bankOrder("awaiting_shipping_quote", "proof_submitted"), "submitted")).toBeNull();
     expect(approvalRefusal(bankOrder("awaiting_shipping_quote", "verified"), "verified")).toBeNull();
     expect(approvalRefusal(codOrder("awaiting_shipping_quote"), "not_due")).toBeNull();
-    for (const goods of ["rejected", "missing"] as const) {
-      expect(approvalRefusal(bankOrder("awaiting_shipping_quote", "rejected"), goods)).toBe("Waiting for a new payment screenshot from the customer.");
-    }
+    expect(approvalRefusal(bankOrder("awaiting_shipping_quote", "rejected"), "rejected")).toBe("Waiting for a new payment screenshot from the customer.");
+    expect(approvalRefusal(bankOrder("awaiting_shipping_quote", "unpaid"), "missing")).toBe("The customer hasn't uploaded a payment screenshot yet.");
     expect(approvalRefusal(bankOrder("pending", "unpaid"), "verified")).toBe("This order is already approved.");
     expect(approvalRefusal(codOrder("cancelled"), "not_due")).toBe("This order is closed.");
   });
@@ -222,7 +297,7 @@ describe("approve order", () => {
     expect(approvedStatus("cod", 0, true)).toBe("processing");
   });
 
-  it("makes the order good to go once the delivery charge screenshot is approved, not before", () => {
+  it("makes the order good to go once every due payment is approved, not before", () => {
     expect(statusAfterPaymentReview("pending", "verified")).toBe("processing");
     expect(statusAfterPaymentReview("pending", "rejected")).toBe("pending");
     expect(statusAfterPaymentReview("awaiting_shipping_quote", "rejected")).toBe("awaiting_shipping_quote");

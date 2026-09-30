@@ -9,6 +9,7 @@ const PATHS = {
   moon: "M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z",
   logout: "M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9",
   menu: ICON_PATHS.menu,
+  sidebar: "M3 4h18v16H3zM9 4v16",
   close: ICON_PATHS.close,
   trash: ICON_PATHS.trash,
   search: ICON_PATHS.search,
