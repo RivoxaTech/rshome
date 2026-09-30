@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  PAYMENT_REJECTED_NOTE,
-  buildTimeline,
-  paymentProgress,
-  statusHeadline,
-  uploadPurpose,
-  type ProofSummary,
-  type TimelineOrder,
-} from "./status";
+import { buildTimeline, paymentProgress, statusHeadline, uploadPurpose, type ProofSummary, type TimelineOrder } from "./status";
 
 const submitted = (purpose: ProofSummary["purpose"]): ProofSummary => ({ purpose, status: "submitted", rejectionReason: null });
 const verified = (purpose: ProofSummary["purpose"]): ProofSummary => ({ purpose, status: "verified", rejectionReason: null });
@@ -17,7 +9,7 @@ const rejected = (purpose: ProofSummary["purpose"], reason: string | null = null
   rejectionReason: reason,
 });
 
-/** A bank order as placed today: goods screenshot uploaded at checkout, delivery charge not yet quoted. */
+/** A bank order as placed: products screenshot uploaded at checkout, not yet approved. */
 function order(overrides: Partial<TimelineOrder> = {}): TimelineOrder {
   return {
     orderStatus: "awaiting_shipping_quote",
@@ -43,141 +35,106 @@ const view = (input: TimelineOrder, byTransfer = BY_TRANSFER) => {
     progress,
   };
 };
+const noteOf = (input: TimelineOrder, label: string) => buildTimeline(input, paymentProgress(input, BY_TRANSFER)).find((step) => step.label === label)?.note;
 
-describe("bank transfer timeline", () => {
-  it("reviews the checkout screenshot while the delivery charge is awaited", () => {
+/** Approved with a delivery charge of PKR 450, products paid. */
+const approved = (overrides: Partial<TimelineOrder> = {}) => order({ orderStatus: "pending", shippingTotal: "450.00", proofs: [verified("goods")], ...overrides });
+
+describe("bank transfer timeline (C20)", () => {
+  it("checks the payment first", () => {
     expect(view(order())).toEqual({
       steps: [
-        "Payment under review:current",
-        "Waiting for delivery charge:current",
-        "Delivery charge payment:upcoming",
-        "Confirmed:upcoming",
-        "Being prepared:upcoming",
-        "Shipped:upcoming",
+        "Order placed:done",
+        "Payment checked:current",
+        "Approved:upcoming",
+        "Delivery charge paid:upcoming",
+        "Processing:upcoming",
+        "Sent:upcoming",
         "Delivered:upcoming",
       ],
-      headline: "Waiting for delivery charge",
+      headline: "Payment being checked",
       upload: null,
       progress: { goods: "submitted", delivery: "awaiting_charge" },
     });
+    expect(noteOf(order(), "Payment checked")).toBe("We're checking your payment screenshot.");
   });
 
-  it("marks the goods payment done once verified, still before the charge is set", () => {
-    const result = view(order({ proofs: [verified("goods")] }));
-    expect(result.steps.slice(0, 3)).toEqual([
-      "Payment under review:done",
-      "Waiting for delivery charge:current",
-      "Delivery charge payment:upcoming",
-    ]);
-    expect(result.upload).toBeNull();
+  it("asks for the delivery charge once approved", () => {
+    expect(view(approved())).toMatchObject({
+      steps: [
+        "Order placed:done",
+        "Payment checked:done",
+        "Approved:done",
+        "Delivery charge paid:current",
+        "Processing:upcoming",
+        "Sent:upcoming",
+        "Delivered:upcoming",
+      ],
+      headline: "Order approved – please pay the delivery charge of PKR 450",
+      upload: "delivery",
+    });
+    expect(noteOf(approved(), "Delivery charge paid")).toBe("Transfer PKR 450 and upload the screenshot.");
   });
 
-  it("asks for the delivery charge screenshot once the charge is set", () => {
-    const quoted = order({ orderStatus: "pending", shippingTotal: "450.00", proofs: [verified("goods")] });
-    const result = view(quoted);
-    expect(result.steps.slice(0, 3)).toEqual(["Payment under review:done", "Waiting for delivery charge:done", "Delivery charge payment:current"]);
-    expect(result.headline).toBe("Awaiting payment");
-    expect(result.upload).toBe("delivery");
+  it("checks the delivery charge screenshot", () => {
+    const underReview = approved({ proofs: [submitted("delivery"), verified("goods")] });
+    expect(view(underReview)).toMatchObject({ headline: "Order approved – delivery charge being checked", upload: null });
+    expect(noteOf(underReview, "Delivery charge paid")).toBe("Screenshot received. We're checking it.");
   });
 
-  it("puts the delivery screenshot under review, then waits for confirmation", () => {
-    const underReview = order({ orderStatus: "pending", shippingTotal: "450.00", proofs: [submitted("delivery"), verified("goods")] });
-    expect(view(underReview)).toMatchObject({ headline: "Payment under review", upload: null });
-    expect(buildTimeline(underReview, paymentProgress(underReview, BY_TRANSFER))[2]).toEqual({
-      label: "Delivery charge payment",
+  it("moves through processing, sent and delivered once paid", () => {
+    const paid = [verified("delivery"), verified("goods")];
+    expect(view(approved({ orderStatus: "processing", proofs: paid }))).toMatchObject({
+      headline: "Order approved",
+      steps: expect.arrayContaining(["Delivery charge paid:done", "Processing:current", "Sent:upcoming"]),
+    });
+    const sent = approved({ orderStatus: "shipped", proofs: paid, courier: "TCS", trackingNote: "CN 123456" });
+    expect(view(sent).headline).toBe("On its way");
+    expect(buildTimeline(sent, paymentProgress(sent, BY_TRANSFER)).find((step) => step.label === "Sent")).toEqual({
+      label: "Sent",
       state: "current",
-      note: "Screenshot received. We're checking it.",
+      note: "TCS · CN 123456",
     });
-
-    const paid = order({ orderStatus: "pending", shippingTotal: "450.00", proofs: [verified("delivery"), verified("goods")] });
-    expect(view(paid)).toMatchObject({ headline: "Waiting for confirmation", upload: null });
-    expect(view(paid).steps.slice(2, 4)).toEqual(["Delivery charge payment:done", "Confirmed:upcoming"]);
+    const delivered = approved({ orderStatus: "delivered", proofs: paid });
+    expect(buildTimeline(delivered, paymentProgress(delivered, BY_TRANSFER)).every((step) => step.state === "done")).toBe(true);
+    expect(view(delivered).headline).toBe("Delivered");
   });
 
-  it("shows the reason and reopens the upload when a screenshot is rejected", () => {
-    const goodsRejected = order({ proofs: [rejected("goods", "Amount does not match")] });
-    expect(buildTimeline(goodsRejected, paymentProgress(goodsRejected, BY_TRANSFER))[0]).toEqual({
-      label: "Awaiting payment",
-      state: "current",
-      note: `${PAYMENT_REJECTED_NOTE} Reason: Amount does not match`,
-    });
-    expect(view(goodsRejected)).toMatchObject({ headline: "Awaiting payment", upload: "goods" });
-
-    // A newer screenshot replaces the rejected one.
-    expect(view(order({ proofs: [submitted("goods"), rejected("goods")] })).upload).toBeNull();
-
-    const deliveryRejected = order({ orderStatus: "pending", shippingTotal: "450.00", proofs: [rejected("delivery"), verified("goods")] });
-    expect(buildTimeline(deliveryRejected, paymentProgress(deliveryRejected, BY_TRANSFER))[2].note).toBe(PAYMENT_REJECTED_NOTE);
-    expect(view(deliveryRejected).upload).toBe("delivery");
+  it("skips the delivery charge payment for a zero charge, and when it is paid in cash (option B)", () => {
+    const free = order({ orderStatus: "processing", shippingTotal: "0.00", proofs: [verified("goods")] });
+    expect(view(free).steps).toEqual(["Order placed:done", "Payment checked:done", "Approved:done", "Processing:current", "Sent:upcoming", "Delivered:upcoming"]);
+    expect(view(order(), false).steps).not.toContain("Delivery charge paid:upcoming");
   });
 
-  it("asks for the goods screenshot first when both payments need one", () => {
-    const both = order({ orderStatus: "pending", shippingTotal: "450.00", proofs: [rejected("goods")] });
-    expect(view(both).upload).toBe("goods");
-  });
-
-  it("needs no delivery payment for a zero delivery charge", () => {
-    const free = order({ orderStatus: "pending", shippingTotal: "0.00", proofs: [verified("goods")] });
-    expect(view(free)).toMatchObject({ headline: "Waiting for confirmation", upload: null, progress: { delivery: "not_due" } });
-    expect(view(free).steps).not.toContain("Delivery charge payment:current");
-  });
-
-  it("drops the delivery payment step when the charge is paid in cash on delivery (option B)", () => {
-    const quoted = order({ orderStatus: "pending", shippingTotal: "450.00", proofs: [verified("goods")] });
-    expect(view(quoted, false)).toMatchObject({
-      steps: ["Payment under review:done", "Waiting for delivery charge:done", "Confirmed:upcoming", "Being prepared:upcoming", "Shipped:upcoming", "Delivered:upcoming"],
-      headline: "Waiting for confirmation",
-      upload: null,
-    });
-  });
-
-  it("takes no uploads once the order is confirmed or closed", () => {
-    const confirmed = order({ orderStatus: "confirmed", shippingTotal: "450.00", proofs: [verified("delivery"), verified("goods")] });
-    expect(view(confirmed).steps.slice(0, 4)).toEqual([
-      "Payment under review:done",
-      "Waiting for delivery charge:done",
-      "Delivery charge payment:done",
-      "Confirmed:current",
-    ]);
+  it("takes no uploads once the order is good to go or closed", () => {
+    expect(view(approved({ orderStatus: "processing", proofs: [verified("delivery"), verified("goods")] })).upload).toBeNull();
     expect(view(order({ orderStatus: "cancelled", proofs: [rejected("goods")] })).upload).toBeNull();
   });
 
-  it("treats an order placed before S8 without a screenshot as awaiting payment", () => {
-    expect(view(order({ proofs: [] }))).toMatchObject({ headline: "Awaiting payment", upload: "goods" });
+  it("asks an order placed before S8 without a screenshot for one", () => {
+    expect(view(order({ proofs: [] }))).toMatchObject({ headline: "Please upload your payment screenshot", upload: "goods" });
   });
 });
 
-describe("cash on delivery timeline", () => {
+describe("cash on delivery timeline (C20)", () => {
   const cod = (overrides: Partial<TimelineOrder> = {}) => order({ paymentMethod: "cod", proofs: [], ...overrides });
 
-  it("has no payment steps", () => {
-    expect(view(cod({ orderStatus: "pending", shippingTotal: "450.00" }))).toEqual({
-      steps: ["Waiting for delivery charge:done", "Confirmed:upcoming", "Being prepared:upcoming", "Shipped:upcoming", "Delivered:upcoming"],
-      headline: "Waiting for confirmation",
+  it("has no payment steps and never talks about waiting for the delivery charge", () => {
+    expect(view(cod())).toEqual({
+      steps: ["Order placed:done", "Approved:current", "Processing:upcoming", "Sent:upcoming", "Delivered:upcoming"],
+      headline: "Order received",
       upload: null,
       progress: { goods: "not_due", delivery: "not_due" },
     });
-    expect(view(cod()).headline).toBe("Waiting for delivery charge");
-  });
-
-  it("marks confirmed, prepared and shipped as the order moves, with the courier note", () => {
-    expect(view(cod({ orderStatus: "confirmed" })).steps.slice(1)).toEqual([
-      "Confirmed:current",
-      "Being prepared:upcoming",
-      "Shipped:upcoming",
-      "Delivered:upcoming",
-    ]);
-    expect(view(cod({ orderStatus: "processing" })).headline).toBe("Being prepared");
-
-    const shipped = cod({ orderStatus: "shipped", courier: "TCS", trackingNote: "CN 123456" });
-    const shippedStep = buildTimeline(shipped, paymentProgress(shipped, BY_TRANSFER)).find((step) => step.label === "Shipped");
-    expect(shippedStep).toEqual({ label: "Shipped", state: "current", note: "TCS · CN 123456" });
+    expect(view(cod({ orderStatus: "processing", shippingTotal: "450.00" }))).toMatchObject({
+      steps: ["Order placed:done", "Approved:done", "Processing:current", "Sent:upcoming", "Delivered:upcoming"],
+      headline: "Order approved",
+    });
   });
 
   it("shows everything done once delivered", () => {
-    const delivered = cod({ orderStatus: "delivered" });
+    const delivered = cod({ orderStatus: "delivered", shippingTotal: "450.00" });
     expect(buildTimeline(delivered, paymentProgress(delivered, BY_TRANSFER)).every((step) => step.state === "done")).toBe(true);
-    expect(view(delivered).headline).toBe("Delivered");
   });
 });
 

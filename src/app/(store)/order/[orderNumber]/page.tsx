@@ -112,12 +112,10 @@ export default async function OrderPage({ params }: PageProps<"/order/[orderNumb
             )}
             <div className={ROW}>
               <dt className="text-muted-foreground">Delivery</dt>
-              <dd>{totals.delivery.status === "priced" ? totals.delivery.amount : "To be confirmed"}</dd>
+              <dd>{totals.delivery.status === "priced" ? totals.delivery.amount : "Added on approval"}</dd>
             </div>
-            {totals.delivery.status === "pending" ? (
-              <p className="text-muted-foreground text-xs leading-relaxed">{siteConfig.deliveryPendingNote}</p>
-            ) : (
-              totals.delivery.note && <p className="text-muted-foreground text-xs leading-relaxed">{totals.delivery.note}</p>
+            {totals.delivery.status === "priced" && totals.delivery.note && (
+              <p className="text-muted-foreground text-xs leading-relaxed">{totals.delivery.note}</p>
             )}
             <div className={`${ROW} border-border mt-2 border-t pt-4 text-sm`}>
               <dt>Total</dt>

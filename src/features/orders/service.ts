@@ -10,7 +10,6 @@ import { findOrderNumberByNumberAndPhone, getOrderByNumber, getOrderItems } from
 import {
   buildTimeline,
   paymentProgress,
-  proofRejectionReason,
   statusHeadline,
   uploadPurpose,
   type OrderStatus,
@@ -65,8 +64,9 @@ export type CustomerOrderView = {
     deliveryCharge: string | null;
     /** How the delivery charge is paid (`features.deliveryChargeByTransfer`). */
     deliveryChargeByTransfer: boolean;
-    /** What a new screenshot would pay for now, if anything, and why the last one was rejected. */
-    upload: { purpose: ProofPurpose; amount: string; rejectionReason: string | null } | null;
+    /** What a new screenshot would pay for now, if anything. A rejected screenshot closes the whole
+     * order (owner decision, S9), so an upload is only ever due when nothing has been sent yet. */
+    upload: { purpose: ProofPurpose; amount: string } | null;
   };
   customer: { name: string; phone: string; email: string | null };
   address: string[];
@@ -113,8 +113,7 @@ export async function getCustomerOrder(orderNumber: string): Promise<CustomerOrd
       goodsTotal,
       deliveryCharge,
       deliveryChargeByTransfer: features.deliveryChargeByTransfer,
-      upload:
-        purpose && uploadAmount ? { purpose, amount: uploadAmount, rejectionReason: proofRejectionReason(order, purpose) } : null,
+      upload: purpose && uploadAmount ? { purpose, amount: uploadAmount } : null,
     },
     customer: { name: order.customerName, phone: formatPhone(order.phone), email: order.email },
     address: [order.addressLine, [order.city, order.postalCode].filter(Boolean).join(" "), countryName],

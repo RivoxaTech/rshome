@@ -11,7 +11,7 @@ const PROOF_LABEL: Record<Exclude<Payment["goods"] | Payment["delivery"], "not_d
   submitted: "Under review",
   verified: "Received",
   rejected: "Not accepted",
-  awaiting_charge: "Not set yet",
+  awaiting_charge: "After approval",
 };
 
 function PaymentRow({ label, amount, status }: { label: string; amount: string; status: string }) {
@@ -42,18 +42,17 @@ function PaymentRows({ payment }: { payment: Payment }) {
 
 function UploadHeading({ upload }: { upload: NonNullable<Payment["upload"]> }) {
   if (upload.purpose === "delivery") return <>Pay the delivery charge of {upload.amount}</>;
-  return upload.rejectionReason === null ? <>Pay {upload.amount} for your products</> : <>Upload a new payment screenshot</>;
+  return <>Pay {upload.amount} for your products</>;
 }
 
 /**
  * What the customer must do to pay (owner decision, S8). A bank-transfer order paid its products
  * at checkout; once staff set the delivery charge, it is paid by a second transfer here (or in
- * cash on delivery, per `features.deliveryChargeByTransfer`). A rejected screenshot shows the
- * reason and opens the upload again.
+ * cash on delivery, per `features.deliveryChargeByTransfer`). Rejecting a screenshot rejects the
+ * whole order (owner decision, S9), so there is never a second chance to upload here.
  */
 export function OrderPayment({ order, bankAccounts }: { order: CustomerOrderView; bankAccounts: BankAccount[] }) {
   const closed = order.orderStatus === "cancelled" || order.orderStatus === "rejected";
-  const awaitingQuote = order.orderStatus === "awaiting_shipping_quote";
   const { payment } = order;
 
   if (closed) {
@@ -67,8 +66,9 @@ export function OrderPayment({ order, bankAccounts }: { order: CustomerOrderView
   if (order.paymentMethod === "cod") {
     return (
       <p className="text-muted-foreground mt-4 text-sm leading-relaxed">
-        Pay {order.totals.total} in cash when your order arrives.
-        {awaitingQuote && " The delivery charge will be added once we confirm it with you on WhatsApp."}
+        {payment.deliveryCharge === null
+          ? "You pay in cash when your order arrives."
+          : `Pay ${order.totals.total} in cash when your order arrives: ${payment.goodsTotal} for the products and ${payment.deliveryCharge} for delivery.`}
       </p>
     );
   }
@@ -84,11 +84,6 @@ export function OrderPayment({ order, bankAccounts }: { order: CustomerOrderView
             <p className="font-serif text-2xl leading-tight">
               <UploadHeading upload={upload} />
             </p>
-            {upload.rejectionReason !== null && (
-              <p role="alert" className="border-destructive text-destructive mt-3 border-l-2 pl-4 text-xs leading-relaxed">
-                Your last screenshot was not accepted{upload.rejectionReason ? `: ${upload.rejectionReason}` : "."}
-              </p>
-            )}
             <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
               Transfer {upload.amount} to the account below, then upload a screenshot of the transfer.
             </p>
@@ -118,10 +113,10 @@ function nextStep(payment: Payment): string {
     parts.push(
       payment.deliveryCharge
         ? `Pay the delivery charge of ${payment.deliveryCharge} in cash when your order arrives.`
-        : "We'll confirm your delivery charge on WhatsApp. You pay it in cash when your order arrives.",
+        : "We'll set your delivery charge when we approve your order. You pay it in cash when your order arrives.",
     );
   } else if (payment.delivery === "awaiting_charge") {
-    parts.push("We'll confirm your delivery charge on WhatsApp, then you can pay it by bank transfer on this page.");
+    parts.push("Once we approve your order, you'll pay the delivery charge here by bank transfer.");
   }
-  return parts.length > 0 ? parts.join(" ") : "Thank you, your payment is complete. We'll confirm your order soon.";
+  return parts.length > 0 ? parts.join(" ") : "Thank you, your payment is complete.";
 }

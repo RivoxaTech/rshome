@@ -1,23 +1,21 @@
-import { requireSession } from "@/server/auth/permissions";
-import { PanelSidebar } from "@/components/panel/PanelSidebar";
-import { LogoutButton } from "@/components/panel/LogoutButton";
+import { PanelFrame } from "@/components/panel/PanelFrame";
 import { siteConfig } from "@/config/site.config";
+import { PERMISSIONS } from "@/features/auth/permissions";
+import { getOrderCounts } from "@/features/orders/staff-service";
+import { requireSession } from "@/server/auth/permissions";
 
 export default async function ProtectedPanelLayout({ children }: { children: React.ReactNode }) {
   const session = await requireSession();
+  const counts: Partial<Record<string, number>> = {};
+  if (session.permissions.has(PERMISSIONS.ORDER_VIEW)) {
+    const orderCounts = await getOrderCounts();
+    counts["orders-bank"] = orderCounts.bank_transfer.needsAction;
+    counts["orders-cod"] = orderCounts.cod.needsAction;
+  }
 
   return (
-    <div className="bg-background flex min-h-screen flex-1">
-      <PanelSidebar permissions={session.permissions} logoText={siteConfig.logoText} />
-      <div className="flex flex-1 flex-col">
-        <header className="border-border flex items-center justify-between border-b px-6 py-3">
-          <span className="text-muted-foreground text-sm">
-            {session.name} &middot; {session.roleKey}
-          </span>
-          <LogoutButton />
-        </header>
-        <main className="flex-1 p-6">{children}</main>
-      </div>
-    </div>
+    <PanelFrame permissions={session.permissions} counts={counts} logoText={siteConfig.logoText} userName={session.name} roleLabel={session.roleKey}>
+      {children}
+    </PanelFrame>
   );
 }

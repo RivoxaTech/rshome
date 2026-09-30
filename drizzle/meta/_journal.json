@@ -36,6 +36,13 @@
       "when": 1790693589917,
       "tag": "0004_payment_proof_purpose",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1790711053407,
+      "tag": "0005_order_stock_restored",
+      "breakpoints": true
     }
   ]
 }

@@ -13,6 +13,7 @@ import {
   percentOff,
   priceVariant,
   resolveCoupon,
+  totalWithDeliveryCharge,
   variantBasePrice,
   type CartLineInput,
   type PricingCoupon,
@@ -401,6 +402,14 @@ describe("goodsTotalOf", () => {
   it("takes the discounts and the coupon off the subtotal, never the delivery charge", () => {
     expect(goodsTotalOf({ subtotal: 500000, discountTotal: 50000, couponDiscount: 0 })).toBe(450000);
     expect(goodsTotalOf({ subtotal: 500000, discountTotal: 0, couponDiscount: 20000 })).toBe(480000);
+  });
+});
+
+describe("totalWithDeliveryCharge", () => {
+  it("adds the whole delivery charge to the goods total, after discounts and coupon", () => {
+    const amounts = { subtotal: 500000, discountTotal: 50000, couponDiscount: 20000 };
+    expect(totalWithDeliveryCharge(amounts, 45000)).toBe(475000);
+    expect(totalWithDeliveryCharge(amounts, 0)).toBe(430000);
   });
 });
 

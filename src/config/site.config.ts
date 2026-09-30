@@ -18,6 +18,26 @@ export const siteConfig = {
   orderNumberPrefix: "RSH",
   /** The customer-to-shop WhatsApp message on the order page; `{orderNumber}` is filled in. */
   orderWhatsAppMessage: "Hello RS Home, I have a question about my order {orderNumber}.",
+  /**
+   * The shop-to-customer WhatsApp messages on the panel order page, one per stage (C13, C20).
+   * `{name}`, `{store}`, `{orderNumber}`, `{deliveryCharge}`, `{total}`, `{reason}` and `{orderUrl}`
+   * are filled in.
+   */
+  staffWhatsAppMessages: {
+    general: "Hello {name}, this is {store} about your order {orderNumber}.",
+    screenshotMissing:
+      "Hello {name}, this is {store} about your order {orderNumber}. We haven't received your payment screenshot yet. Please upload it here: {orderUrl}",
+    // A rejected screenshot rejects the whole order (owner decision, S9): there is no re-upload, only a new order.
+    screenshotRejected:
+      "Hello {name}, this is {store}. We couldn't accept the payment screenshot for your order {orderNumber}, so we've had to reject it: {reason}. Message us here if you'd like to place a new order: {orderUrl}",
+    approvedDeliveryDue:
+      "Hello {name}, your {store} order {orderNumber} is approved. The delivery charge is {deliveryCharge}, so your new total is {total}. Please transfer {deliveryCharge} and upload the screenshot here: {orderUrl}",
+    approvedCod:
+      "Hello {name}, your {store} order {orderNumber} is approved. The delivery charge is {deliveryCharge}, so your total is {total}, paid in cash on delivery. You can view your order here: {orderUrl}",
+    approved:
+      "Hello {name}, your {store} order {orderNumber} is approved. Your total is {total}, including the delivery charge of {deliveryCharge}. We're preparing it now: {orderUrl}",
+    sent: "Hello {name}, your {store} order {orderNumber} is on its way. You can view your order here: {orderUrl}",
+  },
   contact: {
     phone: "03218581969",
     whatsapp: "923218581969",

@@ -30,4 +30,28 @@ export const ICON_PATHS = {
   check: "M20 6L9 17l-5-5",
   // Payment screenshot picker (S8): a picture frame with a mountain and sun.
   image: "M4 4h16v16H4zM4 16l5-5 4 4 2-2 5 5M15.5 9.5h.01",
+  // Panel (S9): dashboard tiles, bank columns, a banknote, sun/moon, logout, chevrons, a profile ring.
+  dashboard: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  bank: "M3 10l9-6 9 6M4 10v9M20 10v9M8 10v9M12 10v9M16 10v9M2 21h20",
+  cash: "M3 6h18v12H3zM7 6v12M17 6v12M12 9a3 3 0 100 6 3 3 0 000-6z",
+  sun: "M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4M12 8a4 4 0 100 8 4 4 0 000-8z",
+  moon: "M20 13.2A8 8 0 1110.8 4a6.4 6.4 0 009.2 9.2z",
+  logout: "M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9",
+  chevronLeft: "M15 18l-6-6 6-6",
+  chevronRight: "M9 18l6-6-6-6",
+  calendar: "M4 5h16v16H4zM4 9h16M8 3v4M16 3v4",
 } as const;
+
+/**
+ * The ⋮ "more actions" menu (S9): three filled dots. `ICON_PATHS.menu` rotated 90° drew three
+ * vertical bars instead, since it is a hamburger icon — this is a real dot glyph, not a stroke path.
+ */
+export function MoreVerticalIcon({ className = "h-[18px] w-[18px]" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <circle cx="12" cy="5" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="12" cy="19" r="2" />
+    </svg>
+  );
+}

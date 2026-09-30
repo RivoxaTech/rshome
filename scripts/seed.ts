@@ -1,6 +1,7 @@
 import "../src/server/load-env";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { siteConfig } from "../src/config/site.config";
@@ -215,13 +216,115 @@ async function seedShippingZones() {
   console.log("Upserted shipping zones: Karachi, Pakistan, International.");
 }
 
-type VariantSeed = {
+export type VariantSeed = {
   sku: string;
   label: string;
   attributes: Record<string, string>;
   stock: number;
   priceOverride?: string;
 };
+
+export type ProductSeed = {
+  categorySlug: string;
+  name: string;
+  slug: string;
+  shortDescription: string;
+  price: string;
+  isFeatured: boolean;
+  variants: VariantSeed[];
+};
+
+// A "Default" variant is a simple product's single, unavoidable variant row (client decision S2b #6).
+// Exported so scripts/seed-demo-orders.ts can read real SKUs and stock levels rather than inventing
+// numbers of its own when it restores variant stock to the seed value.
+export const PRODUCT_SEEDS: ProductSeed[] = [
+  {
+    categorySlug: "tableware",
+    name: "Porcelain Dinner Plate Set",
+    slug: "porcelain-dinner-plate-set",
+    shortDescription: "Premium dining collection",
+    price: "4500.00",
+    isFeatured: true,
+    variants: [
+      { sku: "RSH-TW-001-WHT", label: "White", attributes: { Colour: "White" }, stock: 20 },
+      { sku: "RSH-TW-001-IVR", label: "Ivory", attributes: { Colour: "Ivory" }, stock: 15, priceOverride: "4800.00" },
+    ],
+  },
+  {
+    categorySlug: "tableware",
+    name: "Stoneware Bowl Set",
+    slug: "stoneware-bowl-set",
+    shortDescription: "Everyday stoneware bowls",
+    price: "3200.00",
+    isFeatured: false,
+    variants: [{ sku: "RSH-TW-002", label: "Default", attributes: {}, stock: 20 }],
+  },
+  {
+    categorySlug: "tea-sets",
+    name: "Floral Ceramic Tea Set",
+    slug: "floral-ceramic-tea-set",
+    shortDescription: "Elegant ceramic tea set",
+    price: "6800.00",
+    isFeatured: true,
+    variants: [
+      { sku: "RSH-TS-001-6PC", label: "6-Piece", attributes: { Size: "6-Piece" }, stock: 18 },
+      { sku: "RSH-TS-001-12PC", label: "12-Piece", attributes: { Size: "12-Piece" }, stock: 10, priceOverride: "11500.00" },
+    ],
+  },
+  {
+    categorySlug: "tea-sets",
+    name: "Classic White Tea Set",
+    slug: "classic-white-tea-set",
+    shortDescription: "Timeless white porcelain tea set",
+    price: "5200.00",
+    isFeatured: false,
+    variants: [{ sku: "RSH-TS-002", label: "Default", attributes: {}, stock: 20 }],
+  },
+  {
+    categorySlug: "trays",
+    name: "Wooden Serving Tray",
+    slug: "wooden-serving-tray",
+    shortDescription: "Minimal luxury serving tray",
+    price: "2400.00",
+    isFeatured: true,
+    variants: [
+      { sku: "RSH-TR-001-SM", label: "Small", attributes: { Size: "Small" }, stock: 25 },
+      { sku: "RSH-TR-001-MD", label: "Medium", attributes: { Size: "Medium" }, stock: 20, priceOverride: "2800.00" },
+      { sku: "RSH-TR-001-LG", label: "Large", attributes: { Size: "Large" }, stock: 12, priceOverride: "3300.00" },
+    ],
+  },
+  {
+    categorySlug: "trays",
+    name: "Marble Finish Tray",
+    slug: "marble-finish-tray",
+    shortDescription: "Polished marble-finish tray",
+    price: "3100.00",
+    isFeatured: false,
+    variants: [{ sku: "RSH-TR-002", label: "Default", attributes: {}, stock: 20 }],
+  },
+  {
+    categorySlug: "decor",
+    name: "Ceramic Vase",
+    slug: "ceramic-vase",
+    shortDescription: "Minimal decorative accent",
+    price: "2900.00",
+    // One featured product per category, matching the demo's "Edit" section (one item per collection).
+    isFeatured: true,
+    variants: [
+      { sku: "RSH-DC-001-WHT", label: "White", attributes: { Colour: "White" }, stock: 20 },
+      { sku: "RSH-DC-001-BLK", label: "Black", attributes: { Colour: "Black" }, stock: 20 },
+    ],
+  },
+  {
+    categorySlug: "decor",
+    name: "Wall Art Panel",
+    slug: "wall-art-panel",
+    shortDescription: "Statement wall art panel",
+    price: "5600.00",
+    isFeatured: false,
+    variants: [{ sku: "RSH-DC-002", label: "Default", attributes: {}, stock: 20 }],
+  },
+];
 
 async function seedCatalog(media: Record<SeedImageKey, ProcessedMediaImage>) {
   const categorySeeds = [
@@ -275,104 +378,7 @@ async function seedCatalog(media: Record<SeedImageKey, ProcessedMediaImage>) {
 
   const categoryRows = await db.select().from(categories);
   const categoryIdBySlug = new Map(categoryRows.map((c) => [c.slug, c.id]));
-
-  // A "Default" variant is a simple product's single, unavoidable variant row (client decision S2b #6).
-  const productSeeds: {
-    categorySlug: string;
-    name: string;
-    slug: string;
-    shortDescription: string;
-    price: string;
-    isFeatured: boolean;
-    variants: VariantSeed[];
-  }[] = [
-    {
-      categorySlug: "tableware",
-      name: "Porcelain Dinner Plate Set",
-      slug: "porcelain-dinner-plate-set",
-      shortDescription: "Premium dining collection",
-      price: "4500.00",
-      isFeatured: true,
-      variants: [
-        { sku: "RSH-TW-001-WHT", label: "White", attributes: { Colour: "White" }, stock: 20 },
-        { sku: "RSH-TW-001-IVR", label: "Ivory", attributes: { Colour: "Ivory" }, stock: 15, priceOverride: "4800.00" },
-      ],
-    },
-    {
-      categorySlug: "tableware",
-      name: "Stoneware Bowl Set",
-      slug: "stoneware-bowl-set",
-      shortDescription: "Everyday stoneware bowls",
-      price: "3200.00",
-      isFeatured: false,
-      variants: [{ sku: "RSH-TW-002", label: "Default", attributes: {}, stock: 20 }],
-    },
-    {
-      categorySlug: "tea-sets",
-      name: "Floral Ceramic Tea Set",
-      slug: "floral-ceramic-tea-set",
-      shortDescription: "Elegant ceramic tea set",
-      price: "6800.00",
-      isFeatured: true,
-      variants: [
-        { sku: "RSH-TS-001-6PC", label: "6-Piece", attributes: { Size: "6-Piece" }, stock: 18 },
-        { sku: "RSH-TS-001-12PC", label: "12-Piece", attributes: { Size: "12-Piece" }, stock: 10, priceOverride: "11500.00" },
-      ],
-    },
-    {
-      categorySlug: "tea-sets",
-      name: "Classic White Tea Set",
-      slug: "classic-white-tea-set",
-      shortDescription: "Timeless white porcelain tea set",
-      price: "5200.00",
-      isFeatured: false,
-      variants: [{ sku: "RSH-TS-002", label: "Default", attributes: {}, stock: 20 }],
-    },
-    {
-      categorySlug: "trays",
-      name: "Wooden Serving Tray",
-      slug: "wooden-serving-tray",
-      shortDescription: "Minimal luxury serving tray",
-      price: "2400.00",
-      isFeatured: true,
-      variants: [
-        { sku: "RSH-TR-001-SM", label: "Small", attributes: { Size: "Small" }, stock: 25 },
-        { sku: "RSH-TR-001-MD", label: "Medium", attributes: { Size: "Medium" }, stock: 20, priceOverride: "2800.00" },
-        { sku: "RSH-TR-001-LG", label: "Large", attributes: { Size: "Large" }, stock: 12, priceOverride: "3300.00" },
-      ],
-    },
-    {
-      categorySlug: "trays",
-      name: "Marble Finish Tray",
-      slug: "marble-finish-tray",
-      shortDescription: "Polished marble-finish tray",
-      price: "3100.00",
-      isFeatured: false,
-      variants: [{ sku: "RSH-TR-002", label: "Default", attributes: {}, stock: 20 }],
-    },
-    {
-      categorySlug: "decor",
-      name: "Ceramic Vase",
-      slug: "ceramic-vase",
-      shortDescription: "Minimal decorative accent",
-      price: "2900.00",
-      // One featured product per category, matching the demo's "Edit" section (one item per collection).
-      isFeatured: true,
-      variants: [
-        { sku: "RSH-DC-001-WHT", label: "White", attributes: { Colour: "White" }, stock: 20 },
-        { sku: "RSH-DC-001-BLK", label: "Black", attributes: { Colour: "Black" }, stock: 20 },
-      ],
-    },
-    {
-      categorySlug: "decor",
-      name: "Wall Art Panel",
-      slug: "wall-art-panel",
-      shortDescription: "Statement wall art panel",
-      price: "5600.00",
-      isFeatured: false,
-      variants: [{ sku: "RSH-DC-002", label: "Default", attributes: {}, stock: 20 }],
-    },
-  ];
+  const productSeeds = PRODUCT_SEEDS;
 
   for (const product of productSeeds) {
     const categoryId = categoryIdBySlug.get(product.categorySlug);
@@ -569,11 +575,15 @@ async function main() {
   console.log("Seed complete.");
 }
 
-main()
-  .catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await pool.end();
-  });
+// Only run when this file is the entry point (`tsx scripts/seed.ts`), not when
+// scripts/seed-demo-orders.ts imports PRODUCT_SEEDS from it.
+if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
+  main()
+    .catch((error) => {
+      console.error(error instanceof Error ? error.message : error);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await pool.end();
+    });
+}

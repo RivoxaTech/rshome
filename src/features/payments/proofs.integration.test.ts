@@ -247,24 +247,34 @@ describe.skipIf(!TEST_DATABASE_URL)("payment screenshots (integration)", () => {
       expect(history.at(-1)).toMatchObject({ kind: "payment", fromStatus: "unpaid", toStatus: "proof_submitted" });
     });
 
-    it("takes a new goods screenshot after staff rejected the last, up to 5 per order", async () => {
+    it("refuses a new upload once the order is rejected (owner decision, S9: rejecting a screenshot rejects the order)", async () => {
       const order = await placeBankOrder();
       grantAccess(order.orderNumber);
-      const rejectAll = () =>
-        db.update(paymentProofs).set({ status: "rejected", rejectionReason: "Amount does not match" }).where(eq(paymentProofs.orderId, order.id));
+      await db.update(paymentProofs).set({ status: "rejected", rejectionReason: "Amount does not match" }).where(eq(paymentProofs.orderId, order.id));
+      await db.update(orders).set({ orderStatus: "rejected", paymentStatus: "rejected", rejectionReason: "Amount does not match" }).where(eq(orders.id, order.id));
 
-      expect((await uploadToOrder(order.orderNumber, "goods", await screenshot())).status).toBe(409);
-      for (let upload = 2; upload <= 5; upload += 1) {
-        await rejectAll();
-        expect((await uploadToOrder(order.orderNumber, "goods", await screenshot())).status).toBe(201);
-      }
-      await rejectAll();
-      await db.delete(rateLimits); // Six attempts also hit the per-order rate limit; this checks the cap.
       expect(await uploadToOrder(order.orderNumber, "goods", await screenshot())).toEqual({
+        status: 409,
+        body: { error: "This order doesn't need a payment screenshot right now." },
+      });
+      expect(await proofsOf(order.id)).toHaveLength(1);
+    });
+
+    it("refuses more than 5 screenshots on one order (PAY-06)", async () => {
+      const order = await placeBankOrder();
+      grantAccess(order.orderNumber);
+      // A rejection now closes the order before a second screenshot could ever be due (owner
+      // decision, S9), so this pads the count directly to exercise the cap on its own.
+      for (let extra = 0; extra < 4; extra += 1) {
+        await db.insert(paymentProofs).values({ orderId: order.id, purpose: "goods", status: "verified", filePath: `proofs/test/${extra}.webp`, fileSize: 1 });
+      }
+      await setDeliveryCharge(order.id, "unpaid");
+      await db.delete(rateLimits);
+      expect(await proofsOf(order.id)).toHaveLength(5);
+      expect(await uploadToOrder(order.orderNumber, "delivery", await screenshot())).toEqual({
         status: 409,
         body: { error: "This order already has the most screenshots we accept. Please message us on WhatsApp." },
       });
-      expect(await proofsOf(order.id)).toHaveLength(5);
     });
 
     it("refuses a COD order", async () => {

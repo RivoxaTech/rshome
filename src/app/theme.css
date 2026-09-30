@@ -73,6 +73,54 @@
   --shadow-lift: 0 45px 80px -35px oklch(0.4 0.03 60 / 0.45);
 }
 
+/*
+ * Admin and developer panel (section 9): same tokens, Inter instead of the storefront's serif/
+ * display pairing, and a dark variant toggled by `#panel-shell[data-theme="dark"]`. Scoped to
+ * `[data-panel]` so the storefront is never affected.
+ */
+[data-panel],
+[data-panel] button,
+[data-panel] input,
+[data-panel] select,
+[data-panel] textarea {
+  font-family: var(--font-inter);
+}
+
+/* The storefront's --radius is near-zero by design; the panel wants soft, dense-admin corners. */
+[data-panel] {
+  --radius: 0.5rem;
+}
+
+[data-panel] h1,
+[data-panel] h2,
+[data-panel] h3 {
+  font-family: var(--font-inter);
+  font-weight: 600;
+}
+
+[data-panel][data-theme="dark"] {
+  color-scheme: dark;
+  --background: oklch(0.17 0.014 50);
+  --foreground: oklch(0.92 0.012 85);
+  --card: oklch(0.21 0.016 50);
+  --card-foreground: oklch(0.92 0.012 85);
+  --popover: oklch(0.23 0.017 50);
+  --popover-foreground: oklch(0.92 0.012 85);
+  --primary: oklch(0.86 0.03 82);
+  --primary-foreground: oklch(0.18 0.014 50);
+  --secondary: oklch(0.28 0.018 50);
+  --secondary-foreground: oklch(0.92 0.012 85);
+  --muted: oklch(0.26 0.016 50);
+  --muted-foreground: oklch(0.64 0.02 70);
+  --accent: oklch(0.58 0.09 78);
+  --accent-foreground: oklch(0.15 0.012 50);
+  --destructive: oklch(0.62 0.2 27);
+  --destructive-foreground: oklch(0.97 0.006 250);
+  --border: oklch(0.32 0.018 50);
+  --input: oklch(0.32 0.018 50);
+  --ring: oklch(0.58 0.09 78);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);

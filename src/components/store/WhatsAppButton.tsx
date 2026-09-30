@@ -14,18 +14,39 @@ export function WhatsAppGlyph() {
   );
 }
 
-/** A round WhatsApp-green icon link that opens `wa.me` in a new tab. */
+/**
+ * A WhatsApp-green link that opens `wa.me` in a new tab: a round icon-only button (storefront,
+ * panel inline actions), or a full-width pill with its label (the panel's Customer card).
+ */
 export function WhatsAppButton({
   href,
   label,
   size = "default",
+  variant = "icon",
   className = "",
 }: {
   href: string;
   label: string;
   size?: keyof typeof SIZES;
+  variant?: "icon" | "full";
   className?: string;
 }) {
+  if (variant === "full") {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`bg-whatsapp inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 ${className}`}
+      >
+        <span className="h-4 w-4 [&>svg]:h-4 [&>svg]:w-4">
+          <WhatsAppGlyph />
+        </span>
+        {label}
+      </a>
+    );
+  }
+
   return (
     <a
       href={href}
