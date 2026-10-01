@@ -1,10 +1,10 @@
 import { requirePermission } from "@/server/auth/permissions";
 import { PERMISSIONS } from "@/features/auth/permissions";
 
-// Stub pending S10 (products CRUD). Gated on product.create as an interim RBAC canary;
-// S10 should split this into product.view (Admin, read-only) and product.create/update/delete (Developer).
+// Stub pending S10 (products CRUD). Gated on product.view, which only the Developer holds
+// (BUILD_PLAN.md C24) — S10 adds the create/update/delete actions on top of this read gate.
 export default async function ProductsPage() {
-  await requirePermission(PERMISSIONS.PRODUCT_CREATE);
+  await requirePermission(PERMISSIONS.PRODUCT_VIEW);
 
   return (
     <div className="flex flex-col gap-2">

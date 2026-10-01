@@ -40,6 +40,8 @@ export const ICON_PATHS = {
   chevronLeft: "M15 18l-6-6 6-6",
   chevronRight: "M9 18l6-6-6-6",
   calendar: "M4 5h16v16H4zM4 9h16M8 3v4M16 3v4",
+  // Products nav item (S9b): a package/box outline.
+  box: "M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10",
 } as const;
 
 /**

@@ -75,6 +75,13 @@ export const getSession = cache(async (): Promise<SessionUser | null> => {
   };
 });
 
+/** The current request's hashed session id (`sessions.id`), or null when there is no cookie. */
+export async function getCurrentSessionId(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  return token ? hashToken(token) : null;
+}
+
 /** Creates a DB session row and sets the cookie. Must run in a Server Action or Route Handler. */
 export async function createSession(userId: number, ip: string, userAgent: string): Promise<void> {
   const token = randomBytes(32).toString("hex");

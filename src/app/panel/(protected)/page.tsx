@@ -1,9 +1,16 @@
-import { requirePermission } from "@/server/auth/permissions";
+import { redirect } from "next/navigation";
+import { requireSession } from "@/server/auth/permissions";
+import { firstAllowedPath } from "@/features/auth/landing";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 
+/**
+ * The Developer no longer holds `dashboard.view` (BUILD_PLAN.md C24), so this is never their
+ * landing page — redirect to their own first-allowed page instead of the generic 403 (S9b).
+ */
 export default async function DashboardPage() {
-  const session = await requirePermission(PERMISSIONS.DASHBOARD_VIEW);
+  const session = await requireSession();
+  if (!session.permissions.has(PERMISSIONS.DASHBOARD_VIEW)) redirect(firstAllowedPath(session.permissions));
 
   return (
     <>

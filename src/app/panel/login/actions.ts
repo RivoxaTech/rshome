@@ -1,8 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { firstAllowedPath } from "@/features/auth/landing";
 import { LoginInputSchema, login } from "@/features/auth/service";
 import { getClientIp, getUserAgent } from "@/server/request";
+import { getSession } from "@/server/auth/session";
 
 export type LoginActionState = { error: string } | undefined;
 
@@ -21,5 +23,6 @@ export async function loginAction(_prevState: LoginActionState, formData: FormDa
     return { error: result.error };
   }
 
-  redirect("/panel");
+  const session = await getSession();
+  redirect(session ? firstAllowedPath(session.permissions) : "/panel/account");
 }

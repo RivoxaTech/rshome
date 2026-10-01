@@ -94,6 +94,18 @@ export const getOrderCounts = cache(async (): Promise<Record<PaymentMethod, TabC
   return counts;
 });
 
+/**
+ * The sidebar's per-nav-item counts (`nav-items.ts` keys): `{}` for a viewer without `order.view`
+ * (the Developer, since S9b) so the panel layout never even queries orders for them.
+ */
+export async function getOrderCountsForPermissions(
+  permissions: ReadonlySet<PermissionKey>,
+): Promise<Partial<Record<string, number>>> {
+  if (!permissions.has(PERMISSIONS.ORDER_VIEW)) return {};
+  const counts = await getOrderCounts();
+  return { "orders-bank": counts.bank_transfer.needsAction, "orders-cod": counts.cod.needsAction };
+}
+
 // ── What a row or the detail page can do ────────────────────────────────────────────────────
 
 type StaffProof = Awaited<ReturnType<typeof getProofsForStaff>>[number];

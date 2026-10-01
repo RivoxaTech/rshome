@@ -7,19 +7,16 @@ import { z } from "zod";
 import { siteConfig } from "../src/config/site.config";
 import {
   ADMIN_DEFAULT_PERMISSIONS,
+  DEVELOPER_DEFAULT_PERMISSIONS,
   PERMISSION_DESCRIPTIONS,
   PERMISSIONS,
   type PermissionKey,
 } from "../src/features/auth/permissions";
+import { syncRolePermissions } from "../src/features/auth/repo";
 import { hashPassword } from "../src/server/auth/password";
 import { db, pool } from "../src/server/db/client";
 import { categories, productImages, productVariants, products } from "../src/server/db/schema/catalog";
-import {
-  permissions as permissionsTable,
-  rolePermissions,
-  roles,
-  users,
-} from "../src/server/db/schema/access-control";
+import { permissions as permissionsTable, roles, users } from "../src/server/db/schema/access-control";
 import { coupons, discounts, discountTargets } from "../src/server/db/schema/promotions";
 import { settings } from "../src/server/db/schema/settings";
 import { shippingZoneAreas, shippingZones } from "../src/server/db/schema/shipping";
@@ -68,6 +65,8 @@ async function seedPermissions() {
   console.log(`Upserted ${allKeys.length} permissions.`);
 }
 
+// Both are system roles (DATABASE.md): neither can be edited or deleted in the panel, and their
+// permission sets are owned by the code above, not by whatever a past run granted.
 async function seedRoles() {
   await db
     .insert(roles)
@@ -75,36 +74,25 @@ async function seedRoles() {
     .onDuplicateKeyUpdate({ set: { name: "Developer", isSystem: true } });
   await db
     .insert(roles)
-    .values({ key: "admin", name: "Admin", isSystem: false })
-    .onDuplicateKeyUpdate({ set: { name: "Admin" } });
+    .values({ key: "admin", name: "Admin", isSystem: true })
+    .onDuplicateKeyUpdate({ set: { name: "Admin", isSystem: true } });
   console.log("Upserted roles: developer, admin.");
 }
 
+/**
+ * Syncs both system roles to their default sets by granting AND revoking (ARCHITECTURE.md §4.5,
+ * BUILD_PLAN.md C24): a permission no longer listed for a role is deleted from `role_permissions`,
+ * not just left alone, so reversing a role's access takes effect on the next seed run.
+ */
 async function seedRolePermissions() {
   const roleRows = await db.select().from(roles);
   const developerRole = roleRows.find((r) => r.key === "developer")!;
   const adminRole = roleRows.find((r) => r.key === "admin")!;
 
-  const permissionRows = await db.select().from(permissionsTable);
-  const permissionIdByKey = new Map(permissionRows.map((p) => [p.key, p.id]));
-
-  const grants: { roleId: number; permissionId: number }[] = [];
-  for (const permission of permissionRows) {
-    grants.push({ roleId: developerRole.id, permissionId: permission.id });
-  }
-  for (const key of ADMIN_DEFAULT_PERMISSIONS) {
-    const permissionId = permissionIdByKey.get(key);
-    if (permissionId) grants.push({ roleId: adminRole.id, permissionId });
-  }
-
-  for (const grant of grants) {
-    await db
-      .insert(rolePermissions)
-      .values(grant)
-      // No-op update: makes the insert idempotent without an "insert ignore".
-      .onDuplicateKeyUpdate({ set: { roleId: sql`role_id` } });
-  }
-  console.log(`Granted ${grants.length} role/permission pairs.`);
+  const developerSync = await syncRolePermissions(developerRole.id, DEVELOPER_DEFAULT_PERMISSIONS);
+  const adminSync = await syncRolePermissions(adminRole.id, ADMIN_DEFAULT_PERMISSIONS);
+  console.log(`Developer role: granted ${developerSync.granted}, revoked ${developerSync.revoked}.`);
+  console.log(`Admin role: granted ${adminSync.granted}, revoked ${adminSync.revoked}.`);
   return { developerRole, adminRole };
 }
 

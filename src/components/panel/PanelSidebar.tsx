@@ -73,7 +73,13 @@ export function PanelSidebar({
         })}
       </ul>
 
-      <div className={`border-border mt-auto flex items-center gap-2 border-t px-3 py-3 ${collapsed ? "justify-center" : ""}`}>
+      <Link
+        href="/panel/account"
+        title="Account settings"
+        aria-label="Account settings"
+        onClick={() => setMobileOpen(false)}
+        className={`border-border hover:bg-secondary mt-auto flex items-center gap-2 border-t px-3 py-3 transition-colors ${collapsed ? "justify-center" : ""}`}
+      >
         <span className="bg-secondary text-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
           {initials(userName)}
         </span>
@@ -83,7 +89,7 @@ export function PanelSidebar({
             <p className="text-muted-foreground truncate text-xs">Signed in{roleLabel ? ` · ${roleLabel}` : ""}</p>
           </div>
         )}
-      </div>
+      </Link>
     </>
   );
 

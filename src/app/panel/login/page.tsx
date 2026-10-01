@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/server/auth/session";
+import { firstAllowedPath } from "@/features/auth/landing";
 import { LoginForm } from "@/app/panel/login/LoginForm";
 import { siteConfig } from "@/config/site.config";
 
 export default async function LoginPage() {
   const session = await getSession();
-  if (session) redirect("/panel");
+  if (session) redirect(firstAllowedPath(session.permissions));
 
   return (
     <div className="bg-background flex flex-1 items-center justify-center p-6">
