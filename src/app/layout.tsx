@@ -32,7 +32,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" data-scroll-behavior="smooth" className={`${cormorantGaramond.variable} ${jost.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+      {/* suppressHydrationWarning: browser extensions (e.g. ColorZilla's cz-shortcut-listen) inject
+          attributes onto <body> before React hydrates; this only silences that mismatch on this
+          one element, not real hydration bugs in the tree below it. */}
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <FocusModality />
         {children}
       </body>
