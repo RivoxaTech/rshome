@@ -27,3 +27,11 @@ export const bankAccountSchema = z.object({
 export type BankAccount = z.infer<typeof bankAccountSchema>;
 
 export const bankAccountsSchema = z.array(bankAccountSchema).min(1);
+
+/**
+ * Owner alert recipients (S21 Phase 2): `notify_owner_order_emails` (off by default — push is the
+ * primary alert) and `notify_owner_wholesale_emails` (on by default, S17). Edited in the database
+ * until S14's settings editor.
+ */
+export const notifyRecipientsSchema = z.array(z.email()).default([]);
+export type NotifyRecipients = z.infer<typeof notifyRecipientsSchema>;

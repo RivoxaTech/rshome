@@ -9,6 +9,7 @@ import { BankDetails } from "@/components/store/orders/BankDetails";
 import { ProofUpload } from "@/components/store/orders/ProofUpload";
 import { CopyButton } from "@/components/ui/CopyButton";
 import type { CountryOption } from "@/config/countries";
+import { siteConfig } from "@/config/site.config";
 import { checkoutInputSchema, fieldErrorsOf } from "@/features/checkout/schemas";
 import type { BankAccount } from "@/features/settings/schemas";
 import { CheckoutSummary } from "./CheckoutSummary";
@@ -193,6 +194,7 @@ export function CheckoutForm({
               label="Email"
               type="email"
               autoComplete="email"
+              hint={siteConfig.checkoutEmailHint}
               value={form.email}
               onChange={(event) => update({ email: event.target.value })}
               error={fieldErrors.email}

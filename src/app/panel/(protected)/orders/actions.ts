@@ -1,7 +1,9 @@
 "use server";
 
 import { refresh } from "next/cache";
+import { after } from "next/server";
 import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
+import { sendOrderApprovedEmail, sendOrderClosedEmail, sendOrderShippedEmail } from "@/features/mail/service";
 import {
   addOrderNote,
   approveOrder,
@@ -11,6 +13,7 @@ import {
   updateFulfilment,
   type StaffActionResult,
 } from "@/features/orders/staff-actions";
+import { getProofOrderNumber } from "@/features/orders/staff-repo";
 import { ACTION_PERMISSIONS } from "@/features/orders/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 
@@ -27,22 +30,43 @@ async function run(permissions: PermissionKey[], formData: FormData, change: Sta
 
 /** It sets the delivery charge, approves the payment screenshot and moves the order on, so it needs all three. */
 export async function approveOrderAction(_state: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
-  return run(ACTION_PERMISSIONS.approve, formData, approveOrder);
+  const result = await run(ACTION_PERMISSIONS.approve, formData, approveOrder);
+  if (result.ok) {
+    const orderNumber = String(formData.get("orderNumber"));
+    after(() => sendOrderApprovedEmail(orderNumber));
+  }
+  return result;
 }
 
 /** Approving needs only the payment permission; rejecting rejects the whole order, so it needs both. */
 export async function reviewProofAction(_state: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
-  const permissions =
-    formData.get("decision") === "reject" ? [PERMISSIONS.ORDER_VERIFY_PAYMENT, PERMISSIONS.ORDER_UPDATE_STATUS] : [PERMISSIONS.ORDER_VERIFY_PAYMENT];
-  return run(permissions, formData, reviewProof);
+  const decision = formData.get("decision");
+  const permissions = decision === "reject" ? [PERMISSIONS.ORDER_VERIFY_PAYMENT, PERMISSIONS.ORDER_UPDATE_STATUS] : [PERMISSIONS.ORDER_VERIFY_PAYMENT];
+  // Resolved before the change in case the proof (and its order) were somehow gone afterwards.
+  const orderNumber = decision === "reject" ? await getProofOrderNumber(Number(formData.get("proofId"))) : null;
+
+  const result = await run(permissions, formData, reviewProof);
+  // D37: rejecting a screenshot rejects the whole order, same as "Cancel/Reject" below.
+  if (result.ok && decision === "reject" && orderNumber) after(() => sendOrderClosedEmail(orderNumber));
+  return result;
 }
 
 export async function updateFulfilmentAction(_state: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
-  return run([PERMISSIONS.ORDER_UPDATE_STATUS], formData, updateFulfilment);
+  const result = await run([PERMISSIONS.ORDER_UPDATE_STATUS], formData, updateFulfilment);
+  if (result.ok && formData.get("status") === "shipped") {
+    const orderNumber = String(formData.get("orderNumber"));
+    after(() => sendOrderShippedEmail(orderNumber));
+  }
+  return result;
 }
 
 export async function closeOrderAction(_state: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
-  return run([PERMISSIONS.ORDER_UPDATE_STATUS], formData, closeOrder);
+  const result = await run([PERMISSIONS.ORDER_UPDATE_STATUS], formData, closeOrder);
+  if (result.ok) {
+    const orderNumber = String(formData.get("orderNumber"));
+    after(() => sendOrderClosedEmail(orderNumber));
+  }
+  return result;
 }
 
 export async function addOrderNoteAction(_state: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {

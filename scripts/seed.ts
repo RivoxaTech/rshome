@@ -538,14 +538,22 @@ async function seedSettings() {
   }
   console.log(`Upserted ${Object.keys(values).length} settings keys: ${Object.keys(values).join(", ")}.`);
 
-  // PLACEHOLDER bank details (S7): the client hasn't sent the real ones. Created once and never
-  // overwritten, so the values entered in the S14 settings editor survive a reseed.
-  const [existingBank] = await db.select({ key: settings.key }).from(settings).where(eq(settings.key, "bank_accounts"));
-  if (existingBank) {
-    console.log("Settings key bank_accounts already exists, left untouched.");
+  // Created once and never overwritten, so values entered later (the S14 settings editor, or by
+  // hand for the two notify_owner_* keys below) survive a reseed.
+  await createSettingOnceIfMissing("bank_accounts", siteConfig.bankAccounts, "PLACEHOLDER values");
+  // S21 Phase 2: empty = off (push is the primary new-order alert); the owner fills these in by
+  // hand until S14's settings editor exists.
+  await createSettingOnceIfMissing("notify_owner_order_emails", [], "an empty recipient list");
+  await createSettingOnceIfMissing("notify_owner_wholesale_emails", [], "an empty recipient list");
+}
+
+async function createSettingOnceIfMissing(key: string, value: unknown, describedAs: string) {
+  const [existing] = await db.select({ key: settings.key }).from(settings).where(eq(settings.key, key));
+  if (existing) {
+    console.log(`Settings key ${key} already exists, left untouched.`);
   } else {
-    await db.insert(settings).values({ key: "bank_accounts", value: JSON.stringify(siteConfig.bankAccounts) });
-    console.log("Created settings key bank_accounts with PLACEHOLDER values.");
+    await db.insert(settings).values({ key, value: JSON.stringify(value) });
+    console.log(`Created settings key ${key} with ${describedAs}.`);
   }
 }
 

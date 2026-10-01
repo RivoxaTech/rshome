@@ -1,9 +1,13 @@
 import { insertAuditLog } from "@/features/audit/repo";
 import { PERMISSIONS } from "@/features/auth/permissions";
+import { loadStore } from "@/features/mail/service";
+import { buildOwnerAlertEmail } from "@/features/mail/templates";
 import type { PaymentMethod } from "@/features/orders/status";
+import { getNotifyOwnerOrderEmails, getNotifyOwnerWholesaleEmails } from "@/features/settings/service";
 import { db } from "@/server/db/client";
 import { env } from "@/server/env";
 import { sendPush } from "@/server/notify/push";
+import { sendMail } from "@/server/mail/transport";
 import { buildPushPayload, type NotifyEvent } from "./events";
 import {
   deleteSubscription,
@@ -20,7 +24,7 @@ import type { PushSubscribeInput } from "./schemas";
 const STALE_STATUS_CODES = new Set([404, 410]);
 
 /** CLAUDE.md #10/notify design: a channel failure is recorded, never thrown — no personal data, no secrets. */
-async function logNotifyFailure(entityId: string, message: string): Promise<void> {
+async function logNotifyFailure(entityId: string, message: string, channel: "push" | "mail" = "push"): Promise<void> {
   try {
     await insertAuditLog(db, {
       userId: null,
@@ -28,12 +32,35 @@ async function logNotifyFailure(entityId: string, message: string): Promise<void
       entity: "notify",
       entityId,
       oldValues: null,
-      newValues: { channel: "push", reason: message },
+      newValues: { channel, reason: message },
       createdAt: new Date(),
     });
   } catch (error) {
     // The audit write itself failed (e.g. the DB is down): never let a notification take anything else down with it.
     console.error("notify.failed could not be recorded", entityId, error);
+  }
+}
+
+/** Which settings key (if any) holds this event's owner-alert email recipients. */
+async function ownerEmailRecipients(event: NotifyEvent): Promise<string[]> {
+  if (event.type === "new_wholesale_inquiry") return getNotifyOwnerWholesaleEmails();
+  return getNotifyOwnerOrderEmails();
+}
+
+function orderNumberOf(event: NotifyEvent): string | null {
+  return event.type === "new_wholesale_inquiry" ? null : event.orderNumber;
+}
+
+/** The owner's email alert (off by default for orders, ARCHITECTURE.md §4.2 step 10): same no-personal-data rule as push. */
+async function dispatchOwnerEmail(event: NotifyEvent, title: string, url: string, entityId: string): Promise<void> {
+  try {
+    const recipients = await ownerEmailRecipients(event);
+    if (recipients.length === 0) return;
+    const store = await loadStore();
+    const content = buildOwnerAlertEmail({ title, orderNumber: orderNumberOf(event), url, store });
+    await sendMail({ to: recipients.join(","), ...content });
+  } catch (error) {
+    await logNotifyFailure(entityId, error instanceof Error ? error.message : "Unknown error", "mail");
   }
 }
 
@@ -57,12 +84,15 @@ async function dispatchPush(subscriptions: StoredSubscription[], payload: unknow
 
 /** The event senders below are what the app layer fires with `after()` — they must never throw. */
 async function sendEvent(event: NotifyEvent, permission: (typeof PERMISSIONS)[keyof typeof PERMISSIONS], entityId: string): Promise<void> {
+  const payload = buildPushPayload(event);
   try {
     const subscriptions = await listSubscriptionsForPermission(permission);
-    await dispatchPush(subscriptions, buildPushPayload(event), entityId);
+    await dispatchPush(subscriptions, payload, entityId);
   } catch (error) {
     await logNotifyFailure(entityId, error instanceof Error ? error.message : "Unknown error");
   }
+  // Push is always attempted; the owner's email is an opt-in backup (ARCHITECTURE.md §4.2 step 10).
+  await dispatchOwnerEmail(event, payload.title, payload.url, entityId);
 }
 
 /**

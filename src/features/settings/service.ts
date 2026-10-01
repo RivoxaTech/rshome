@@ -4,9 +4,11 @@ import { getSettingValue } from "@/features/settings/repo";
 import {
   type BankAccount,
   type Contact,
+  type NotifyRecipients,
   type SocialLinks,
   bankAccountsSchema,
   contactSchema,
+  notifyRecipientsSchema,
   socialLinksSchema,
 } from "@/features/settings/schemas";
 
@@ -32,4 +34,14 @@ export const getSocialLinks = cache((): Promise<SocialLinks> =>
 
 export const getBankAccounts = cache((): Promise<BankAccount[]> =>
   readSetting("bank_accounts", bankAccountsSchema, [...siteConfig.bankAccounts]),
+);
+
+/** Off by default (empty list) — push is the primary new-order alert (BUILD_PLAN.md C26). */
+export const getNotifyOwnerOrderEmails = cache((): Promise<NotifyRecipients> =>
+  readSetting("notify_owner_order_emails", notifyRecipientsSchema, []),
+);
+
+/** On by default once S17 adds a real inquiry form; the key itself seeds empty (owner decision). */
+export const getNotifyOwnerWholesaleEmails = cache((): Promise<NotifyRecipients> =>
+  readSetting("notify_owner_wholesale_emails", notifyRecipientsSchema, []),
 );

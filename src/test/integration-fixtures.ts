@@ -12,6 +12,7 @@ import { categories, productImages, productVariants, products } from "@/server/d
 import { pushSubscriptions } from "@/server/db/schema/notify";
 import { orderItems, orderStatusHistory, orders, paymentProofs } from "@/server/db/schema/orders";
 import { couponUsages, coupons } from "@/server/db/schema/promotions";
+import { settings } from "@/server/db/schema/settings";
 import { shippingZoneAreas, shippingZones } from "@/server/db/schema/shipping";
 
 type Db = (typeof import("@/server/db/client"))["db"];
@@ -29,6 +30,7 @@ export async function resetTables(db: Db): Promise<void> {
   for (const table of [
     auditLogs,
     pushSubscriptions,
+    settings,
     orderStatusHistory,
     paymentProofs,
     couponUsages,

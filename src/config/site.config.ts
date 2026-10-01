@@ -13,6 +13,8 @@ export const siteConfig = {
   footerTagline: "Home Essentials · Elegant Tableware · Tea Sets · Trays · Decor",
   /** Shown wherever the delivery charge is still pending (client decision C13: quoted on WhatsApp). */
   deliveryPendingNote: "Delivery charge: to be confirmed, we will contact you on WhatsApp",
+  /** Checkout's optional email field (S21 Phase 2: order-lifecycle emails only go out when this is filled in). */
+  checkoutEmailHint: "Add your email to get order updates.",
   timezone: "Asia/Karachi",
   /** Order numbers are `PREFIX-YYMMDD-XXXX` (ARCHITECTURE.md D14). */
   orderNumberPrefix: "RSH",

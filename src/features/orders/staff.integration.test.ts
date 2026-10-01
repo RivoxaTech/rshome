@@ -28,6 +28,14 @@ vi.mock("next/headers", () => ({
   }),
   headers: async () => new Headers(),
 }));
+// `after()` requires a real Next request scope, which doesn't exist here (D35); the S21 Phase 2
+// order-lifecycle emails it fires run inline instead, with the transport mocked below.
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: (fn: () => unknown) => void Promise.resolve().then(fn) };
+});
+const sendMail = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock("@/server/mail/transport", () => ({ sendMail }));
 vi.mock("next/cache", () => ({ refresh: vi.fn() }));
 
 const ADMIN = ["order.view", "order.update_status", "order.verify_payment", "order.set_shipping"];
