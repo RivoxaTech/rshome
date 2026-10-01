@@ -17,19 +17,17 @@ function initials(name: string): string {
 
 export function PanelSidebar({
   items,
-  counts,
   logoText,
   userName,
   roleLabel,
 }: {
   items: PanelNavItem[];
-  counts: Partial<Record<string, number>>;
   logoText: string;
   userName: string;
   roleLabel: string;
 }) {
   const pathname = usePathname();
-  const { collapsed, toggleCollapsed, mobileOpen, setMobileOpen } = usePanelUi();
+  const { collapsed, toggleCollapsed, mobileOpen, setMobileOpen, counts } = usePanelUi();
 
   const nav = (
     <>

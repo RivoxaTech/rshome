@@ -1,6 +1,7 @@
 export * from "./access-control";
 export * from "./audit";
 export * from "./catalog";
+export * from "./notify";
 export * from "./orders";
 export * from "./pages";
 export * from "./promotions";

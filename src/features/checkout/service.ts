@@ -1,5 +1,6 @@
 import { randomInt } from "node:crypto";
 import { hasDisplayableAttributes } from "@/features/cart/service";
+import type { PaymentMethod } from "@/features/orders/status";
 import { decimalToPaisa, paisaToDecimal } from "@/features/pricing/money";
 import type { CartLineInput } from "@/features/pricing/pricing";
 import { loadCoupon, priceCart } from "@/features/pricing/service";
@@ -37,7 +38,9 @@ export const PROOF_REQUIRED_MESSAGE = "Please upload your payment screenshot to 
 export const PROOF_EXPIRED_MESSAGE = "Your payment screenshot upload has expired. Please upload it again.";
 
 export type CreateOrderResult =
-  | { ok: true; orderNumber: string }
+  // `created` is false for an idempotent resubmit or a raced duplicate: the app layer only fires
+  // the new-order notification (ARCHITECTURE.md §4.2 step 10) when a row was actually inserted.
+  | { ok: true; orderNumber: string; paymentMethod: PaymentMethod; created: boolean }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 /** A refusal with a message the customer sees; anything else thrown is a real failure. */
@@ -270,7 +273,7 @@ export async function createOrder(rawInput: unknown, ctx: { ip: string }): Promi
   if (!limit.allowed) return { ok: false, error: "Too many attempts. Please try again in a few minutes." };
 
   const existing = await findOrderNumberByCheckoutToken(input.checkoutToken);
-  if (existing) return { ok: true, orderNumber: existing };
+  if (existing) return { ok: true, orderNumber: existing, paymentMethod: input.paymentMethod, created: false };
 
   // The hard rule (§4.1): COD never leaves Pakistan, whatever zone the request claims.
   if (input.paymentMethod === "cod" && input.country !== "PK") return { ok: false, error: COD_PAKISTAN_ONLY_MESSAGE };
@@ -288,13 +291,13 @@ export async function createOrder(rawInput: unknown, ctx: { ip: string }): Promi
 
   try {
     const orderNumber = await withDeadlockRetry(() => placeOrder(input, zone, proofFile));
-    return { ok: true, orderNumber };
+    return { ok: true, orderNumber, paymentMethod: input.paymentMethod, created: true };
   } catch (error) {
     if (error instanceof CheckoutError) return refused(error);
     // Two submits with the same token raced past the check above: the first one's order wins.
     if (isDuplicateOn(error, "checkout_token")) {
       const raced = await findOrderNumberByCheckoutToken(input.checkoutToken);
-      if (raced) return { ok: true, orderNumber: raced };
+      if (raced) return { ok: true, orderNumber: raced, paymentMethod: input.paymentMethod, created: false };
     }
     throw error;
   }

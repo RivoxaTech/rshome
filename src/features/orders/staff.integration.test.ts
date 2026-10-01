@@ -125,7 +125,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
       { orderNumber, purpose, readFile: async () => new File([new Uint8Array(png)], "transfer.png", { type: "image/png" }) },
       { ip: nextIp() },
     );
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, purpose });
   }
 
   beforeAll(async () => {

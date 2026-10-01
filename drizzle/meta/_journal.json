@@ -43,6 +43,13 @@
       "when": 1790711053407,
       "tag": "0005_order_stock_restored",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1790823277883,
+      "tag": "0006_normal_odin",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { hasOrderAccess } from "@/features/checkout/order-access-cookie";
 import { orderNumberSchema } from "@/features/checkout/schemas";
+import { notifyDeliveryScreenshotUploaded } from "@/features/notify/service";
 import { refuseUploadRequest, uploadOrderProof } from "@/features/payments/service";
 import { getClientIp, readFormFile } from "@/server/request";
 
@@ -28,5 +29,7 @@ export async function POST(request: Request, { params }: RouteContext<"/api/orde
     { ip: await getClientIp() },
   );
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+  // Owner push (BUILD_PLAN.md S21): never for the checkout screenshot, only the delivery charge one.
+  if (result.purpose === "delivery") after(() => notifyDeliveryScreenshotUploaded(parsed.data));
   return NextResponse.json({ ok: true }, { status: 201 });
 }

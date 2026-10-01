@@ -18,6 +18,9 @@ type PanelUiState = {
   toggleTheme: () => void;
   title: string;
   setTitle: (title: string) => void;
+  /** The sidebar's per-nav-item badges (`nav-items.ts` keys): server-rendered, then kept live by the S21 poller. */
+  counts: Partial<Record<string, number>>;
+  setCounts: (counts: Partial<Record<string, number>>) => void;
 };
 
 const PanelUiCtx = createContext<PanelUiState | null>(null);
@@ -25,16 +28,19 @@ const PanelUiCtx = createContext<PanelUiState | null>(null);
 export function PanelUiProvider({
   initialCollapsed,
   initialTheme,
+  initialCounts,
   children,
 }: {
   initialCollapsed: boolean;
   initialTheme: PanelTheme;
+  initialCounts: Partial<Record<string, number>>;
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useState(initialTheme);
   const [title, setTitle] = useState("");
+  const [counts, setCounts] = useState(initialCounts);
 
   const value = useMemo<PanelUiState>(
     () => ({
@@ -57,8 +63,10 @@ export function PanelUiProvider({
         }),
       title,
       setTitle,
+      counts,
+      setCounts,
     }),
-    [collapsed, mobileOpen, theme, title],
+    [collapsed, mobileOpen, theme, title, counts],
   );
 
   return <PanelUiCtx.Provider value={value}>{children}</PanelUiCtx.Provider>;

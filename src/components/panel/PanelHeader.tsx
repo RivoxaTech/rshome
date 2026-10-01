@@ -3,8 +3,9 @@
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
 import { usePanelUi } from "@/components/panel/PanelUiContext";
 import { LogoutButton } from "@/components/panel/LogoutButton";
+import { NotificationBell } from "@/components/panel/notifications/NotificationBell";
 
-export function PanelHeader() {
+export function PanelHeader({ showNotifications, vapidPublicKey }: { showNotifications: boolean; vapidPublicKey: string | null }) {
   const { title, theme, toggleTheme, setMobileOpen } = usePanelUi();
 
   return (
@@ -23,6 +24,7 @@ export function PanelHeader() {
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
+        {showNotifications && <NotificationBell vapidPublicKey={vapidPublicKey} />}
         <button
           type="button"
           onClick={toggleTheme}

@@ -92,7 +92,7 @@ function refusalFor(order: TimelineOrder, purpose: ProofPurpose, proofCount: num
 export async function uploadOrderProof(
   input: { orderNumber: string; purpose: unknown; readFile: ReadFile },
   ctx: { ip: string },
-): Promise<{ ok: true } | UploadFailure> {
+): Promise<{ ok: true; purpose: ProofPurpose } | UploadFailure> {
   if (!(await consumeRateLimit(`proof:ip:${ctx.ip}`, IP_RATE_LIMIT)).allowed) return TOO_MANY_ATTEMPTS;
   if (!(await consumeRateLimit(`proof:order:${input.orderNumber}`, ORDER_RATE_LIMIT)).allowed) return TOO_MANY_ATTEMPTS;
 
@@ -141,7 +141,7 @@ export async function uploadOrderProof(
       await deleteProofFile(stored.relativePath);
       return failure(409, refusal);
     }
-    return { ok: true };
+    return { ok: true, purpose: purpose.data };
   } catch (error) {
     await deleteProofFile(stored.relativePath);
     throw error;

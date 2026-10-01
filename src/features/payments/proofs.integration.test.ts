@@ -25,6 +25,12 @@ vi.mock("next/headers", () => ({
   }),
   headers: async () => current.headers,
 }));
+// `after()` requires a real Next request scope, which doesn't exist here (D35); the delivery-charge
+// upload's S21 push fires with no subscribers seeded in this suite, so running it inline is safe.
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: (fn: () => unknown) => void Promise.resolve().then(fn) };
+});
 
 type Db = typeof import("@/server/db/client");
 

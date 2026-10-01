@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { permissions, rateLimits, rolePermissions, roles, sessions, users } from "@/server/db/schema/access-control";
 import { auditLogs } from "@/server/db/schema/audit";
 import { categories, productImages, productVariants, products } from "@/server/db/schema/catalog";
+import { pushSubscriptions } from "@/server/db/schema/notify";
 import { orderItems, orderStatusHistory, orders, paymentProofs } from "@/server/db/schema/orders";
 import { couponUsages, coupons } from "@/server/db/schema/promotions";
 import { shippingZoneAreas, shippingZones } from "@/server/db/schema/shipping";
@@ -27,6 +28,7 @@ export async function resetTables(db: Db): Promise<void> {
   // Children before parents, so no foreign-key toggling is needed.
   for (const table of [
     auditLogs,
+    pushSubscriptions,
     orderStatusHistory,
     paymentProofs,
     couponUsages,

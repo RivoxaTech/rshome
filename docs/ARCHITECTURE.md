@@ -85,6 +85,9 @@ rs-home/
                    uploads), repo.ts (payment_proofs); review arrives in S9
       dashboard/   repo.ts (S16: one indexed SQL aggregate per card/chart/list, see §4.7), service.ts (period
                    resolution + the previous-period comparison), *.test.ts (hand-computed fixture)
+      notify/      events.ts (pure event payload builders, never a customer name or phone, S21),
+                   repo.ts (push_subscriptions + permission-scoped lookups), schemas.ts, service.ts
+                   (subscribe/unsubscribe/send, 404-410 cleanup, `notify.failed` audit on any other failure)
       discounts/  coupons/  shipping/  settings/  wholesale/  audit/  pages/
     server/
       env.ts       Zod-validated environment
@@ -93,8 +96,11 @@ rs-home/
       storage/     images.ts (sharp: media sizes, proof re-encode), files.ts (UPLOAD_DIR check),
                    proofs.ts (proof files: pending, permanent, sweep)
       mail/        nodemailer wrapper (S21; SMTP_* required in production)
-      notify/      push.ts (web-push send + VAPID config, S21), events.ts (the three events' payloads,
-                   never a customer name or phone), poll.ts (the live-count query, permission-scoped)
+      notify/      push.ts (web-push send + VAPID config only, S21 — no feature knowledge, CLAUDE.md §2;
+                   every send is `urgency: "high"` with a 1-day `TTL` (86400s) — a staff member
+                   needs to see it now, and a push the service couldn't deliver within a day is
+                   stale and should be dropped, not queued; the live count reuses
+                   `features/orders/staff-service.ts`'s existing counts directly)
       rate-limit.ts  (MySQL-backed)
       request.ts   client IP, origin check for Route Handlers
     components/    ui/ (primitives), store/ (storefront: cart/, catalog/, checkout/, forms/, orders/, home/), panel/ (tables, forms)
@@ -206,7 +212,7 @@ Every entry point loads `.env.local`: the app (Next does this), `drizzle.config.
 | `TEST_DATABASE_URL` | tests only: the integration-test database (name must end in `_test`); `vitest.setup.ts` swaps it in for `DATABASE_URL`, and `npm run db:migrate:test` creates and migrates it |
 | `SEED_DEVELOPER_EMAIL`, `SEED_DEVELOPER_PASSWORD`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` | seed only |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | **required in production** (S21, owner decision BUILD_PLAN.md C26); optional in dev, where a missing SMTP config just logs instead of sending |
-| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | S21: web-push keys for the owner's browser notifications; `VAPID_SUBJECT` is a `mailto:` contact address |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | S21: web-push keys for the owner's browser notifications; `VAPID_SUBJECT` is a `mailto:` contact address. **The production private key must never change once a device has subscribed against it** — every existing subscription is signed against that key pair and would silently stop working, with no way to recover it short of every device re-enabling notifications |
 | `NODE_OPTIONS` | `--max-old-space-size=256` on the host |
 
 **Database pool:** one pool per process, `connectionLimit: 4`, `idleTimeout` below the server's `wait_timeout`, `timezone: 'Z'`, `charset: 'utf8mb4_unicode_ci'`. In dev it is kept on `globalThis` so hot reload doesn't open new pools.

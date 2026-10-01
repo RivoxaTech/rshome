@@ -1,10 +1,13 @@
 import type { DbClient } from "@/server/db/client";
 import { auditLogs } from "@/server/db/schema/audit";
 
-/** One audit row (CLAUDE.md #10); the snapshots are stored as JSON text (DATABASE.md DB2). */
+/**
+ * One audit row (CLAUDE.md #10); the snapshots are stored as JSON text (DATABASE.md DB2).
+ * `userId` is null for a system write with no acting user (S21: `notify.failed`).
+ */
 export async function insertAuditLog(
   tx: DbClient,
-  entry: { userId: number; action: string; entity: string; entityId: string | number; oldValues: object | null; newValues: object; createdAt: Date },
+  entry: { userId: number | null; action: string; entity: string; entityId: string | number; oldValues: object | null; newValues: object; createdAt: Date },
 ): Promise<void> {
   await tx.insert(auditLogs).values({
     userId: entry.userId,
