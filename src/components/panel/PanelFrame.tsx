@@ -38,9 +38,9 @@ export async function PanelFrame({
       {canSeeOrderAlerts && <OrderCountsPoller />}
       <div className="flex h-dvh w-full overflow-hidden">
         <PanelSidebar items={items} logoText={logoText} userName={userName} roleLabel={roleLabel} />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <PanelHeader showNotifications={canSeeOrderAlerts} vapidPublicKey={env.VAPID_PUBLIC_KEY ?? null} />
-          <main className="bg-background flex-1 overflow-y-auto">
+          <main className="bg-background min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 p-4 sm:p-6">{children}</div>
           </main>
         </div>

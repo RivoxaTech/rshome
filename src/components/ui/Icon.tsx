@@ -46,6 +46,8 @@ export const ICON_PATHS = {
   bell: "M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9zM13.73 21a2 2 0 01-3.46 0",
   // Wholesale nav item (S17): a crate/carton outline, for bulk goods.
   wholesale: "M3 8l9-5 9 5-9 5-9-5zM3 8v8l9 5 9-5V8M12 13v8M3 8l9 5M21 8l-9 5",
+  // Average order value stat card (S16): an upward sparkline.
+  trendingUp: "M3 17l6-6 4 4 8-9M15 6h6v6",
 } as const;
 
 /**

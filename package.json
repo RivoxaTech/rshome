@@ -21,7 +21,9 @@
     "db:reset:orders": "tsx scripts/seed-demo-orders.ts reset",
     "db:seed:orders": "tsx scripts/seed-demo-orders.ts seed",
     "db:reset:wholesale": "tsx scripts/seed-demo-wholesale.ts reset",
-    "db:seed:wholesale": "tsx scripts/seed-demo-wholesale.ts seed"
+    "db:seed:wholesale": "tsx scripts/seed-demo-wholesale.ts seed",
+    "db:reset:dashboard": "tsx scripts/seed-demo-dashboard.ts reset",
+    "db:seed:dashboard": "tsx scripts/seed-demo-dashboard.ts seed"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.3",
