@@ -28,9 +28,10 @@ export async function PanelFrame({
 }) {
   const [theme, collapsed] = await Promise.all([getPanelTheme(), getSidebarCollapsed()]);
   const items = PANEL_NAV_ITEMS.filter((item) => permissions.has(item.permission));
-  // The bell and the live count are for `order.view` holders only (ARCHITECTURE.md §9) — the
-  // Developer never sees either, since they never hold that permission (BUILD_PLAN.md C24).
-  const canSeeOrderAlerts = permissions.has(PERMISSIONS.ORDER_VIEW);
+  // The bell and the live count are for `order.view`/`wholesale.view` holders only
+  // (ARCHITECTURE.md §9) — the Developer never sees either, since it holds neither permission
+  // (BUILD_PLAN.md C24).
+  const canSeeOrderAlerts = permissions.has(PERMISSIONS.ORDER_VIEW) || permissions.has(PERMISSIONS.WHOLESALE_VIEW);
 
   return (
     <PanelUiProvider initialTheme={theme} initialCollapsed={collapsed} initialCounts={counts}>

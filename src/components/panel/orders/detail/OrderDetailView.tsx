@@ -68,20 +68,19 @@ export function OrderDetailView({ order, backHref }: { order: StaffOrderView; ba
       </div>
 
       {/*
-        Explicit grid placement, not `order` (round 2 tried grouping Customer+Activity in one
-        flex column, which put Activity right after Customer on phones too — the owner wants it
-        last there instead). On `lg` the three groups place by `col-start`/`row-start` regardless
-        of DOM order: Customer at (col 3, row 1), the left group at (cols 1-2, row 1), Activity at
-        (col 3, row 2) — directly under Customer, in whatever row 2 turns out to be. On phones
-        (`grid-cols-1`, no placement classes active) each group simply stacks in DOM order, so
-        Activity — written last — renders last.
+        Two column groups, not three grid rows (S17 follow-up fix): Customer and Activity live
+        together in ONE wrapper that is `display: contents` on phones (so its children stack
+        individually, orderable) and a real flex column at `lg` (so they sit flush against each
+        other with just their own `gap-4`). The original version placed Customer at (col 3, row 1)
+        and Activity at (col 3, row 2) as separate grid items — but since row 1 also holds the left
+        column (Items, screenshots, delivery, totals, which grows with the item/screenshot count),
+        the grid made row 1 as tall as the left column, and Customer's own cell stretched to fill
+        it, leaving a blank gap between Customer and Activity that grew with the left column's
+        height. Order classes give the phone sequence (Customer first, then the left group, then
+        Activity last) independently of this desktop grouping.
       */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="flex flex-col gap-4 lg:col-start-3 lg:row-start-1">
-          <CustomerCard customer={order.customer} address={order.address} customerNote={order.customerNote} whatsApp={order.whatsApp} />
-        </div>
-
-        <div className="flex flex-col gap-4 lg:col-span-2 lg:col-start-1 lg:row-start-1">
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-3 lg:items-start lg:gap-4">
+        <div className="order-2 flex flex-col gap-4 lg:order-none lg:col-span-2 lg:col-start-1 lg:row-start-1">
           <ItemsCard items={order.items} />
           <TopAlertCard
             control={control}
@@ -98,8 +97,13 @@ export function OrderDetailView({ order, backHref }: { order: StaffOrderView; ba
           <PaymentSummaryCard totals={order.totals} isCod={control.isCod} />
         </div>
 
-        <div className="lg:col-start-3 lg:row-start-2">
-          <ActivityCard orderNumber={order.orderNumber} history={order.history} canAddNote={order.canAddNote} />
+        <div className="contents lg:col-start-3 lg:row-start-1 lg:flex lg:flex-col lg:gap-4">
+          <div className="order-1 lg:order-none">
+            <CustomerCard customer={order.customer} address={order.address} customerNote={order.customerNote} whatsApp={order.whatsApp} />
+          </div>
+          <div className="order-3 lg:order-none">
+            <ActivityCard orderNumber={order.orderNumber} history={order.history} canAddNote={order.canAddNote} />
+          </div>
         </div>
       </div>
 

@@ -3,16 +3,16 @@ import { redirect } from "next/navigation";
 import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 import { getOrderCounts, listStaffOrders } from "@/features/orders/staff-service";
 import { orderListQuerySchema, type OrderListQuery } from "@/features/orders/schemas";
-import { METHOD_PAGES, ordersPath, tabsFor, type OrderTab } from "@/features/orders/transitions";
+import { DEFAULT_PAGE_SIZE, METHOD_PAGES, PAGE_SIZE_OPTIONS, TAB_INFO, ordersPath, tabsFor, type OrderTab } from "@/features/orders/transitions";
 import type { PaymentMethod } from "@/features/orders/status";
 import { requirePermission } from "@/server/auth/permissions";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { OrderTabs } from "@/components/panel/orders/OrderTabs";
 import { OrdersTable } from "@/components/panel/orders/OrdersTable";
 import { OrdersTableSkeleton } from "@/components/panel/orders/OrdersTableSkeleton";
-import { Pagination } from "@/components/panel/orders/Pagination";
-import { RowsPerPageSelect } from "@/components/panel/orders/RowsPerPageSelect";
-import { SearchBox } from "@/components/panel/orders/SearchBox";
+import { Pagination } from "@/components/panel/Pagination";
+import { RowsPerPageSelect } from "@/components/panel/RowsPerPageSelect";
+import { SearchBox } from "@/components/panel/SearchBox";
 
 /**
  * The table and its pagination, in their own Suspense boundary (S9): the tabs and the search box
@@ -42,7 +42,16 @@ async function OrdersTableSection({
   return (
     <>
       <OrdersTable items={items} method={method} backHref={backHref} />
-      <Pagination method={method} tab={tab} q={query.q} page={page} pageCount={pageCount} total={total} pageSize={pageSize} />
+      <Pagination
+        basePath={`/panel/orders/${METHOD_PAGES[method].slug}`}
+        tabSlug={tab === "all" ? undefined : TAB_INFO[tab].slug}
+        q={query.q}
+        page={page}
+        pageCount={pageCount}
+        total={total}
+        pageSize={pageSize}
+        defaultPageSize={DEFAULT_PAGE_SIZE}
+      />
     </>
   );
 }
@@ -68,9 +77,24 @@ export async function OrdersPageBody({
         <OrderTabs method={method} currentTab={tab} counts={counts} q={query.q} pageSize={query.pageSize} />
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1 sm:max-w-[360px]">
-            <SearchBox method={method} tab={tab} initialQ={query.q ?? ""} pageSize={query.pageSize} />
+            <SearchBox
+              initialQ={query.q ?? ""}
+              basePath={`/panel/orders/${METHOD_PAGES[method].slug}`}
+              tabSlug={tab === "all" ? undefined : TAB_INFO[tab].slug}
+              pageSize={query.pageSize}
+              defaultPageSize={DEFAULT_PAGE_SIZE}
+              placeholder="Search orders"
+              ariaLabel="Search orders"
+            />
           </div>
-          <RowsPerPageSelect method={method} tab={tab} q={query.q} pageSize={query.pageSize} />
+          <RowsPerPageSelect
+            basePath={`/panel/orders/${METHOD_PAGES[method].slug}`}
+            tabSlug={tab === "all" ? undefined : TAB_INFO[tab].slug}
+            q={query.q}
+            pageSize={query.pageSize}
+            options={PAGE_SIZE_OPTIONS}
+            defaultPageSize={DEFAULT_PAGE_SIZE}
+          />
         </div>
         <Suspense key={`${tab}-${query.q ?? ""}-${query.page}-${query.pageSize}`} fallback={<OrdersTableSkeleton />}>
           <OrdersTableSection method={method} tab={tab} query={query} permissions={session.permissions} />

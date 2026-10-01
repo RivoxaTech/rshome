@@ -2,7 +2,7 @@
 
 import { deleteOrderAction } from "@/app/panel/(protected)/orders/actions";
 import { Dialog } from "@/components/panel/Dialog";
-import { useStaffAction } from "@/components/panel/orders/use-staff-action";
+import { useStaffAction } from "@/components/panel/use-staff-action";
 
 /** The trash icon on a cancelled or rejected order (owner decision, S9 follow-up): permanent, no reason needed. */
 export function DeleteOrderDialog({ orderNumber, onClose }: { orderNumber: string; onClose: () => void }) {

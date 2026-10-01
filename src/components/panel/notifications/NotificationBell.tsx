@@ -58,6 +58,15 @@ export function NotificationBell({ vapidPublicKey }: { vapidPublicKey: string | 
       const registration = await navigator.serviceWorker.register("/sw.js");
       const subscription = await registration.pushManager.getSubscription();
       setState(subscription ? "on" : "off");
+      // Self-healing (S17 follow-up): the browser already believes it's subscribed, but the
+      // server-side row may be gone (e.g. a dev-data cleanup emptied push_subscriptions while
+      // this browser never re-enabled notifications). Silently re-send it — the existing upsert
+      // makes this a no-op when the row is already there. A 401/403 (signed out, or this session
+      // no longer holds order.view/wholesale.view) is ignored: nothing to heal for this user.
+      if (subscription) {
+        const json = subscription.toJSON();
+        postJson("/api/push/subscribe", "POST", { endpoint: json.endpoint, keys: json.keys }).catch(() => {});
+      }
     } catch {
       setState("unsupported");
     }

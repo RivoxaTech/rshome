@@ -4,6 +4,7 @@ import { HeroSection } from "@/components/store/home/HeroSection";
 import { StorySection } from "@/components/store/home/StorySection";
 import { WholesaleSection } from "@/components/store/home/WholesaleSection";
 import { WhySection } from "@/components/store/home/WhySection";
+import { features } from "@/config/features";
 import { homeContent } from "@/config/home-content";
 import { getHomeFeaturedProducts, getStoreCategories } from "@/features/catalog/service";
 
@@ -77,14 +78,16 @@ export default async function HomePage() {
         );
       })}
 
-      <WholesaleSection
-        eyebrow={homeContent.wholesale.eyebrow}
-        heading={homeContent.wholesale.heading}
-        copy={homeContent.wholesale.copy}
-        primaryCta={homeContent.wholesale.primaryCta}
-        secondaryCta={homeContent.wholesale.secondaryCta}
-        images={wholesaleImages}
-      />
+      {features.wholesale && (
+        <WholesaleSection
+          eyebrow={homeContent.wholesale.eyebrow}
+          heading={homeContent.wholesale.heading}
+          copy={homeContent.wholesale.copy}
+          primaryCta={homeContent.wholesale.primaryCta}
+          secondaryCta={homeContent.wholesale.secondaryCta}
+          images={wholesaleImages}
+        />
+      )}
 
       <WhySection eyebrow={homeContent.why.eyebrow} points={homeContent.why.points} />
     </div>

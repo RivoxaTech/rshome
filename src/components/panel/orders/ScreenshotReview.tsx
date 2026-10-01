@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { reviewProofAction } from "@/app/panel/(protected)/orders/actions";
 import { ProofImage } from "@/components/panel/orders/ProofImage";
-import { useStaffAction } from "@/components/panel/orders/use-staff-action";
+import { useStaffAction } from "@/components/panel/use-staff-action";
 import type { OrderControl } from "@/features/orders/staff-service";
 
 /** One waiting screenshot with its Approve/Reject controls; used in the modal and inline on the detail page. */

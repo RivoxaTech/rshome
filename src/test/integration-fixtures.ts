@@ -14,6 +14,7 @@ import { orderItems, orderStatusHistory, orders, paymentProofs } from "@/server/
 import { couponUsages, coupons } from "@/server/db/schema/promotions";
 import { settings } from "@/server/db/schema/settings";
 import { shippingZoneAreas, shippingZones } from "@/server/db/schema/shipping";
+import { wholesaleInquiries, wholesaleInquiryItems, wholesaleInquiryNotes } from "@/server/db/schema/wholesale";
 
 type Db = (typeof import("@/server/db/client"))["db"];
 
@@ -31,6 +32,9 @@ export async function resetTables(db: Db): Promise<void> {
     auditLogs,
     pushSubscriptions,
     settings,
+    wholesaleInquiryNotes,
+    wholesaleInquiryItems,
+    wholesaleInquiries,
     orderStatusHistory,
     paymentProofs,
     couponUsages,

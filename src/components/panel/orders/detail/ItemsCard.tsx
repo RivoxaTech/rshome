@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { DetailCard } from "@/components/panel/orders/detail/DetailCard";
+import { DetailCard } from "@/components/panel/DetailCard";
 import type { StaffOrderView } from "@/features/orders/staff-service";
 
 export function ItemsCard({ items }: { items: StaffOrderView["items"] }) {

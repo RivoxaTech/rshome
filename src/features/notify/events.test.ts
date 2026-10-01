@@ -32,12 +32,20 @@ describe("buildPushPayload", () => {
     assertNoPersonalData(payload);
   });
 
-  it("builds the wholesale inquiry payload with no identifying detail at all", () => {
-    const payload = buildPushPayload({ type: "new_wholesale_inquiry" });
+  it("builds the wholesale inquiry payload with no identifying detail beyond the inquiry id", () => {
+    const payload = buildPushPayload({ type: "new_wholesale_inquiry", inquiryId: 42 });
     expect(payload.title).toBe("New wholesale inquiry");
     expect(payload.body).toBe("");
-    expect(payload.url).toContain("/panel/wholesale");
+    expect(payload.url).toContain("/panel/wholesale/42");
+    expect(payload.tag).toBe("wholesale-42");
     assertNoPersonalData(payload);
+  });
+
+  it("gives each wholesale inquiry a unique tag and URL, so a repeat notification isn't silently replaced", () => {
+    const first = buildPushPayload({ type: "new_wholesale_inquiry", inquiryId: 1 });
+    const second = buildPushPayload({ type: "new_wholesale_inquiry", inquiryId: 2 });
+    expect(first.tag).not.toBe(second.tag);
+    expect(first.url).not.toBe(second.url);
   });
 
   it("never varies the payload by anything beyond the event's own type and order number", () => {

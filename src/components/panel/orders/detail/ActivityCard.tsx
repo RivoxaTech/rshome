@@ -2,8 +2,8 @@
 
 import { useRef } from "react";
 import { addOrderNoteAction } from "@/app/panel/(protected)/orders/actions";
-import { DetailCard } from "@/components/panel/orders/detail/DetailCard";
-import { useStaffAction } from "@/components/panel/orders/use-staff-action";
+import { DetailCard } from "@/components/panel/DetailCard";
+import { useStaffAction } from "@/components/panel/use-staff-action";
 import type { StaffOrderView } from "@/features/orders/staff-service";
 
 function HistoryRow({ row }: { row: StaffOrderView["history"][number] }) {

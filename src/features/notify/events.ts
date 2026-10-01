@@ -3,12 +3,14 @@ import { env } from "@/server/env";
 
 /**
  * The three events S21 notifies on (BUILD_PLAN.md C26, ARCHITECTURE.md §4.2 step 10).
- * `new_wholesale_inquiry` is built and tested here but not fired anywhere yet — S17 wires it.
+ * `new_wholesale_inquiry` carries the new inquiry's id (S17 follow-up) so its tag and URL are
+ * unique per inquiry — a constant tag made Chrome silently replace an earlier wholesale
+ * notification instead of showing a new one.
  */
 export type NotifyEvent =
   | { type: "new_order"; orderNumber: string; paymentMethod: PaymentMethod }
   | { type: "delivery_screenshot_uploaded"; orderNumber: string }
-  | { type: "new_wholesale_inquiry" };
+  | { type: "new_wholesale_inquiry"; inquiryId: number };
 
 export type PushPayload = { title: string; body: string; url: string; tag: string };
 
@@ -50,6 +52,11 @@ export function buildPushPayload(event: NotifyEvent): PushPayload {
         tag: `order-${event.orderNumber}`,
       };
     case "new_wholesale_inquiry":
-      return { title: "New wholesale inquiry", body: "", url: panelUrl("/panel/wholesale"), tag: "wholesale-inquiry" };
+      return {
+        title: "New wholesale inquiry",
+        body: "",
+        url: panelUrl(`/panel/wholesale/${event.inquiryId}`),
+        tag: `wholesale-${event.inquiryId}`,
+      };
   }
 }

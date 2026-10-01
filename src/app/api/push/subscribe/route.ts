@@ -6,12 +6,14 @@ import { authorizeRequest } from "@/server/auth/permissions";
 import { getUserAgent, isAllowedOrigin } from "@/server/request";
 
 /**
- * The panel bell's "Enable notifications" (BUILD_PLAN.md S21): only a signed-in user holding
- * `order.view` may subscribe a device (the Developer, who never holds it, is refused).
+ * The panel bell's "Enable notifications" (BUILD_PLAN.md S21, broadened S17): a signed-in user
+ * holding `order.view` or `wholesale.view` may subscribe a device — the bell itself shows for
+ * either (`PanelFrame.tsx`), so this must accept both; the Developer, who holds neither, is
+ * refused.
  */
 export async function POST(request: Request) {
   if (!isAllowedOrigin(request)) return NextResponse.json({ error: "This request is not allowed." }, { status: 403 });
-  const auth = await authorizeRequest(PERMISSIONS.ORDER_VIEW);
+  const auth = await authorizeRequest(PERMISSIONS.ORDER_VIEW, PERMISSIONS.WHOLESALE_VIEW);
   if (!auth.ok) return NextResponse.json({ error: "Not allowed." }, { status: auth.status });
 
   const body = await request.json().catch(() => null);
@@ -25,7 +27,7 @@ export async function POST(request: Request) {
 /** "Turning it off removes it": the device's own subscription, scoped to this user. */
 export async function DELETE(request: Request) {
   if (!isAllowedOrigin(request)) return NextResponse.json({ error: "This request is not allowed." }, { status: 403 });
-  const auth = await authorizeRequest(PERMISSIONS.ORDER_VIEW);
+  const auth = await authorizeRequest(PERMISSIONS.ORDER_VIEW, PERMISSIONS.WHOLESALE_VIEW);
   if (!auth.ok) return NextResponse.json({ error: "Not allowed." }, { status: auth.status });
 
   const body = await request.json().catch(() => null);

@@ -19,5 +19,6 @@ export const PANEL_NAV_ITEMS: PanelNavItem[] = [
   { key: "dashboard", label: "Dashboard", href: "/panel", icon: "dashboard", permission: PERMISSIONS.DASHBOARD_VIEW },
   { key: "orders-bank", label: "Orders – Bank transfer", href: "/panel/orders/bank", icon: "bank", permission: PERMISSIONS.ORDER_VIEW },
   { key: "orders-cod", label: "Orders – COD", href: "/panel/orders/cod", icon: "cash", permission: PERMISSIONS.ORDER_VIEW },
+  { key: "wholesale", label: "Wholesale", href: "/panel/wholesale", icon: "wholesale", permission: PERMISSIONS.WHOLESALE_VIEW },
   { key: "products", label: "Products", href: "/panel/products", icon: "box", permission: PERMISSIONS.PRODUCT_VIEW },
 ];

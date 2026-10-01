@@ -9,6 +9,7 @@ import {
   text,
   varchar,
 } from "drizzle-orm/mysql-core";
+import { users } from "./access-control";
 import { products } from "./catalog";
 
 export const wholesaleInquiries = mysqlTable("wholesale_inquiries", {
@@ -40,6 +41,28 @@ export const wholesaleInquiryItems = mysqlTable(
     productId: bigint("product_id", { mode: "number", unsigned: true }).references(() => products.id),
     itemName: varchar("item_name", { length: 200 }).notNull(),
     quantity: int("quantity", { unsigned: true }).notNull(),
+    /** Optional per-row note from the form (S17), e.g. "matte finish". */
+    note: varchar("note", { length: 255 }),
   },
   (table) => [index("wholesale_inquiry_items_inquiry_id_idx").on(table.inquiryId)],
+);
+
+/**
+ * Internal staff notes on an inquiry (S17). Status changes are written to `audit_logs` instead
+ * (action `wholesale.status_change`) — the panel's Activity timeline merges both sources.
+ */
+export const wholesaleInquiryNotes = mysqlTable(
+  "wholesale_inquiry_notes",
+  {
+    id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+    inquiryId: bigint("inquiry_id", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => wholesaleInquiries.id),
+    authorUserId: bigint("author_user_id", { mode: "number", unsigned: true })
+      .notNull()
+      .references(() => users.id),
+    note: text("note").notNull(),
+    createdAt: datetime("created_at").notNull().$defaultFn(() => new Date()),
+  },
+  (table) => [index("wholesale_inquiry_notes_inquiry_id_idx").on(table.inquiryId)],
 );

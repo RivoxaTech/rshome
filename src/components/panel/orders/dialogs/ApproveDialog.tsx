@@ -4,7 +4,7 @@ import { useState } from "react";
 import { approveOrderAction, reviewProofAction } from "@/app/panel/(protected)/orders/actions";
 import { Dialog } from "@/components/panel/Dialog";
 import { ProofImage } from "@/components/panel/orders/ProofImage";
-import { useStaffAction } from "@/components/panel/orders/use-staff-action";
+import { useStaffAction } from "@/components/panel/use-staff-action";
 import type { ProofView } from "@/features/orders/staff-service";
 
 /**

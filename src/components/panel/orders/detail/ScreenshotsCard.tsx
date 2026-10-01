@@ -1,4 +1,4 @@
-import { DetailCard } from "@/components/panel/orders/detail/DetailCard";
+import { DetailCard } from "@/components/panel/DetailCard";
 import { ProofImage } from "@/components/panel/orders/ProofImage";
 import type { ProofView } from "@/features/orders/staff-service";
 

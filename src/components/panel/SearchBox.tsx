@@ -3,20 +3,25 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
-import { ordersPath, type OrderTab } from "@/features/orders/transitions";
-import type { PaymentMethod } from "@/features/orders/status";
+import { buildListPath } from "@/components/panel/list-path";
 
-/** Order number, name or phone, 300 ms after the last keystroke, in the URL (C21). */
+/** A debounced (300 ms) search box whose URL is built from plain props, shared by the orders and wholesale lists. */
 export function SearchBox({
-  method,
-  tab,
   initialQ,
+  basePath,
+  tabSlug,
   pageSize,
+  defaultPageSize,
+  placeholder = "Search",
+  ariaLabel = "Search",
 }: {
-  method: PaymentMethod;
-  tab: OrderTab | "all";
   initialQ: string;
+  basePath: string;
+  tabSlug?: string;
   pageSize: number;
+  defaultPageSize: number;
+  placeholder?: string;
+  ariaLabel?: string;
 }) {
   const router = useRouter();
   const [value, setValue] = useState(initialQ);
@@ -31,7 +36,7 @@ export function SearchBox({
   useEffect(() => {
     if (value === initialQ) return;
     const timer = setTimeout(() => {
-      router.replace(ordersPath(method, tab, { q: value || undefined, pageSize }), { scroll: false });
+      router.replace(buildListPath(basePath, tabSlug, { q: value || undefined, pageSize }, defaultPageSize), { scroll: false });
     }, 300);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -44,8 +49,8 @@ export function SearchBox({
         type="search"
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        placeholder="Search orders"
-        aria-label="Search orders"
+        placeholder={placeholder}
+        aria-label={ariaLabel}
         maxLength={100}
         className="w-full min-w-0 bg-transparent text-xs outline-none sm:text-sm"
       />

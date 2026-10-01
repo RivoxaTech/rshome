@@ -2,7 +2,7 @@
 
 import { updateFulfilmentAction } from "@/app/panel/(protected)/orders/actions";
 import { Dialog } from "@/components/panel/Dialog";
-import { useStaffAction } from "@/components/panel/orders/use-staff-action";
+import { useStaffAction } from "@/components/panel/use-staff-action";
 
 /** Delivery → Completed; for cash on delivery this also records the cash as collected. */
 export function CompleteDialog({ orderNumber, isCod, onClose }: { orderNumber: string; isCod: boolean; onClose: () => void }) {

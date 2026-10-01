@@ -2,7 +2,7 @@
 
 import { updateFulfilmentAction } from "@/app/panel/(protected)/orders/actions";
 import { Dialog } from "@/components/panel/Dialog";
-import { useStaffAction } from "@/components/panel/orders/use-staff-action";
+import { useStaffAction } from "@/components/panel/use-staff-action";
 
 /** Processing → Delivery: courier and tracking note are both optional. */
 export function ShipDialog({ orderNumber, onClose }: { orderNumber: string; onClose: () => void }) {

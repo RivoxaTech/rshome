@@ -107,12 +107,25 @@ describe.skipIf(!TEST_DATABASE_URL)("push notifications (integration)", () => {
     expect(await subscriptionsOf(userId)).toHaveLength(0);
   });
 
-  it("refuses to subscribe a session without order.view", async () => {
+  it("refuses to subscribe a session holding neither order.view nor wholesale.view", async () => {
     await signInAs([PERMISSIONS.PRODUCT_VIEW]);
     const response = await subscribeRoute.POST(
       jsonRequest("/api/push/subscribe", "POST", { endpoint: nextEndpoint(), keys: { p256dh: "p", auth: "a" } }),
     );
     expect(response.status).toBe(403);
+  });
+
+  it("subscribes a wholesale.view-only session too (the bell shows for either permission) and stays idempotent on a repeat", async () => {
+    const { userId } = await signInAs([PERMISSIONS.WHOLESALE_VIEW]);
+    const body = { endpoint: nextEndpoint(), keys: { p256dh: "p-wholesale", auth: "a-wholesale" } };
+
+    const first = await subscribeRoute.POST(jsonRequest("/api/push/subscribe", "POST", body));
+    expect(first.status).toBe(201);
+    // The self-healing re-subscribe (NotificationBell.tsx) resends the same subscription on every
+    // panel load; the upsert must make that a no-op, never a duplicate row.
+    const second = await subscribeRoute.POST(jsonRequest("/api/push/subscribe", "POST", body));
+    expect(second.status).toBe(201);
+    expect(await subscriptionsOf(userId)).toHaveLength(1);
   });
 
   it("sends a new_order push to every order.view subscriber and to nobody else", async () => {

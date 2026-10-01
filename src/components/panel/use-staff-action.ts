@@ -1,12 +1,12 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import type { StaffActionResult } from "@/features/orders/staff-actions";
 
-type StaffFormAction = (state: StaffActionResult | null, formData: FormData) => Promise<StaffActionResult>;
+type ActionResult = { ok: boolean };
+type StaffFormAction<T extends ActionResult> = (state: T | null, formData: FormData) => Promise<T>;
 
 /** Wraps a panel Server Action in `useActionState` and calls `onSuccess` once, right after it succeeds. */
-export function useStaffAction(action: StaffFormAction, onSuccess: () => void) {
+export function useStaffAction<T extends ActionResult>(action: StaffFormAction<T>, onSuccess: () => void) {
   const [state, formAction, pending] = useActionState(action, null);
   const handled = useRef(state);
 

@@ -1,4 +1,4 @@
-import { DetailCard } from "@/components/panel/orders/detail/DetailCard";
+import { DetailCard } from "@/components/panel/DetailCard";
 import { WhatsAppButton, whatsAppHref } from "@/components/store/WhatsAppButton";
 import type { StaffOrderView } from "@/features/orders/staff-service";
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { closeOrderAction } from "@/app/panel/(protected)/orders/actions";
 import { Dialog } from "@/components/panel/Dialog";
-import { useStaffAction } from "@/components/panel/orders/use-staff-action";
+import { useStaffAction } from "@/components/panel/use-staff-action";
 import type { CloseAction } from "@/features/orders/transitions";
 
 /**

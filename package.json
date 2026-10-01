@@ -19,7 +19,9 @@
     "db:migrate:test": "tsx scripts/migrate.ts --test",
     "db:seed": "tsx scripts/seed.ts",
     "db:reset:orders": "tsx scripts/seed-demo-orders.ts reset",
-    "db:seed:orders": "tsx scripts/seed-demo-orders.ts seed"
+    "db:seed:orders": "tsx scripts/seed-demo-orders.ts seed",
+    "db:reset:wholesale": "tsx scripts/seed-demo-wholesale.ts reset",
+    "db:seed:wholesale": "tsx scripts/seed-demo-wholesale.ts seed"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.3",

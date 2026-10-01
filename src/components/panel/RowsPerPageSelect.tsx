@@ -1,20 +1,23 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { PAGE_SIZE_OPTIONS, ordersPath, type OrderTab } from "@/features/orders/transitions";
-import type { PaymentMethod } from "@/features/orders/status";
+import { buildListPath } from "@/components/panel/list-path";
 
-/** Rows per page (25/50/75/100), beside the search box so it never fights the table for space below. */
+/** Rows per page, beside the search box so it never fights the table for space below. The URL is built from plain props. */
 export function RowsPerPageSelect({
-  method,
-  tab,
+  basePath,
+  tabSlug,
   q,
   pageSize,
+  options,
+  defaultPageSize,
 }: {
-  method: PaymentMethod;
-  tab: OrderTab | "all";
+  basePath: string;
+  tabSlug?: string;
   q?: string;
   pageSize: number;
+  options: readonly number[];
+  defaultPageSize: number;
 }) {
   const router = useRouter();
 
@@ -23,11 +26,13 @@ export function RowsPerPageSelect({
       <span className="hidden sm:inline">Rows</span>
       <select
         value={pageSize}
-        onChange={(event) => router.push(ordersPath(method, tab, { q, page: 1, pageSize: Number(event.target.value) }))}
+        onChange={(event) =>
+          router.push(buildListPath(basePath, tabSlug, { q, page: 1, pageSize: Number(event.target.value) }, defaultPageSize))
+        }
         aria-label="Rows per page"
         className="border-input bg-background text-foreground rounded-md border px-1 py-1 text-xs"
       >
-        {PAGE_SIZE_OPTIONS.map((size) => (
+        {options.map((size) => (
           <option key={size} value={size}>
             {size}
           </option>

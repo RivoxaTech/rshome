@@ -15,4 +15,6 @@ export const features = {
    * delivery, so only the goods screenshot (at checkout) is needed.
    */
   deliveryChargeByTransfer: true,
+  /** Off: the storefront's `/wholesale` page 404s and every "Wholesale" link/button is hidden (S17). */
+  wholesale: true,
 } as const;

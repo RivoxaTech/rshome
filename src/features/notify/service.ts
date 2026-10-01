@@ -109,9 +109,9 @@ export async function notifyDeliveryScreenshotUploaded(orderNumber: string): Pro
   await sendEvent({ type: "delivery_screenshot_uploaded", orderNumber }, PERMISSIONS.ORDER_VIEW, orderNumber);
 }
 
-/** Built and tested now; S17 wires the actual call once the wholesale inbox exists. */
-export async function notifyWholesaleInquiry(): Promise<void> {
-  await sendEvent({ type: "new_wholesale_inquiry" }, PERMISSIONS.WHOLESALE_VIEW, "wholesale-inquiry");
+/** Fired once a real (non-honeypot) inquiry is stored (S17); the id gives the push a unique tag and URL. */
+export async function notifyWholesaleInquiry(inquiryId: number): Promise<void> {
+  await sendEvent({ type: "new_wholesale_inquiry", inquiryId }, PERMISSIONS.WHOLESALE_VIEW, `wholesale-${inquiryId}`);
 }
 
 /** Panel bell: "Enable notifications" (ARCHITECTURE.md §9). Only `order.view` holders may call this (the route checks). */

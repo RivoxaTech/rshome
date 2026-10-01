@@ -22,6 +22,9 @@ self.addEventListener("push", (event) => {
   const options = {
     body: payload.body || "",
     tag: payload.tag || "rshome",
+    // A repeat of a tag already shown (e.g. a second wholesale inquiry while the first
+    // notification is still up) still alerts the user instead of silently replacing it.
+    renotify: true,
     data: { url: payload.url || "/panel" },
   };
   event.waitUntil(self.registration.showNotification(title, options));

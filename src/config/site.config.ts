@@ -20,6 +20,8 @@ export const siteConfig = {
   orderNumberPrefix: "RSH",
   /** The customer-to-shop WhatsApp message on the order page; `{orderNumber}` is filled in. */
   orderWhatsAppMessage: "Hello RS Home, I have a question about my order {orderNumber}.",
+  /** The customer-to-shop WhatsApp button on the wholesale thank-you state (S17). */
+  wholesaleWhatsAppMessage: "Hello RS Home, I just submitted a wholesale inquiry and wanted to follow up.",
   /**
    * The shop-to-customer WhatsApp messages on the panel order page, one per stage (C13, C20).
    * `{name}`, `{store}`, `{orderNumber}`, `{deliveryCharge}`, `{total}`, `{reason}` and `{orderUrl}`
@@ -62,5 +64,13 @@ export const siteConfig = {
       iban: "[PLACEHOLDER] PK00XXXX0000000000000000",
       note: null,
     },
+  ],
+  /** The wholesale form's business-type select (S17); values match the `wholesale_inquiries.business_type` enum. */
+  wholesaleBusinessTypes: [
+    { value: "retail", label: "Retail store" },
+    { value: "restaurant_cafe", label: "Restaurant / Café" },
+    { value: "hotel", label: "Hotel" },
+    { value: "event", label: "Event" },
+    { value: "other", label: "Other" },
   ],
 } as const;

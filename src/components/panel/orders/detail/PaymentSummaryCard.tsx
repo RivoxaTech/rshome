@@ -1,4 +1,4 @@
-import { DetailCard } from "@/components/panel/orders/detail/DetailCard";
+import { DetailCard } from "@/components/panel/DetailCard";
 import type { StaffOrderView } from "@/features/orders/staff-service";
 
 function Row({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {

@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { ordersPath, type OrderTab } from "@/features/orders/transitions";
-import type { PaymentMethod } from "@/features/orders/status";
+import { buildListPath } from "@/components/panel/list-path";
 
 /** Page numbers with "…" where pages are skipped: always the ends, and a window around the current page. */
 function pageList(current: number, total: number): (number | "…")[] {
@@ -18,25 +17,28 @@ function pageList(current: number, total: number): (number | "…")[] {
   return result;
 }
 
+/** "Showing X–Y of Z" plus numbered pages; the URL is built from plain props, shared by the orders and wholesale lists. */
 export function Pagination({
-  method,
-  tab,
+  basePath,
+  tabSlug,
   q,
   page,
   pageCount,
   total,
   pageSize,
+  defaultPageSize,
 }: {
-  method: PaymentMethod;
-  tab: OrderTab | "all";
+  basePath: string;
+  tabSlug?: string;
   q?: string;
   page: number;
   pageCount: number;
   total: number;
   pageSize: number;
+  defaultPageSize: number;
 }) {
   if (total === 0) return null;
-  const pageHref = (target: number) => ordersPath(method, tab, { q, page: target, pageSize });
+  const pageHref = (target: number) => buildListPath(basePath, tabSlug, { q, page: target, pageSize }, defaultPageSize);
   const start = (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
   const linkClass = "rounded-md px-2.5 py-1.5 hover:bg-secondary";
