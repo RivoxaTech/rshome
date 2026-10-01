@@ -24,8 +24,12 @@ Reviewed and agreed on 28 September 2026. See the Decisions section at the end, 
 | sessions | id CHAR(64) PK (SHA-256 hex of the cookie token), user_id (FK), expires_at, last_seen_at, ip VARCHAR(45), user_agent VARCHAR(255), created_at. Index user_id, expires_at |
 | rate_limits | bucket VARCHAR(191) PK (e.g. `login:ip:1.2.3.4`), count INT UNSIGNED, window_ends_at DATETIME. Updated with an atomic upsert; expired rows are reset on the next hit and swept on writes |
 
-Permission keys (REQUIREMENTS §3.2, plus client decisions): `dashboard.view`, `order.view`, `order.update_status`, `order.verify_payment`, `order.set_shipping`, `order.export`, `wholesale.view`, `wholesale.manage`, `product.view`, `product.create`, `product.update`, `product.delete`, `product.import`, `category.manage`, `discount.manage`, `coupon.manage`, `shipping.manage`, `settings.manage`, `user.manage`, `role.manage`, `audit.view`.
-Admin default set: `dashboard.view`, `order.view`, `order.update_status`, `order.verify_payment`, `order.set_shipping`, `order.export`, `wholesale.view`, `wholesale.manage`, `product.view`.
+Permission keys (REQUIREMENTS §3.2, plus client decisions): `dashboard.view`, `order.view`, `order.update_status`, `order.verify_payment`, `order.set_shipping`, `order.export`, `wholesale.view`, `wholesale.manage`, `product.view`, `product.create`, `product.update`, `product.delete`, `product.import`, `category.manage`, `discount.manage`, `coupon.manage`, `shipping.manage`, `settings.manage`, `settings.bank`, `user.manage`, `role.manage`, `audit.view`.
+
+**Owner decision (BUILD_PLAN.md C24, 1 Oct 2026), reversing C6/D19's `product.view` for Admin:** Admin and Developer permission sets no longer overlap at all.
+Admin default set: `dashboard.view`, `order.view`, `order.update_status`, `order.verify_payment`, `order.set_shipping`, `order.export`, `wholesale.view`, `wholesale.manage`, `settings.bank`.
+Developer default set: `product.view`, `product.create`, `product.update`, `product.delete`, `product.import`, `category.manage`, `discount.manage`, `coupon.manage`, `shipping.manage`, `settings.manage`, `user.manage`, `role.manage`, `audit.view`.
+`settings.bank` is new and narrower than `settings.manage`: it edits only the bank accounts, contact phone/address and WhatsApp number shown at checkout (REQUIREMENTS DV-07). `settings.manage` covers every other settings key (social links, announcement text, notification recipients) but no longer reaches those three fields. The Developer no longer holds `dashboard.view` or any `order.*`/`wholesale.*` permission, so orders, payment screenshots, wholesale inquiries and customer data are invisible to the Developer role; this is privacy by default between the two roles, not protection against a malicious developer who controls the server.
 
 ## Catalogue
 | Table | Columns | Indexes |
@@ -71,12 +75,19 @@ Zone resolution: an exact (country, city) row, else (country, NULL), else the `i
 |---|---|
 | wholesale_inquiries | id, name, business NULL, business_type ENUM('retail','restaurant_cafe','hotel','event','other'), phone, email NULL, city, needed_by_date DATE NULL, message TEXT, status ENUM('new','contacted','closed'), created_at, updated_at |
 | wholesale_inquiry_items | id, inquiry_id (FK), product_id (FK NULL — set only when the row matches a catalogue product), item_name VARCHAR(200), quantity INT UNSIGNED | (inquiry_id) |
-| settings | `key` VARCHAR(100) PK, value TEXT (JSON, validated per key with Zod), updated_at. Keys seeded today: `contact` (phone, WhatsApp number, address), `social_links` (Facebook, Instagram URL and handle), `bank_accounts` (array of bank name, account title, account number, IBAN, note; seeded with `[PLACEHOLDER]` values once, never overwritten). Reserved for later: announcement_text, home hero text |
+| settings | `key` VARCHAR(100) PK, value TEXT (JSON, validated per key with Zod), updated_at. Keys seeded today: `contact` (phone, WhatsApp number, address), `social_links` (Facebook, Instagram URL and handle), `bank_accounts` (array of bank name, account title, account number, IBAN, note; seeded with `[PLACEHOLDER]` values once, never overwritten). Reserved for later: `announcement_text`, home hero text, and (S14, settings.bank editing + the other settings) `notify_owner_order_emails` (recipient list, default empty — the owner's new-order email stays off unless this is filled in) and `notify_owner_wholesale_emails` (recipient list for a new wholesale inquiry) |
 | audit_logs | id, user_id (FK NULL), action VARCHAR(50), entity VARCHAR(50), entity_id VARCHAR(50), old_values TEXT NULL, new_values TEXT NULL, created_at. Index (entity, entity_id), created_at |
 | static_pages | id, slug VARCHAR(191) unique, title, body TEXT (Markdown), is_published, created_at, updated_at |
 
+## Planned: push notifications (S21, not created yet)
+| Table | Columns | Indexes |
+|---|---|---|
+| push_subscriptions | id, user_id (FK users), endpoint VARCHAR(500), p256dh VARCHAR(191), auth VARCHAR(191), user_agent VARCHAR(255) NULL, created_at, last_used_at NULL | (user_id), endpoint unique |
+
+One row per browser/device the owner enabled notifications on. A subscription whose push send comes back 404/410 is deleted. Created by S21's migration, not this one. See REQUIREMENTS §16 and ARCHITECTURE.md's notifications decision.
+
 ## Seed data (idempotent; safe to run repeatedly)
-- Upsert permissions from the code `PERMISSIONS` const. Roles `developer` (is_system, all permissions) and `admin` (the default set above).
+- Upsert permissions from the code `PERMISSIONS` const. Roles `developer` (is_system) and `admin` (is_system), each synced to its default set above: the seed **grants and revokes** — a permission a system role's default set no longer lists is removed from `role_permissions`, not just left alone, so a future change to either set (like reversing C6) takes effect on the next seed run without a manual fix-up (BUILD_PLAN.md C24).
 - One developer and one admin user from `SEED_*` env vars (created if missing; existing passwords never overwritten).
 - Settings: `contact` and `social_links` (client decision, section 8 of the S2b brief), upserted on every run; `bank_accounts` with `[PLACEHOLDER]` values (S7), created once and never overwritten so real details entered later survive a reseed.
 - `orders.phone` and `coupon_usages.customer_key` hold the normalised phone (`lib/phone.ts`): a Pakistani mobile as `923XXXXXXXXX`, any other number as country code plus digits.
@@ -85,7 +96,7 @@ Zone resolution: an exact (country, city) row, else (country, NULL), else the `i
 - Placeholder product images: the 4 images in `design-reference/src/assets/` (`hero.jpg`, `tableware.jpg`, `teaset.jpg`, `tray.jpg`), processed through the S4 media pipeline. Each sample product gets a 3-image gallery: its category's image first (primary), then the next two placeholders.
 - Sample discount (development only, S5): `[Sample] 10% off Trays`, percent 10.00, target category `trays`, active, no dates. Created once if missing and never overwritten, so editing it in the DB survives a reseed. Deactivate or delete it before launch.
 - Sample coupon (development only, S6): code `WELCOME10`, percent 10.00, `min_order` 3000.00, active, no dates or limits. Same rule: created once, never overwritten, remove before launch. With the sample discount active, any tray in the cart blocks it (the exclusivity rule).
-- Launch products are loaded from the client's spreadsheet (CSV) and image folder through `scripts/import-products.ts`.
+- **Launch products (owner decision H, BUILD_PLAN.md C29):** entered by us through the panel (S10, one product at a time) and the CSV import (S18, bulk). There is no separate `scripts/import-products.ts` content-loading script — the panel's own import feature is the one path for bulk content, in development and at launch alike.
 
 ## Rules the schema must support
 1. A payment can be rejected many times; every proof is kept.
@@ -114,3 +125,4 @@ Zone resolution: an exact (country, city) row, else (country, NULL), else the `i
 | DB15 (29 Sep) | Integration tests run against a second database, `rs_home_test` (`TEST_DATABASE_URL`, name must end in `_test`), created and migrated by `npm run db:migrate:test` | `createOrder` tests wipe and rebuild their fixtures; they must never touch the dev data. |
 | DB16 (29 Sep) | `payment_proofs.purpose` (migration `0004_payment_proof_purpose`); a bank order's `payment_status` starts `proof_submitted` | Owner decision (S8, ARCHITECTURE.md D32): the goods screenshot comes with the order and the delivery charge gets its own; staff must tell them apart. |
 | DB17 (30 Sep) | `orders.stock_restored_at` (migration `0005_order_stock_restored`) | S9: a second guard against restoring stock twice on cancel/reject (ARCHITECTURE.md §4.3). |
+| DB18 (1 Oct) | New permission `settings.bank`, held by Admin, not Developer; Admin's default set drops `product.view` (reversing C6) and gains `settings.bank`; Developer's default set drops `dashboard.view` and every `order.*`/`wholesale.*` key; the seed sync now revokes as well as grants. `push_subscriptions` planned for S21's migration. `settings` gains two planned keys, `notify_owner_order_emails` and `notify_owner_wholesale_emails` (S14/S21) | Owner decision (BUILD_PLAN.md C24, C26): the two roles' permissions must not overlap at all, so the seed has to actively remove what a role no longer qualifies for, not only add new grants. |

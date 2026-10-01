@@ -13,9 +13,9 @@
 
 **Expected traffic:** 500 to 1,000 registered or ordering customers in the exceptional case. Low concurrency. Cheap shared cPanel hosting (PKWebHost) is the target.
 
-**Hosting and domain:** purchased at the end, after the client approves the demo. Until then the project is developed and demonstrated from a local machine, so it must run and build locally and be deployable to cPanel later without rework.
+**Hosting and domain:** purchased at the end, near launch (section 14). Until then the project is developed and tested from a local machine, so it must run and build locally and be deployable to cPanel later without rework.
 
-**Delivery:** 2 weeks total. A working demo must be shown at the end of week 1 (this triggers the first 50% payment).
+**Delivery:** owner decision (1 October 2026, BUILD_PLAN.md C22): no separate client demo — the full project is built in the sequence in section 15 and goes straight to launch. (This replaces the original 2-week, demo-then-payment-milestone schedule this line described; the payment schedule itself is a business term outside this document's scope — flagged for the owner to confirm separately.)
 
 **Business model of the build:** The client does not manage catalogue content herself. The agency (Developer role) manages products, categories, discounts, coupons and settings on request. The client (Admin role) manages orders and sees revenue.
 
@@ -33,8 +33,10 @@
 | Role | Who | Purpose |
 |---|---|---|
 | Customer | Public visitor | Browse, add to cart, checkout, upload payment proof, track order. |
-| Admin | RS HOME owner or staff | See revenue and orders, verify payment screenshots, accept or reject orders, update order status. |
-| Developer | Agency (super role) | Everything Admin can do, plus catalogue, categories, discounts, coupons, shipping, settings, users and roles. |
+| Admin | RS HOME owner or staff | See revenue and orders, verify payment screenshots, accept or reject orders, update order status, edit bank/contact/WhatsApp details. |
+| Developer | Agency | Catalogue, categories, discounts, coupons, shipping, other settings, users and roles. |
+
+**Owner decision (1 October 2026, BUILD_PLAN.md C24), reversing the "Developer always holds all permissions" design below and 3.2's original `product.view` row (BUILD_PLAN.md C6):** the two roles' permission sets are disjoint. The Developer is no longer a superset of the Admin — it manages the store's catalogue and configuration and cannot see orders, payment screenshots, wholesale inquiries or customer data; the Admin runs the day-to-day store and cannot see products, categories, discounts, coupons, shipping zones, other settings, users, roles or the audit log. This is privacy by default between the two roles, not protection against a malicious developer who controls the server.
 
 ### 3.1 Permission model (required design)
 
@@ -42,28 +44,32 @@ Access control is **permission-based (RBAC)**, not hard-coded per role name. Rol
 
 - Tables: `roles`, `permissions`, `role_permissions`, `users.role_id`.
 - Every API route and server action calls one helper, for example `requirePermission('product.create')`. UI menu items are hidden using the same permission list.
-- The Developer role always holds all permissions and cannot be edited or deleted by other roles.
+- Both system roles (`developer`, `admin`) hold a fixed default permission set (3.2) that the seed actively syncs — granting what's missing and **revoking what's no longer listed** — so a later change to either set takes effect without a manual fix-up. Neither can be edited or deleted by other roles. A user can only grant permissions they hold, so neither role can grant itself something outside its own set from the panel.
+- After login, a user lands on the first page their permissions allow (dashboard → orders → wholesale → products → settings → users → audit), never a hard-coded `/panel`; the 403 page links to that same page.
 - A new client that wants full control: create or edit a role and tick permissions. No code change.
 
 ### 3.2 Default permission matrix
 
 | Permission key | Admin | Developer |
 |---|---|---|
-| dashboard.view (revenue, stats) | Yes | Yes |
-| order.view / order.update_status | Yes | Yes |
-| order.verify_payment (accept or reject screenshot) | Yes | Yes |
-| order.export | Yes | Yes |
-| wholesale.view | Yes | Yes |
-| wholesale.manage (change inquiry status, add internal notes) | Yes | Yes |
-| product.view | Read-only (optional) | Yes |
-| product.create / update / delete / import | No | Yes |
+| dashboard.view (revenue, stats) | Yes | No |
+| order.view / order.update_status | Yes | No |
+| order.verify_payment (accept or reject screenshot) | Yes | No |
+| order.set_shipping (enter the delivery charge and note) | Yes | No |
+| order.export | Yes | No |
+| wholesale.view | Yes | No |
+| wholesale.manage (change inquiry status, add internal notes) | Yes | No |
+| settings.bank (bank accounts, contact phone/address, WhatsApp number only) | Yes | No |
+| product.view / create / update / delete / import | No | Yes |
 | category.manage | No | Yes |
 | discount.manage | No | Yes |
 | coupon.manage | No | Yes |
 | shipping.manage | No | Yes |
-| settings.manage (bank details, banners, contact info) | No | Yes |
+| settings.manage (every other settings key: social links, announcement text, notification recipients) | No | Yes |
 | user.manage / role.manage | No | Yes |
 | audit.view | No | Yes |
+
+Any signed-in user, Admin or Developer, can change their own password from `/panel/account` — this needs a session, not a permission key (section 8).
 
 ## 4. Recommended Technology
 
@@ -83,7 +89,7 @@ Final choices are confirmed in the architecture step, but the constraints below 
 
 ## 5. Storefront Requirements (Customer Side)
 
-Priority key: **M1** = required for the week-1 demo, **M2** = week 2, **P3** = after launch.
+Priority key (historical labels, kept so existing SF-xx/AD-xx/DV-xx references stay stable): **M1** = earliest-built, core flow, **M2** = built before launch in the sequence in section 15, **P3** = after launch. Owner decision (1 October 2026, BUILD_PLAN.md C23): there is no week-1/week-2 split any more — every M1 and M2 item ships before launch; only P3 items (and the two post-launch add-ons in section 16) are deferred.
 
 ### 5.1 Pages and features
 
@@ -187,10 +193,11 @@ Customers cannot cancel their own orders; the WhatsApp button on the order/track
 - **AD-01 (M1) Login.** Email and password. Session expiry. Login rate-limited.
 - **AD-02 (M1) Orders list.** Owner decision C20/D36: one page per payment method (Orders – Bank transfer, Orders – COD), each with status tabs over `order_status`/`payment_status` (Need review, Pending delivery charge — bank only, Processing, Delivery, Completed, Cancelled, Rejected). Need review sorts oldest first (a work queue); every other tab newest first (D38). One count and an alert dot (a screenshot waiting to be checked) per tab. Search by order number, name or phone, 300 ms after the last keystroke, in the URL. A table (S.N, order, date, customer, status, total, trash) — or a card per order on phones — whose row opens the order detail page except the coloured status pill and the trash icon: the trash opens the Cancel/Reject chooser while the order is open, permanently deletes it once Cancelled or Rejected, and doesn't show once it's out for delivery or completed (D38). Pagination: a rows-per-page choice (25/50/75/100, default 25) beside the search box, "Showing X–Y of Z", numbered pages with an ellipsis, keeping the tab, search and page size in the URL; a tab, search, page-size or page change shows a table-shaped skeleton in place, never a blank page (S9).
 - **AD-03 (M1) Order detail page.** Opened from the orders list, back link to the exact tab/search/page it came from; the panel header shows a breadcrumb ("Orders – Bank transfer / RSH-…"), and the page has the title once, in one row with the back arrow, the status and payment pills and the placed date. Shows items (with variant label and SKU), the customer (a full-width labelled WhatsApp button, contact, shipping address, customer note — first on phones), address, totals, payment method, **every payment screenshot** (purpose, status, upload date, reviewer; a small thumbnail that opens a large viewer dialog on click; a rejected one shows its reason), delivery (charge, note, courier, tracking, read only — only the rows that have a value; before approval, one line saying the charge is set on approval), status history and an internal note. A highlighted card surfaces whichever screenshot still needs review, or, for a bank order in Need review with its products screenshot, that screenshot next to a quick reject link, or, while the order simply waits on the customer, a plain message and a WhatsApp button. One primary button drives the order's current stage (Approve order — which sets the delivery charge, `order.set_shipping`, and approves the products screenshot in one step — Check screenshot, Move to Delivery, or Mark completed), each opening its own dialog; a ⋮ menu (a proper three-dot icon) offers Cancel order / Reject order until the order is out for delivery; neither the primary button nor the ⋮ menu shows on a closed or completed order. **Owner decision (S9):** rejecting an order or a payment screenshot always requires a reason and always rejects the whole order (no "keep it open, upload again" state); the customer sees the reason on the tracking page and can never upload another screenshot for that order. Rejecting a screenshot needs `order.verify_payment` and `order.update_status`; approving needs only the first.
-- **AD-04 (M2) Dashboard.** Revenue (today, 7 days, 30 days, all time), pending revenue, orders by status, count of payments awaiting review, recent orders, simple revenue chart.
-- **AD-05 (M2) Wholesale inquiries.** List and detail (name, business, business type, contact, city, requested items, needed-by date, message), status new/contacted/closed (`wholesale.manage`), a WhatsApp button, and an internal note field.
-- **AD-06 (P3) Export orders** to CSV. **Printable order slip** for packing.
-- By default Admin has no access to product, category, discount, coupon or settings editing. These appear only if the permission is granted to the role.
+- **AD-04 (M2) Dashboard**, owner decision (BUILD_PLAN.md C28), route `/panel`, `dashboard.view`. A period selector (Today, 7 days, 30 days, This month, All time; default 30 days; kept in the URL; Asia/Karachi day boundaries). Four stat cards — Revenue (with a pending-revenue line), Total orders, Average order value, Total wholesale leads — each with an up/down badge against the same-length previous period (except All time). A revenue-plus-order-count chart over the period (daily up to 31 days, else weekly or monthly) drawn as plain inline SVG with an accessible fallback, no charting library. Most selling products: top 5 by units sold in the period. Recent orders: the latest 8 across both payment methods, linking out. A "Needs your action" strip (orders to review, delivery-charge screenshots to check). Not included: a weekly top-customers list or an orders-by-status breakdown — the action strip replaces both. Figures: revenue, total orders and average order value per §6.2; wholesale leads = inquiries received in the period; most selling counts `order_items` units from orders not cancelled or rejected; every figure is an indexed SQL aggregate and tests check it against a hand-computed fixture.
+- **AD-05 (M2) Wholesale inquiries.** List and detail (name, business, business type, contact, city, requested items, needed-by date, message), status new/contacted/closed (`wholesale.manage`), a WhatsApp button, and an internal note field. A new inquiry sends the owner a web-push notification (event type only, no inquiry contact details in the payload) and, if `notify_owner_wholesale_emails` has recipients, an email.
+- **AD-06 (M2) Export orders** to CSV, and **export wholesale inquiries** to CSV (moved into scope for launch, no longer deferred past it). **Printable order slip** for packing.
+- **AD-07 (M1, any signed-in user) Change password.** `/panel/account`, needs only a session (no permission key): current password, a new one of at least 8 characters that differs from it, rate-limited. Success ends every other session for that user and writes an audit log row.
+- By default Admin has no access to product, category, discount, coupon, shipping-zone or other-settings editing, users, roles or the audit log — only to orders, wholesale inquiries, the dashboard and the bank/contact/WhatsApp fields (`settings.bank`). These appear only if the permission is granted to the role.
 
 ## 9. Developer Panel (Agency)
 
@@ -198,11 +205,11 @@ Same application, extra menu items controlled by permissions. The panel uses the
 
 - **DV-01 (M1) Categories.** Create, edit, reorder, activate or deactivate. Name, slug, description, image (used on the home Collections cards), optional parent category.
 - **DV-02 (M1) Products.** Create, edit, archive. Name, slug, short and long description, price, category, active or draft, featured flag (shows in "The RS Home Edit"), multiple images with drag-to-reorder and primary image. Each product has one or more **variants** (colour, size, or a single "Default" variant for a simple product): SKU, label, attributes, optional price override, stock, optional weight override, sort order, active flag. Stock and SKU live on the variant, never on the product. Images are resized to WebP on upload.
-- **DV-03 (M2) Bulk import.** Upload a CSV or Excel file to create or update products (150 more products after launch). Image handling by URL or by matching filenames from a zip. Shows a validation report before saving. This saves days of manual entry.
+- **DV-03 (M2) Bulk import and export.** Upload a CSV file to create or update products (150 more products after launch); a validation report shows before saving; images by URL or by matching filenames from a zip (scope confirmed in the S18 session). Also covers **product CSV export** and **order CSV export** (AD-06) and a **printable order slip** — all CSV import/export work for both products and orders is DV-03/S18. No separate import script: content goes in through this feature and through DV-02's own product form (owner decision H, BUILD_PLAN.md C29).
 - **DV-04 (M2) Discounts.** CRUD per section 7.1.
 - **DV-05 (M2) Coupons.** CRUD per section 7.2, with usage counter.
 - **DV-06 (M2) Shipping.** Zones (Pakistan cities or regions, and international countries or regions), mode per zone (section 6.4; all zones start as `quote`), flat rate, free-shipping threshold, COD on or off per zone (the server still refuses COD outside Pakistan regardless of this setting). Setting the shipping charge on an order awaiting a quote is on the order detail page (AD-03), not here.
-- **DV-07 (M2) Store settings.** Store name, logo text, contact details (phone, WhatsApp number, address), social links (Facebook, Instagram), bank account details shown at checkout, announcement bar text. No currency or exchange-rate setting (PKR only, section 6.3).
+- **DV-07 (M2) Store settings, split by permission (owner decision, BUILD_PLAN.md C24).** `settings.bank` (Admin): bank account details shown at checkout, contact phone/address, WhatsApp number. `settings.manage` (Developer, everything else): store name, logo text, social links (Facebook, Instagram), announcement bar text, notification recipient lists (owner order-email list, wholesale-inquiry email list). No currency or exchange-rate setting (PKR only, section 6.3).
 - **DV-08 (M2) Users and roles.** Create Admin users, edit roles and their permissions.
 - **DV-09 (M2) Audit log.** Who changed what and when, for products, prices, discounts, coupons, settings and order status.
 
@@ -281,25 +288,27 @@ Money is stored as DECIMAL(12,2) in PKR. The full column-level schema is produce
 - Set environment variables in the cPanel Node app screen (database URL, session secret, `UPLOAD_DIR`, SMTP).
 - `UPLOAD_DIR` must live **outside** the application folder so redeploys never delete images or payment screenshots.
 - **Right after purchase:** deploy immediately to a staging subdomain and run a smoke test (login, image upload, order placement, screenshot upload, restart) before pointing the .com domain.
-- **Demo before purchase:** show the client the local app through a temporary public tunnel (for example Cloudflare Tunnel) and a screen recording as backup. Do not use serverless hosts for this demo, because uploaded files do not persist there.
 - Provide a `deploy` checklist or script: build, assemble, zip, upload, restart, smoke test.
 
-## 15. Milestones
+**Owner decision (1 October 2026, BUILD_PLAN.md C22):** there is no client demo before launch — we build the full project and go straight to it. The temporary public tunnel and screen recording that this section used to describe for a pre-purchase walkthrough are dropped entirely; the first time the app is shown publicly is the staging smoke test above, after hosting is bought.
 
-| When | Focus | Result |
-|---|---|---|
-| Before day 1 | Get Lovable source into GitHub (partner task). Ask hosting pre-sales the section 14 questions. Collect product data for the first 50 products. Confirm open questions (section 16) when the client is reachable. | Unblocked start |
-| Day 1 | Scaffold project, MySQL schema and migrations, seed, auth and RBAC, design tokens from demo. | App runs, login works |
-| Day 2 | Home page pixel port, category listing, product detail (real data from DB). | Storefront browsing |
-| Day 3 | Cart, checkout, pricing module, order creation transaction. | Orders can be placed (COD and bank) |
-| Day 4 | Screenshot upload, secure file serving, Admin orders list and detail, verify and reject flow. | Full order to verification flow |
-| Day 5 | Developer panel: categories and products CRUD with image upload. | Catalogue manageable |
-| Day 6 | Load the first 50 products, production build test locally, public demo link via tunnel, walk-through test. | Demo ready |
-| Day 7 | Polish, mobile fixes, bug fixes. **Demo to client. First payment milestone.** | Week 1 demo |
-| Days 8-9 | Discounts, coupons and the exclusivity rule, shipping zones, settings. | Pricing complete |
-| Days 10-11 | Dashboard and revenue, wholesale form, bulk import, static pages, SEO. | Feature complete |
-| Days 12-13 | Load real products, testing, security pass, performance pass, backups. | Release candidate |
-| Day 14 | Final deploy on the .com domain, SSL, handover notes. | Launch |
+## 15. Build sequence
+
+**Owner decision (1 October 2026, BUILD_PLAN.md C22, C23, C27):** there is no week-1/week-2 split and no demo milestone — the whole project ships once, at launch, in the sequence below. Nothing is deferred past launch except the two post-launch add-ons named in section 16 (automatic WhatsApp Business Platform messages, Telegram alerts). The sequence is a dependency order, not a day count; `docs/BUILD_PLAN.md` carries the authoritative slice table, status and definitions of done.
+
+1. Foundation, auth + RBAC, design tokens, home page and media, catalogue and pricing core, cart, checkout and order creation, payment proof upload, panel orders (S1–S9 — already built).
+2. RBAC redesign, role-based landing pages, self-service change password (S9b).
+3. Order alerts: web push, the live sidebar/tab count, customer emails (S21).
+4. Wholesale form, inbox, owner alerts, CSV export (S17).
+5. Admin dashboard (S16).
+6. Developer catalogue: categories, products, variants, images (S10).
+7. Product CSV import and export, order CSV export, printable order slip (S18).
+8. Discounts and coupons (S12+S13).
+9. Settings (bank details, contact, social links, announcement text, notification recipients) and the shipping zone editor (S14).
+10. Static pages and SEO (S19).
+11. Users, roles, audit viewer (S20).
+12. Hardening: security pass, performance pass, backups, Linux build + CI (S22).
+13. Launch: load the real catalogue, deploy on the .com domain, SSL, handover notes (S23).
 
 ## 16. Open Questions to Confirm with the Client
 
@@ -308,11 +317,11 @@ Money is stored as DECIMAL(12,2) in PKR. The full column-level schema is produce
 - **Coupon and discount rule:** cart-level block or item-level? (Default: cart-level, section 7.3.)
 - **Accounts:** guest checkout only, or must customers register? (Default: guest checkout with order tracking.)
 - ~~**Variants:** do products have options such as colour, size or set count?~~ **Answered:** yes, via `product_variants`. See section 9 (DV-02) and DATABASE.md.
-- **Bank details:** one account or several (bank, Easypaisa, JazzCash)? Which account can international customers pay into?
-- **Notifications:** email to the owner and customer on new order? WhatsApp link? (Default: email via SMTP, WhatsApp click-to-chat button — now also a required WhatsApp button on the order/tracking and admin order-detail pages, section 6.4.)
+- **Bank details:** one account or several (bank, Easypaisa, JazzCash)? Which account can international customers pay into? Needed before S23 (section 14).
+- ~~**Notifications:** email to the owner and customer on new order? WhatsApp link?~~ **Answered (1 October 2026, BUILD_PLAN.md C26):** Web Push is the primary owner alert (new order, delivery-charge screenshot, new wholesale inquiry — no personal data in the payload); the live sidebar count and tab title poll a permission-checked endpoint; SMTP email is required in production, sends the customer their own order emails unconditionally, sends the owner a wholesale-inquiry email by default, and sends the owner a new-order email only if a recipient list is filled in (off by default, push is primary); wa.me click-to-chat buttons are unchanged. Automatic WhatsApp Business Platform messages and Telegram alerts remain the only two items deferred to after launch.
 - ~~**Wholesale:** inquiry form only, or separate wholesale prices?~~ **Answered:** inquiry form only, with repeatable item rows. See SF-08.
 - **Tax and invoices:** any tax line or printed invoice needed?
-- **Content:** who supplies product data, photos, descriptions, About and policy text, and in what format? A spreadsheet plus an image folder is ideal.
+- **Content:** who supplies product data, photos, descriptions, About and policy text, and in what format? A spreadsheet plus an image folder is ideal. Needed before S23 (BUILD_PLAN.md C29): real bank details, the owner's notification email(s), phone/WhatsApp/social links, About and policy text, domain and mailbox access — products and photos are entered by us through the panel and CSV import.
 - **Domain and email:** who owns the .com domain, and is a business email needed?
 
 ## 17. Out of Scope (First Release)
@@ -322,6 +331,7 @@ Money is stored as DECIMAL(12,2) in PKR. The full column-level schema is produce
 - Customer reviews, wishlist, loyalty points, abandoned cart emails.
 - Automatic courier integrations and live shipping rate calculation.
 - Client-side self-service catalogue editing (she requests changes from the agency).
+- Automatic WhatsApp Business Platform messages and Telegram alerts (owner decision, section 16) — the only two items deferred past launch; everything else in this document ships at launch.
 
 ## 18. Engineering Guidelines (source for CLAUDE.md)
 
@@ -331,4 +341,4 @@ Money is stored as DECIMAL(12,2) in PKR. The full column-level schema is produce
 - All money and pricing logic in one pricing module with unit tests (discounts, coupons, exclusivity, shipping, rounding).
 - Every mutation is permission-checked on the server and recorded in the audit log where relevant.
 - Work in small vertical slices. After each slice: run lint, type-check, tests, and start the app to verify. Commit with clear messages.
-- Follow the milestone order in section 15. Do not start Phase M2 items until the M1 demo path works end to end.
+- Follow the sequence in `docs/BUILD_PLAN.md` (section 15).

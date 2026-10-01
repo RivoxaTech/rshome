@@ -35,11 +35,11 @@ Deployed to cPanel shared hosting (Passenger) as a `standalone` build. Never rel
 11. Keep memory use low (shared hosting): limit sharp concurrency, paginate every list, no heavy work at request time.
 
 ## UI rules
-Storefront must match the demo exactly: fonts, colours, spacing, icons, logo text, hover and scroll behaviour, mobile layout. Extract tokens into Tailwind config first. Admin and developer panels share the storefront's colour palette (the same CSS variables) — not a separate utilitarian look — but use their own type and corners: Inter, 0.5rem radii, not the storefront's serif/display pairing or its near-zero radius, and their layouts stay dense and functional (tables, forms), not storefront-style pages.
+Storefront must match the demo exactly: fonts, colours, spacing, icons, logo text, hover and scroll behaviour, mobile layout. Extract tokens into Tailwind config first. The storefront itself is unchanged by the panel work below. Admin and developer panels share the storefront's colour palette (the same CSS variables) — not a separate utilitarian look — but use their own type and corners: Inter, 0.5rem radii, not the storefront's serif/display pairing or its near-zero radius, and their layouts stay dense and functional (tables, forms), not storefront-style pages.
 
 ## Workflow
-- Plan before code for each slice. Build one vertical slice at a time in the order of REQUIREMENTS section 15.
+- Plan before code for each slice. Follow the sequence in `docs/BUILD_PLAN.md`.
 - After each slice run typecheck, lint and tests, start the app, and verify the flow manually. Then commit with a clear message.
-- Do not start M2 items until the M1 flow works end to end: browse, cart, checkout, order, screenshot upload, admin verify.
 - If a decision changes the architecture or schema, update the docs in the same commit.
 - Ask me when a requirement is ambiguous instead of guessing. Open questions are listed in REQUIREMENTS section 16.
+- Admin and Developer permissions never overlap: Admin owns orders, wholesale, the dashboard and bank details; Developer owns the catalogue, pricing, other settings, users and the audit log. Every new feature must say in the docs which role owns it before it's built.
