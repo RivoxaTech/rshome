@@ -171,6 +171,51 @@ describe.skipIf(!TEST_DATABASE_URL)("categories CRUD (integration)", () => {
     });
   });
 
+  describe("image path hardening (S10 phase 3b, D54)", () => {
+    const hex32 = "a".repeat(32);
+
+    it("accepts a real categories/<hex> imagePath and the dev seed's enumerated placeholders", async () => {
+      const result = await staffService.createCategory(validInput({ slug: "real-image", imagePath: `categories/${hex32}` }), { id: actorId });
+      expect(result).toMatchObject({ ok: true });
+
+      const seeded = await staffService.createCategory(validInput({ slug: "seed-image", imagePath: "seed/tableware" }), { id: actorId });
+      expect(seeded).toMatchObject({ ok: true });
+    });
+
+    it("refuses a products/<hex> path — a valid upload shape in general, but the wrong folder for a category image", async () => {
+      const result = await staffService.createCategory(validInput({ slug: "wrong-folder", imagePath: `products/${hex32}` }), { id: actorId });
+      expect(result).toMatchObject({ ok: false });
+      expect(await db.select().from(categories).where(eq(categories.slug, "wrong-folder"))).toHaveLength(0);
+    });
+
+    it("refuses on update too, leaving the existing row untouched", async () => {
+      const created = await staffService.createCategory(validInput({ slug: "update-wrong-folder" }), { id: actorId });
+      if (!created.ok) throw new Error("unreachable");
+
+      const result = await staffService.updateCategoryById(created.id!, validInput({ slug: "update-wrong-folder", imagePath: `products/${hex32}` }), { id: actorId });
+      expect(result).toMatchObject({ ok: false });
+
+      const [row] = await db.select().from(categories).where(eq(categories.id, created.id!));
+      expect(row.imagePath).toBeNull();
+    });
+
+    // Through the real Server Actions, the same path a forged (or browser) request takes.
+    it("createCategoryAction and updateCategoryAction both refuse a products/<hex> imagePath, writing nothing", async () => {
+      await signInAs(DEVELOPER_DEFAULT_PERMISSIONS);
+
+      const createResult = await panelActions.createCategoryAction(null, form(validInput({ slug: "action-wrong-folder", imagePath: `products/${hex32}` })));
+      expect(createResult).toMatchObject({ ok: false });
+      expect(await db.select().from(categories).where(eq(categories.slug, "action-wrong-folder"))).toHaveLength(0);
+
+      const created = await staffService.createCategory(validInput({ slug: "action-update-wrong-folder" }), { id: actorId });
+      if (!created.ok) throw new Error("unreachable");
+      const updateResult = await panelActions.updateCategoryAction(null, form({ ...validInput({ slug: "action-update-wrong-folder", imagePath: `products/${hex32}` }), id: created.id! }));
+      expect(updateResult).toMatchObject({ ok: false });
+      const [row] = await db.select().from(categories).where(eq(categories.id, created.id!));
+      expect(row.imagePath).toBeNull();
+    });
+  });
+
   describe("hide/show and the storefront query", () => {
     it("a hidden parent also hides its (still-active) children from the storefront", async () => {
       const parent = await staffService.createCategory(validInput({ slug: "tableware" }), { id: actorId });

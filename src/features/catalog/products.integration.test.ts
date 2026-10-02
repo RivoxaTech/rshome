@@ -65,6 +65,9 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
     return data;
   };
 
+  /** A fake upload path shaped exactly like `PRODUCT_MEDIA_PATH_PATTERN` requires: `products/<32 lowercase hex>`. */
+  const hexPath = (digit: string) => `products/${digit.repeat(32)}`;
+
   const validInput = (categoryId: number, overrides: Record<string, string> = {}) => ({
     name: "Ceramic Vase",
     slug: "ceramic-vase-test",
@@ -139,7 +142,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
 
   describe("create", () => {
     it("creates a product, its default variant and image row, and writes an audit row", async () => {
-      const result = await staffService.createProduct(validInput(categoryId, { imagePath: "products/testimg", imagePathWidth: "800", imagePathHeight: "600" }), { id: actorId });
+      const result = await staffService.createProduct(validInput(categoryId, { imagePath: hexPath("1"), imagePathWidth: "800", imagePathHeight: "600" }), { id: actorId });
       expect(result).toMatchObject({ ok: true });
       if (!result.ok) throw new Error("unreachable");
 
@@ -151,7 +154,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       expect(variants[0]).toMatchObject({ sku: "TEST-VASE-SKU", label: "Default", stock: 10 });
 
       const images = await db.select().from(productImages).where(eq(productImages.productId, result.id!));
-      expect(images).toMatchObject([{ path: "products/testimg", width: 800, height: 600 }]);
+      expect(images).toMatchObject([{ path: hexPath("1"), width: 800, height: 600 }]);
 
       expect(await auditRows(result.id!, "product.create")).toHaveLength(1);
     });
@@ -171,12 +174,32 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       if (result.ok) throw new Error("unreachable");
       expect(result.fieldErrors?.sku).toBeDefined();
     });
+
+    it("refuses a malformed imagePath at the schema boundary, before any row is written (S10 phase 3b hardening)", async () => {
+      for (const badPath of ["categories/" + "a".repeat(32), "../x", "/etc/x", "products/short"]) {
+        const result = await staffService.createProduct(validInput(categoryId, { slug: "bad-image-path-test", sku: "BAD-IMAGE-SKU", imagePath: badPath, imagePathWidth: "800", imagePathHeight: "600" }), {
+          id: actorId,
+        });
+        expect(result, `expected imagePath "${badPath}" to be refused`).toMatchObject({ ok: false });
+      }
+      expect(await db.select().from(products).where(eq(products.slug, "bad-image-path-test"))).toHaveLength(0);
+    });
+
+    it("an empty imagePath is valid — a product with no image is fine", async () => {
+      const result = await staffService.createProduct(validInput(categoryId, { slug: "no-image-test", sku: "NO-IMAGE-SKU" }), { id: actorId });
+      expect(result).toMatchObject({ ok: true });
+      if (!result.ok) throw new Error("unreachable");
+      expect(await db.select().from(productImages).where(eq(productImages.productId, result.id!))).toHaveLength(0);
+    });
   });
 
   describe("update", () => {
-    it("replaces an existing image: the old row is updated and the old file is removed", async () => {
+    // S10 phase 3b (D54): the images card on the edit page owns every image action now — the
+    // product save form no longer reads or writes images on edit, even when posted (a browser
+    // never posts them from that form any more, but the Server Action ignores them regardless).
+    it("leaves an existing image row untouched, even if image fields are posted", async () => {
       const created = await staffService.createProduct(
-        validInput(categoryId, { slug: "image-replace-test", sku: "IMAGE-REPLACE-SKU", imagePath: "products/original", imagePathWidth: "800", imagePathHeight: "600" }),
+        validInput(categoryId, { slug: "image-untouched-test", sku: "IMAGE-UNTOUCHED-SKU", imagePath: hexPath("2"), imagePathWidth: "800", imagePathHeight: "600" }),
         { id: actorId },
       );
       if (!created.ok) throw new Error("unreachable");
@@ -184,10 +207,10 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       const result = await staffService.updateProductById(
         created.id!,
         validInput(categoryId, {
-          slug: "image-replace-test",
-          sku: "IMAGE-REPLACE-SKU",
+          slug: "image-untouched-test",
+          sku: "IMAGE-UNTOUCHED-SKU",
           stock: "10",
-          imagePath: "products/replacement",
+          imagePath: hexPath("3"),
           imagePathWidth: "1024",
           imagePathHeight: "768",
         }),
@@ -196,22 +219,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       expect(result).toMatchObject({ ok: true });
 
       const images = await db.select().from(productImages).where(eq(productImages.productId, created.id!));
-      expect(images).toMatchObject([{ path: "products/replacement", width: 1024, height: 768 }]);
-    });
-
-    it("removes the image row when the image is cleared", async () => {
-      const created = await staffService.createProduct(
-        validInput(categoryId, { slug: "image-clear-test", sku: "IMAGE-CLEAR-SKU", imagePath: "products/to-clear", imagePathWidth: "800", imagePathHeight: "600" }),
-        { id: actorId },
-      );
-      if (!created.ok) throw new Error("unreachable");
-
-      const result = await staffService.updateProductById(created.id!, validInput(categoryId, { slug: "image-clear-test", sku: "IMAGE-CLEAR-SKU", stock: "10" }), {
-        id: actorId,
-      });
-      expect(result).toMatchObject({ ok: true });
-
-      expect(await db.select().from(productImages).where(eq(productImages.productId, created.id!))).toHaveLength(0);
+      expect(images).toMatchObject([{ path: hexPath("2"), width: 800, height: 600 }]);
     });
 
     it("updates general fields and writes an audit row; the variant is untouched (phase 3a: variants have their own card and actions)", async () => {
@@ -659,7 +667,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
               validInput(categoryId, {
                 slug: "action-with-image",
                 sku: "ACTION-IMAGE-SKU",
-                imagePath: "products/action-image-test",
+                imagePath: hexPath("4"),
                 imagePathWidth: "1408",
                 imagePathHeight: "1008",
               }),
@@ -670,7 +678,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
 
       const [product] = await db.select().from(products).where(eq(products.slug, "action-with-image"));
       const [image] = await db.select().from(productImages).where(eq(productImages.productId, product.id));
-      expect(image).toMatchObject({ path: "products/action-image-test", width: 1408, height: 1008 });
+      expect(image).toMatchObject({ path: hexPath("4"), width: 1408, height: 1008 });
     });
 
     // The shared Listbox component (replacing every native <select> in the panel, S10 phase 2b

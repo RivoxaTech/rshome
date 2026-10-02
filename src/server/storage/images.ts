@@ -3,6 +3,7 @@ import { mkdir, rename, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 import sharp, { type Metadata } from "sharp";
 import { env } from "@/server/env";
+import { KNOWN_MEDIA_PATH_PATTERNS } from "./media-paths";
 
 // Shared hosting has small memory limits (CLAUDE.md #11): one image in flight at a time, no cache.
 sharp.concurrency(1);
@@ -76,8 +77,21 @@ export async function processMediaImage(
 /**
  * Deletes the generated WebP sizes for a media image (CLAUDE.md #5: a category/product delete
  * removes its image files safely, never outside `UPLOAD_DIR/media`). Missing files are ignored.
+ *
+ * Two independent gates, not one: `mediaPath` must first match one of `KNOWN_MEDIA_PATH_PATTERNS`
+ * (the exact `products/<32 hex>` / `categories/<32 hex>` shapes a real upload produces) — refusing
+ * silently otherwise, before any filesystem call — and only then is the resolved path re-checked
+ * against `mediaRoot`. The shape check guards against a bad value that was somehow still stored in
+ * a DB row (e.g. a schema that validated it less strictly than it should have); the containment
+ * check guards against a shape check that's wrong or incomplete. Neither alone is trusted to be
+ * the only thing standing between a stored string and `unlink()`. Deliberately generic across
+ * every caller (categories and products both funnel through here) — it has no notion of "this
+ * caller expected a product path"; that distinction belongs one layer up, in the schema the path
+ * was validated against before it was ever written to the row (`features/catalog/schemas.ts`).
  */
 export async function deleteMediaImage(mediaPath: string): Promise<void> {
+  if (!KNOWN_MEDIA_PATH_PATTERNS.some((pattern) => pattern.test(mediaPath))) return;
+
   const mediaRoot = path.join(env.UPLOAD_DIR, "media");
   for (const width of WIDTHS) {
     const filePath = path.resolve(mediaRoot, `${mediaPath}-${width}.webp`);

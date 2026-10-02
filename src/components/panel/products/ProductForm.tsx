@@ -238,15 +238,19 @@ export function ProductForm({
           <textarea id="description" name="description" defaultValue={initial.description ?? ""} rows={6} maxLength={5000} className={inputClass} />
         </Field>
 
-        <MediaImageField
-          name="imagePath"
-          subdir="products"
-          initialPath={initial.imagePath}
-          initialWidth={initial.imageWidth}
-          initialHeight={initial.imageHeight}
-          helpText="WebP, up to 8 MB. The product's main photo (more photos and reordering arrive in phase 3)."
-          error={fieldErrors?.imagePath}
-        />
+        {/* Edit mode manages every image in its own card below the form (S10 phase 3b); only the
+            create form takes one main image here, which becomes the first gallery image. */}
+        {mode === "create" && (
+          <MediaImageField
+            name="imagePath"
+            subdir="products"
+            initialPath={initial.imagePath}
+            initialWidth={initial.imageWidth}
+            initialHeight={initial.imageHeight}
+            helpText="WebP, up to 8 MB. The product's main photo — more photos and reordering are added on the edit page after it's created."
+            error={fieldErrors?.imagePath}
+          />
+        )}
 
         <div className="flex flex-col gap-4 sm:flex-row">
           <div className="flex-1">

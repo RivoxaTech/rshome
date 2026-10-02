@@ -6,10 +6,14 @@
  *                                        service, so the transaction/audit path is exercised;
  *                                        three of them then get 2-4 colour/size variants through
  *                                        the real `createVariant` service (phase 3a), one with a
- *                                        price override, one sold out, one inactive.
+ *                                        price override, one sold out, one inactive; three of them
+ *                                        (2-4 each) also get real gallery images through the real
+ *                                        `addProductImage` service (phase 3b) — tiny generated
+ *                                        sharp images, run through the real WebP pipeline, not a
+ *                                        copied placeholder file.
  *                                        `-- --many` adds 40 more (varied names) for pagination
  *                                        testing.
- *   npm run db:reset:products            removes exactly the tagged products (their variants and
+ *   npm run db:reset:products            removes exactly the tagged products (their variants,
  *                                        image rows, and the image files on disk) — never the 8
  *                                        untagged `scripts/seed.ts` sample products, and never a
  *                                        blanket reset.
@@ -18,12 +22,14 @@
  */
 import "../src/server/load-env";
 import { eq, inArray, like } from "drizzle-orm";
+import sharp from "sharp";
+import { addProductImage } from "../src/features/catalog/images-staff-service";
 import { createProduct, type StaffActionResult } from "../src/features/catalog/products-staff-service";
 import { createVariant } from "../src/features/catalog/variants-staff-service";
 import { db, pool } from "../src/server/db/client";
 import { roles, users } from "../src/server/db/schema/access-control";
 import { categories, productImages, productVariants, products } from "../src/server/db/schema/catalog";
-import { deleteMediaImage } from "../src/server/storage/images";
+import { deleteMediaImage, processMediaImage } from "../src/server/storage/images";
 import { env } from "../src/server/env";
 
 /** Tags every row this script creates, so the targeted reset never touches other seed data. */
@@ -87,10 +93,34 @@ type SeedProduct = {
   featuredPosition?: number;
   /** Extra variants added after the product's "Default" one (S10 phase 3a). */
   variants?: SeedVariant[];
+  /** Extra gallery images (2-4) added through the real `addProductImage` service (S10 phase 3b). */
+  images?: number;
 };
 
 /** A demo variant, posted exactly as the Add-variant dialog would (indexed attribute fields). */
 type SeedVariant = { sku: string; attributes: Record<string, string>; stock: number; priceOverride?: string; isActive?: boolean };
+
+// A small fixed palette so a visual scan of the gallery shows distinct swatches rather than one
+// flat colour repeated — real pixels through the real sharp pipeline (S10 phase 3b), not a copied
+// placeholder file, so each image gets its own random upload-style path.
+const DEMO_IMAGE_COLOURS: { r: number; g: number; b: number }[] = [
+  { r: 196, g: 164, b: 132 },
+  { r: 120, g: 150, b: 140 },
+  { r: 180, g: 120, b: 110 },
+  { r: 150, g: 140, b: 190 },
+];
+
+async function placeImages(productId: number, count: number, actorId: number): Promise<void> {
+  for (let i = 0; i < count; i++) {
+    const colour = DEMO_IMAGE_COLOURS[i % DEMO_IMAGE_COLOURS.length];
+    const buffer = await sharp({ create: { width: 640, height: 640, channels: 3, background: colour } })
+      .jpeg({ quality: 70 })
+      .toBuffer();
+    const image = await processMediaImage(buffer, "products");
+    const result = await addProductImage(productId, image, { id: actorId });
+    if (!result.ok) throw new Error(`addProductImage failed for product ${productId}: ${result.error}`);
+  }
+}
 
 async function placeVariants(productId: number, variants: SeedVariant[], actorId: number): Promise<void> {
   for (const variant of variants) {
@@ -131,6 +161,7 @@ async function placeProduct(product: SeedProduct, sku: string, stock: number, ac
   );
   if (!result.ok) throw new Error(`createProduct failed for "${product.name}": ${result.error}`);
   if (product.variants) await placeVariants(result.id!, product.variants, actorId);
+  if (product.images) await placeImages(result.id!, product.images, actorId);
   return result.id!;
 }
 
@@ -143,6 +174,7 @@ const BASE_PRODUCTS: SeedProduct[] = [
     status: "active",
     isFeatured: true,
     shopPlacement: "top",
+    images: 3,
     // Colour + Size pairs: a price override, a sold-out one and an inactive one, for the variants card and the storefront picker.
     variants: [
       { sku: "DEMO-BOWL-BLUE-S", attributes: { Colour: "Blue", Size: "Small" }, stock: 8 },
@@ -159,6 +191,7 @@ const BASE_PRODUCTS: SeedProduct[] = [
     status: "active",
     isFeatured: true,
     featuredPlacement: "top",
+    images: 2,
     variants: [
       { sku: "DEMO-CANDLE-ANTIQUE", attributes: { Finish: "Antique" }, stock: 6 },
       { sku: "DEMO-CANDLE-POLISHED", attributes: { Finish: "Polished" }, stock: 2, priceOverride: "1950.00" },
@@ -172,6 +205,7 @@ const BASE_PRODUCTS: SeedProduct[] = [
     status: "active",
     shopPlacement: "position",
     shopPosition: 3,
+    images: 4,
     variants: [
       { sku: "DEMO-RUNNER-NATURAL", attributes: { Colour: "Natural" }, stock: 12 },
       { sku: "DEMO-RUNNER-CHARCOAL", attributes: { Colour: "Charcoal" }, stock: 4 },

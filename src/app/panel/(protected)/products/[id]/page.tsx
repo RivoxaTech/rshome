@@ -5,6 +5,7 @@ import { DeleteProductDialog } from "@/components/panel/products/DeleteProductDi
 import { ProductForm } from "@/components/panel/products/ProductForm";
 import { ProductFormHeader } from "@/components/panel/products/ProductFormHeader";
 import { VariantsSection } from "@/components/panel/products/variants/VariantsSection";
+import { ImagesSection } from "@/components/panel/products/images/ImagesSection";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { productBackHrefSchema } from "@/features/catalog/schemas";
 import { checkProductDeletable, getActiveCategoryGroups, getProductForEdit } from "@/features/catalog/products-staff-service";
@@ -28,7 +29,7 @@ export default async function EditProductPage({
 
   const formData = await getProductForEdit(productId);
   if (!formData) notFound();
-  const { product, imagePath, imageWidth, imageHeight, variants, salePrice, shopPosition, shopTotal, featuredPosition, featuredTotal } = formData;
+  const { product, variants, images, salePrice, shopPosition, shopTotal, featuredPosition, featuredTotal } = formData;
 
   const [categoryGroups, deleteGuard] = await Promise.all([getActiveCategoryGroups(product.categoryId), checkProductDeletable(productId)]);
 
@@ -59,9 +60,9 @@ export default async function EditProductPage({
           weightGrams: product.weightGrams,
           status: product.status,
           isFeatured: product.isFeatured,
-          imagePath,
-          imageWidth,
-          imageHeight,
+          imagePath: null,
+          imageWidth: null,
+          imageHeight: null,
         }}
         actionsSlot={
           <div className="flex items-center gap-2">
@@ -71,9 +72,10 @@ export default async function EditProductPage({
         }
       />
 
-      {/* Its own card below and outside the save form: every variant control is a `<form>` of its own (D49, D53). */}
-      <div className="mt-6">
+      {/* Both below and outside the save form: every control in them is a `<form>` of its own (D49, D53, D54). */}
+      <div className="mt-6 flex flex-col gap-6">
         <VariantsSection product={{ id: product.id, name: product.name, price: product.price, status: product.status }} variants={variants} />
+        <ImagesSection productId={product.id} images={images} />
       </div>
     </>
   );

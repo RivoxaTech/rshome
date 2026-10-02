@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  categoryInputSchema,
   defaultVariantCreateSchema,
   productBackHrefSchema,
+  productImageSchema,
   productInputSchema,
   productListQuerySchema,
 } from "./schemas";
+
+const hex32 = "a".repeat(32);
 
 const validProduct = {
   name: "Ceramic Vase",
@@ -56,6 +60,75 @@ describe("productInputSchema", () => {
       expect(result.data.weightGrams).toBeNull();
       expect(result.data.imagePath).toBeNull();
     }
+  });
+
+  it("accepts a real products/<hex> imagePath", () => {
+    const result = productInputSchema.safeParse({ ...validProduct, imagePath: `products/${hex32}`, imagePathWidth: "800", imagePathHeight: "600" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.imagePath).toBe(`products/${hex32}`);
+  });
+
+  it("rejects a malformed imagePath (S10 phase 3b hardening, D54): traversal, absolute, URL, the categories folder, uppercase hex, empty-but-present", () => {
+    for (const badPath of ["../x", "products/../x", "C:\\x", "/etc/x", "https://x", `categories/${hex32}`, `products/${hex32.toUpperCase()}`, "products/short"]) {
+      const result = productInputSchema.safeParse({ ...validProduct, imagePath: badPath });
+      expect(result.success, `expected imagePath "${badPath}" to be refused`).toBe(false);
+    }
+  });
+});
+
+describe("productImageSchema", () => {
+  const validImage = { path: `products/${hex32}`, width: 800, height: 600 };
+
+  it("accepts the exact shape the upload route produces", () => {
+    expect(productImageSchema.safeParse(validImage).success).toBe(true);
+  });
+
+  it("rejects every known-bad shape: traversal, absolute, URL, another feature's folder, uppercase hex, too short, empty", () => {
+    const badPaths = ["../x", "products/../x", "C:\\x", "/etc/x", "https://x", `proofs/${hex32}`, `products/${hex32.toUpperCase()}`, "products/short", ""];
+    for (const path of badPaths) {
+      const result = productImageSchema.safeParse({ ...validImage, path });
+      expect(result.success, `expected path "${path}" to be refused`).toBe(false);
+    }
+  });
+
+  it("rejects a categories/<hex> path — a valid upload shape in general, but the wrong folder for a product image", () => {
+    const result = productImageSchema.safeParse({ ...validImage, path: `categories/${hex32}` });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("categoryInputSchema", () => {
+  const validCategory = { name: "Trays", slug: "trays", description: "", imagePath: "", sortOrder: "0", isActive: "true", parentId: "" };
+
+  it("accepts a real categories/<hex> imagePath", () => {
+    const result = categoryInputSchema.safeParse({ ...validCategory, imagePath: `categories/${hex32}` });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.imagePath).toBe(`categories/${hex32}`);
+  });
+
+  it("accepts the dev seed's enumerated placeholder paths (scripts/seed.ts), and nothing else under seed/", () => {
+    for (const name of ["hero", "tableware", "teaset", "tray"]) {
+      expect(categoryInputSchema.safeParse({ ...validCategory, imagePath: `seed/${name}` }).success).toBe(true);
+    }
+    expect(categoryInputSchema.safeParse({ ...validCategory, imagePath: "seed/anything-else" }).success).toBe(false);
+  });
+
+  it("rejects a products/<hex> path — a valid upload shape in general, but the wrong folder for a category image", () => {
+    const result = categoryInputSchema.safeParse({ ...validCategory, imagePath: `products/${hex32}` });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects every known-bad shape: traversal, absolute, URL, uppercase hex, too short", () => {
+    for (const badPath of ["../x", "categories/../x", "C:\\x", "/etc/x", "https://x", `categories/${hex32.toUpperCase()}`, "categories/short"]) {
+      const result = categoryInputSchema.safeParse({ ...validCategory, imagePath: badPath });
+      expect(result.success, `expected imagePath "${badPath}" to be refused`).toBe(false);
+    }
+  });
+
+  it("blank imagePath becomes null", () => {
+    const result = categoryInputSchema.safeParse(validCategory);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.imagePath).toBeNull();
   });
 });
 

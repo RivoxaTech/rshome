@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { decimalToPaisa, paisaToDecimal } from "@/features/pricing/money";
+import { CATEGORY_MEDIA_PATH_PATTERN, PRODUCT_MEDIA_PATH_PATTERN } from "@/server/storage/media-paths";
 import { SHOP_SORTS } from "./listing";
 import { SLUG_PATTERN } from "./slug";
 import { ATTRIBUTE_SLOTS, generateVariantLabel, validateAttributePairs } from "./variants";
@@ -32,6 +33,36 @@ const optionalText = (max: number) =>
     .optional()
     .transform((value) => (value ? value : null));
 
+/**
+ * `scripts/seed.ts`'s 4 dev-only sample categories each point at one of the design-reference
+ * placeholder photos (shared across more than one row — "hero" is also the Decor category's
+ * image, and the home page's own hero section), processed through `processMediaImage("seed", …)`,
+ * never the panel's own upload route — so the shape is `seed/<name>`, not `categories/<hex>`. A
+ * closed, enumerable allowlist (not a loose pattern), so editing one of these categories without
+ * touching its image still saves. `deleteMediaImage`'s own shape gate (`server/storage/images.ts`)
+ * deliberately does *not* recognise this pattern, so replacing one of these images can never
+ * delete the shared placeholder file off disk.
+ */
+const SEED_CATEGORY_IMAGE_PATTERN = /^seed\/(hero|tableware|teaset|tray)$/;
+
+/**
+ * `""`/missing -> `null`; otherwise the value must match one of `patterns` exactly — the real
+ * shape a panel upload produces, checked again here rather than trusted from the upload route's
+ * own response, because this value is later used to delete files on disk
+ * (`server/storage/images.ts#deleteMediaImage`).
+ */
+function optionalPathField(...patterns: RegExp[]) {
+  return z.preprocess(
+    (value) => (value === "" || value === null || value === undefined ? null : value),
+    z
+      .string()
+      .trim()
+      .max(255)
+      .refine((value) => patterns.some((pattern) => pattern.test(value)), "That image path isn't valid.")
+      .nullable(),
+  );
+}
+
 /** "" or missing -> no parent; otherwise a positive category id (resolved and checked server-side). */
 const parentIdField = z.preprocess(
   (value) => (value === "" || value === null || value === undefined ? null : value),
@@ -57,7 +88,7 @@ export const categoryInputSchema = z.object({
     .max(191, "Keep this under 191 characters.")
     .regex(SLUG_PATTERN, "Use lowercase letters, numbers and single dashes only."),
   description: optionalText(500),
-  imagePath: optionalText(255),
+  imagePath: optionalPathField(CATEGORY_MEDIA_PATH_PATTERN, SEED_CATEGORY_IMAGE_PATTERN),
   sortOrder: z.coerce.number().int("Enter a whole number.").min(0, "Use 0 or higher.").max(100_000, "Enter a smaller number."),
   isActive: activeField,
   parentId: parentIdField,
@@ -141,8 +172,10 @@ export const productInputSchema = z.object({
   isFeatured: activeField,
   // `MediaImageField`'s hidden inputs are named from its `name` prop ("imagePath" here), so the
   // width/height companions it actually posts are "imagePathWidth"/"imagePathHeight" — matching
-  // that, not a shorter guess, is what makes the image row actually get inserted/updated.
-  imagePath: optionalText(255),
+  // that, not a shorter guess, is what makes the image row actually get inserted/updated. Only the
+  // create form ever posts a non-empty value here (S10 phase 3b, D54): the edit form's own Images
+  // card uses `productImageSchema` below, under its own row lock.
+  imagePath: optionalPathField(PRODUCT_MEDIA_PATH_PATTERN),
   imagePathWidth: optionalInt(20_000),
   imagePathHeight: optionalInt(20_000),
 });
@@ -315,3 +348,36 @@ export type SaveShopOrderInput = z.infer<typeof saveShopOrderSchema>;
 
 export const saveFeaturedOrderSchema = z.object({ orderedIds: orderedIdsSchema });
 export type SaveFeaturedOrderInput = z.infer<typeof saveFeaturedOrderSchema>;
+
+// ── Panel: product images (S10 phase 3b) ────────────────────────────────────────────────────────
+
+export const MAX_PRODUCT_IMAGES = 8;
+
+const productImageDimension = z.coerce.number().int().positive().max(20_000);
+
+/**
+ * One already-uploaded file, exactly as `/api/panel/uploads` returns it. `path` must be exactly
+ * `PRODUCT_MEDIA_PATH_PATTERN` (`server/storage/media-paths.ts` — never a URL, an absolute path,
+ * `..`, or another feature's subfolder), checked again here rather than trusted from the upload
+ * route's own response, because this value is later used to delete files on disk.
+ */
+export const productImageSchema = z.object({
+  path: z.string().trim().regex(PRODUCT_MEDIA_PATH_PATTERN, "That image path isn't valid."),
+  width: productImageDimension,
+  height: productImageDimension,
+});
+export type ProductImageInput = z.infer<typeof productImageSchema>;
+
+/** The per-image alt-text field, saved alone (on blur or its own Save button); blank is allowed. */
+export const imageAltSchema = z.object({ alt: optionalText(255) });
+export type ImageAltInput = z.infer<typeof imageAltSchema>;
+
+/** The images card's drag-drop save: called directly from the client (not a `<form>`), same shape as the variants list's. */
+export const saveImageOrderSchema = z.object({
+  productId: z.coerce.number().int().positive(),
+  orderedIds: z
+    .array(z.coerce.number().int().positive())
+    .max(MAX_PRODUCT_IMAGES, "Too many images in one save.")
+    .refine((ids) => new Set(ids).size === ids.length, "Duplicate image id."),
+});
+export type SaveImageOrderInput = z.infer<typeof saveImageOrderSchema>;

@@ -14,6 +14,8 @@ import { getVariantPricer } from "@/features/pricing/service";
 import { deleteMediaImage } from "@/server/storage/images";
 import { db, type DbClient } from "@/server/db/client";
 import { getPrimaryImagesByProductId } from "./repo";
+import { deleteImagesByProductId, insertProductImage } from "./images-staff-repo";
+import { getPanelImages, type PanelImage } from "./images-staff-service";
 import { moveId, renormalize, type Placement } from "./ordering";
 import type { StaffActionResult } from "./staff-service";
 
@@ -36,7 +38,6 @@ import {
 import {
   countOrderItemsByProductId,
   deleteProduct,
-  deleteProductImagesByProductId,
   getActiveCategoryGroups,
   getActiveStockSumsByProductIds,
   getCategoryByIdActive,
@@ -45,11 +46,9 @@ import {
   getOrderedFeaturedProductIds,
   getOrderedProductIds,
   getProductCount,
-  getPrimaryImageByProductId,
   getProductById,
   getProductStatusCounts,
   insertProduct,
-  insertProductImage,
   listProductsPage,
   lockOrderedFeaturedProductIds,
   lockOrderedProductIds,
@@ -57,7 +56,6 @@ import {
   slugInUse,
   updateProduct,
   updateProductFeaturedSortOrders,
-  updateProductImage,
   updateProductSortOrders,
   type ProductRow,
 } from "./products-staff-repo";
@@ -241,11 +239,11 @@ export async function listStaffProducts(
 
 export type ProductEditFormData = {
   product: ProductRow;
-  imagePath: string | null;
-  imageWidth: number | null;
-  imageHeight: number | null;
   /** Every variant in display order, for the edit page's variants card (S10 phase 3a). */
   variants: PanelVariant[];
+  /** Every image in display order, for the edit page's images card (S10 phase 3b). The product
+   *  form itself no longer reads or writes images on edit — only the create form's one field does. */
+  images: PanelImage[];
   salePrice: SaleInfo;
   /** 1-based current position in the shop order, and how many products share that order. */
   shopPosition: number;
@@ -260,20 +258,17 @@ export async function getProductForEdit(id: number): Promise<ProductEditFormData
   if (!product) return null;
   const [variants, images, parentCategoryId, shopOrder, featuredOrder] = await Promise.all([
     getPanelVariants(id),
-    getPrimaryImagesByProductId([id]),
+    getPanelImages(id),
     getCategoryParentId(product.categoryId),
     getOrderedProductIds(db),
     getOrderedFeaturedProductIds(db),
   ]);
-  const image = images.get(id);
   const saleInfoMap = await computeSaleInfo([{ id: product.id, price: product.price, categoryId: product.categoryId, parentCategoryId }]);
 
   return {
     product,
-    imagePath: image?.path ?? null,
-    imageWidth: image?.width ?? null,
-    imageHeight: image?.height ?? null,
     variants,
+    images,
     salePrice: saleInfoMap.get(id) ?? null,
     shopPosition: shopOrder.indexOf(id) + 1,
     shopTotal: shopOrder.length,
@@ -374,7 +369,6 @@ export async function updateProductById(id: number, rawInput: unknown, actor: Ac
   const shopPlacement: ShopPlacementEditInput = parsedShopPlacement.data;
   const featuredPlacement: FeaturedPlacementEditInput = parsedFeaturedPlacement.data;
 
-  let replacedImagePath: string | null = null;
   try {
     await db.transaction(async (tx) => {
       const product = await lockProductById(tx, id);
@@ -449,18 +443,6 @@ export async function updateProductById(id: number, rawInput: unknown, actor: Ac
         const featuredPlacementValue = toPlacement(effective, featuredPlacement.featuredPosition);
         if (featuredPlacementValue) await applyFeaturedPlacement(tx, id, featuredPlacementValue, actor, now);
       }
-
-      const currentImage = await getPrimaryImageByProductId(tx, id);
-      const newPath = input.imagePath;
-      if (!currentImage && newPath && input.imagePathWidth && input.imagePathHeight) {
-        await insertProductImage(tx, { productId: id, path: newPath, width: input.imagePathWidth, height: input.imagePathHeight, sortOrder: 0, createdAt: now });
-      } else if (currentImage && !newPath) {
-        await deleteProductImagesByProductId(tx, id);
-        replacedImagePath = currentImage.path;
-      } else if (currentImage && newPath && currentImage.path !== newPath && input.imagePathWidth && input.imagePathHeight) {
-        await updateProductImage(tx, currentImage.id, { path: newPath, width: input.imagePathWidth, height: input.imagePathHeight });
-        replacedImagePath = currentImage.path;
-      }
     });
   } catch (error) {
     if (error instanceof ProductActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
@@ -470,8 +452,6 @@ export async function updateProductById(id: number, rawInput: unknown, actor: Ac
     throw error;
   }
 
-  // Only removed once the transaction that replaced/cleared it has actually committed.
-  if (replacedImagePath) await deleteMediaImage(replacedImagePath);
   return { ok: true, id };
 }
 
@@ -553,7 +533,7 @@ export async function deleteProductById(id: number, actor: Actor): Promise<Staff
 
       const now = new Date();
       await deleteVariantsByProductId(tx, id);
-      imagePathsToDelete = await deleteProductImagesByProductId(tx, id);
+      imagePathsToDelete = await deleteImagesByProductId(tx, id);
       await deleteProduct(tx, id);
       await insertAuditLog(tx, {
         userId: actor.id,

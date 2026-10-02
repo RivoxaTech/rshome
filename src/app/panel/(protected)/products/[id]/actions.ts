@@ -2,7 +2,14 @@
 
 import { z } from "zod";
 import { PERMISSIONS } from "@/features/auth/permissions";
-import { moveToPlacementSchema, saveVariantOrderSchema, variantStockSchema } from "@/features/catalog/schemas";
+import { imageAltSchema, moveToPlacementSchema, productImageSchema, saveImageOrderSchema, saveVariantOrderSchema, variantStockSchema } from "@/features/catalog/schemas";
+import {
+  addProductImage,
+  deleteProductImage,
+  moveImage,
+  saveImageOrder,
+  setImageAlt,
+} from "@/features/catalog/images-staff-service";
 import {
   createVariant,
   deleteVariantById,
@@ -80,4 +87,60 @@ export async function saveVariantOrderAction(input: unknown): Promise<StaffActio
   const parsed = saveVariantOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Please reload and try again." };
   return saveVariantOrder(parsed.data, { id: session.id });
+}
+
+// ── Images card (S10 phase 3b) ──────────────────────────────────────────────────────────────
+
+/** Adds one already-uploaded file (the uploader calls this once per file, right after `/api/panel/uploads` returns) — called directly from the client, not a `<form>`. */
+export async function addProductImageAction(productId: number, input: unknown): Promise<StaffActionResult> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_UPDATE);
+  const parsedId = idSchema.safeParse(productId);
+  if (!parsedId.success) return BAD_ID;
+  const parsed = productImageSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "That upload didn't work. Try again." };
+  return addProductImage(parsedId.data, parsed.data, { id: session.id });
+}
+
+/** The per-image alt-text field: saved on blur or a small Save button, like the variant row's stock control. */
+export async function setImageAltAction(_prevState: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_UPDATE);
+  const imageId = idSchema.safeParse(formData.get("imageId"));
+  if (!imageId.success) return BAD_ID;
+  const parsed = imageAltSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Keep this under 255 characters.", fieldErrors: { alt: parsed.error.issues[0]?.message ?? "Keep this under 255 characters." } };
+  return setImageAlt(imageId.data, parsed.data, { id: session.id });
+}
+
+export async function deleteProductImageAction(_prevState: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_UPDATE);
+  const imageId = idSchema.safeParse(formData.get("imageId"));
+  if (!imageId.success) return BAD_ID;
+  return deleteProductImage(imageId.data, { id: session.id });
+}
+
+/** The per-row "Move to top/end/position N" quick action — the same tiny `<form>` shape as the variants card's. */
+export async function moveImageAction(_prevState: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_UPDATE);
+  const imageId = idSchema.safeParse(formData.get("imageId"));
+  if (!imageId.success) return BAD_ID;
+  const parsed = moveToPlacementSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Please check the position." };
+  const placement = parsed.data.placement === "position" ? ({ type: "position", position: parsed.data.position! } as const) : ({ type: parsed.data.placement } as const);
+  return moveImage({ imageId: imageId.data, placement }, { id: session.id });
+}
+
+/** "Make primary": the same move as placement "top", one click, no listbox. */
+export async function makeImagePrimaryAction(_prevState: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_UPDATE);
+  const imageId = idSchema.safeParse(formData.get("imageId"));
+  if (!imageId.success) return BAD_ID;
+  return moveImage({ imageId: imageId.data, placement: { type: "top" } }, { id: session.id });
+}
+
+/** The full drag-drop result — called directly from the client, same shape as the variants card's. */
+export async function saveImageOrderAction(input: unknown): Promise<StaffActionResult> {
+  const session = await requirePermission(PERMISSIONS.PRODUCT_UPDATE);
+  const parsed = saveImageOrderSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Please reload and try again." };
+  return saveImageOrder(parsed.data, { id: session.id });
 }

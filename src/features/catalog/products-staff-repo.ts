@@ -5,15 +5,16 @@
  * `variants-staff-repo.ts` in phase 3a.
  */
 import { and, asc, count, desc, eq, inArray, like, ne, or, sql, sum, type SQL } from "drizzle-orm";
-// Variant queries (incl. the create form's "Default" variant) live in `variants-staff-repo.ts` (S10 phase 3a).
+// Variant queries (incl. the create form's "Default" variant) live in `variants-staff-repo.ts` (S10
+// phase 3a); image queries (incl. the whole-product delete's image cleanup) live in
+// `images-staff-repo.ts` (S10 phase 3b).
 import { db, type DbClient } from "@/server/db/client";
-import { categories, productImages, productVariants, products } from "@/server/db/schema/catalog";
+import { categories, productVariants, products } from "@/server/db/schema/catalog";
 import { orderItems } from "@/server/db/schema/orders";
 import type { ProductTab } from "./schemas";
 
 export type ProductRow = typeof products.$inferSelect;
 export type ProductUpdate = Partial<typeof products.$inferInsert>;
-export type ProductImageRow = typeof productImages.$inferSelect;
 
 /** LIKE treats `%` and `_` as wildcards and `\` as its escape: a search is matched literally. */
 const contains = (text: string) => `%${text.replace(/[%_]/g, "\\$&")}%`;
@@ -111,40 +112,10 @@ export async function deleteProduct(tx: DbClient, id: number): Promise<void> {
   await tx.delete(products).where(eq(products.id, id));
 }
 
-/** Returns the removed rows' media paths, so the caller can delete their on-disk files after commit. */
-export async function deleteProductImagesByProductId(tx: DbClient, productId: number): Promise<string[]> {
-  const rows = await tx.select({ path: productImages.path }).from(productImages).where(eq(productImages.productId, productId));
-  await tx.delete(productImages).where(eq(productImages.productId, productId));
-  return rows.map((row) => row.path);
-}
-
 /** A product referenced by any `order_items` row can never be deleted, only archived. */
 export async function countOrderItemsByProductId(productId: number): Promise<number> {
   const [row] = await db.select({ count: count() }).from(orderItems).where(eq(orderItems.productId, productId));
   return row.count;
-}
-
-// ── The main image (phase 2: zero or one row, sort_order 0; multi-image is phase 3) ────────────
-// Listing/display reuses `features/catalog/repo.ts`'s `getPrimaryImagesByProductId` (no status
-// filter applies to images, so the storefront batch helper works for staff reads too); this one
-// takes a `DbClient` so a write path can read it under the same transaction as its own change.
-
-export async function getPrimaryImageByProductId(client: DbClient, productId: number): Promise<ProductImageRow | undefined> {
-  const [row] = await client.select().from(productImages).where(eq(productImages.productId, productId)).orderBy(asc(productImages.sortOrder)).limit(1);
-  return row;
-}
-
-export async function insertProductImage(tx: DbClient, values: typeof productImages.$inferInsert): Promise<number> {
-  const [result] = await tx.insert(productImages).values(values);
-  return result.insertId;
-}
-
-export async function updateProductImage(tx: DbClient, id: number, values: Partial<typeof productImages.$inferInsert>): Promise<void> {
-  await tx.update(productImages).set(values).where(eq(productImages.id, id));
-}
-
-export async function deleteProductImageRow(tx: DbClient, id: number): Promise<void> {
-  await tx.delete(productImages).where(eq(productImages.id, id));
 }
 
 // ── Category options for the form ───────────────────────────────────────────────────────────
