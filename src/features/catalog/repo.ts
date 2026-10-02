@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, like, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, like, type SQL } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { categories, productImages, products, productVariants } from "@/server/db/schema/catalog";
 
@@ -25,6 +25,7 @@ const listingColumns = {
   categoryId: products.categoryId,
   parentCategoryId: categories.parentId,
   createdAt: products.createdAt,
+  sortOrder: products.sortOrder,
 };
 
 function selectActiveListingProducts(...conditions: SQL[]) {
@@ -37,8 +38,13 @@ function selectActiveListingProducts(...conditions: SQL[]) {
 
 export type ListingProductRow = Awaited<ReturnType<typeof selectActiveListingProducts>>[number];
 
+/** Featured strip order (S10 phase 2b, `products.featured_sort_order`); ties: newest first. */
 export function getFeaturedActiveProducts(): Promise<ListingProductRow[]> {
-  return selectActiveListingProducts(eq(products.isFeatured, true)).orderBy(asc(products.createdAt));
+  return selectActiveListingProducts(eq(products.isFeatured, true)).orderBy(
+    asc(products.featuredSortOrder),
+    desc(products.createdAt),
+    desc(products.id),
+  );
 }
 
 /** MySQL's LIKE escape character is a backslash; escape it and the two wildcards. */

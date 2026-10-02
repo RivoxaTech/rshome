@@ -368,9 +368,13 @@ async function seedCatalog(media: Record<SeedImageKey, ProcessedMediaImage>) {
   const categoryIdBySlug = new Map(categoryRows.map((c) => [c.slug, c.id]));
   const productSeeds = PRODUCT_SEEDS;
 
-  for (const product of productSeeds) {
+  // Manual ordering (S10 phase 2b): sort_order follows this array's own order; featured_sort_order
+  // follows the same order among just the featured ones (non-featured rows' value is unused).
+  let featuredIndex = 0;
+  for (const [sortOrder, product] of productSeeds.entries()) {
     const categoryId = categoryIdBySlug.get(product.categorySlug);
     if (!categoryId) continue;
+    const featuredSortOrder = product.isFeatured ? featuredIndex++ : 0;
     await db
       .insert(products)
       .values({
@@ -381,6 +385,8 @@ async function seedCatalog(media: Record<SeedImageKey, ProcessedMediaImage>) {
         price: product.price,
         isFeatured: product.isFeatured,
         status: "active",
+        sortOrder,
+        featuredSortOrder,
       })
       .onDuplicateKeyUpdate({
         set: {
@@ -388,6 +394,8 @@ async function seedCatalog(media: Record<SeedImageKey, ProcessedMediaImage>) {
           shortDescription: product.shortDescription,
           price: product.price,
           isFeatured: product.isFeatured,
+          sortOrder,
+          featuredSortOrder,
         },
       });
   }

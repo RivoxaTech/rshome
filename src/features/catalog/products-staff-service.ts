@@ -9,20 +9,32 @@
 import type { ZodError } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
 import { fieldErrorsOf } from "@/features/checkout/schemas";
+import { decimalToPaisa, paisaToDecimal } from "@/features/pricing/money";
+import { isDiscounted } from "@/features/pricing/pricing";
+import { getVariantPricer } from "@/features/pricing/service";
 import { deleteMediaImage } from "@/server/storage/images";
-import { db } from "@/server/db/client";
+import { db, type DbClient } from "@/server/db/client";
 import { getPrimaryImagesByProductId } from "./repo";
+import { moveId, renormalize, type Placement } from "./ordering";
 import type { StaffActionResult } from "./staff-service";
 
 export type { StaffActionResult };
 import {
   defaultVariantCreateSchema,
   defaultVariantEditSchema,
+  featuredPlacementCreateSchema,
+  featuredPlacementEditSchema,
   productInputSchema,
+  shopPlacementCreateSchema,
+  shopPlacementEditSchema,
   type DefaultVariantEditInput,
+  type FeaturedPlacementEditInput,
+  type FeaturedPlacementInput,
   type ProductInput,
   type ProductStatus,
   type ProductTab,
+  type ShopPlacementEditInput,
+  type ShopPlacementInput,
 } from "./schemas";
 import {
   countOrderItemsByProductId,
@@ -32,6 +44,11 @@ import {
   getActiveCategoryGroups,
   getActiveStockSumsByProductIds,
   getCategoryByIdActive,
+  getCategoryParentId,
+  getFeaturedProductCount,
+  getOrderedFeaturedProductIds,
+  getOrderedProductIds,
+  getProductCount,
   getPrimaryImageByProductId,
   getProductById,
   getProductStatusCounts,
@@ -40,18 +57,28 @@ import {
   insertProductImage,
   insertVariant,
   listProductsPage,
+  lockOrderedFeaturedProductIds,
+  lockOrderedProductIds,
   lockProductById,
   lockVariantById,
   skuInUse,
   slugInUse,
   updateProduct,
+  updateProductFeaturedSortOrders,
   updateProductImage,
+  updateProductSortOrders,
   updateVariant,
   type ProductRow,
   type ProductVariantRow,
 } from "./products-staff-repo";
 
 export { getActiveCategoryGroups, getProductStatusCounts };
+
+/** Totals for the create form's placement fields (what "at the end" currently means). */
+export async function getPlacementTotals(): Promise<{ shopTotal: number; featuredTotal: number }> {
+  const [shopTotal, featuredTotal] = await Promise.all([getProductCount(), getFeaturedProductCount()]);
+  return { shopTotal, featuredTotal };
+}
 
 type Actor = { id: number };
 
@@ -87,6 +114,74 @@ async function assertCategoryValid(categoryId: number, currentCategoryId?: numbe
   if (!category.isActive && categoryId !== currentCategoryId) throw new ProductActionError("That category is hidden. Choose an active category.");
 }
 
+// ── Manual ordering (S10 phase 2b) ──────────────────────────────────────────────────────────────
+
+/** `"keep"` (edit only) means "don't touch this order" — the caller skips applying anything. */
+function toPlacement(placement: "top" | "end" | "position" | "keep", position?: number): Placement | null {
+  if (placement === "keep") return null;
+  if (placement === "position") return { type: "position", position: position! };
+  return { type: placement };
+}
+
+/**
+ * Moves (or, for a brand-new id not yet in the list, inserts) `productId` within the shop order
+ * and writes every row whose `sort_order` changed, inside `tx`. `moveId` removing-then-reinserting
+ * an id that isn't present yet is exactly an insert, so this one function covers both create and
+ * edit. One audit row records the whole before/after order (ARCHITECTURE.md D51).
+ */
+async function applyShopPlacement(tx: DbClient, productId: number, placement: Placement, actor: Actor, now: Date): Promise<void> {
+  const existing = await lockOrderedProductIds(tx);
+  const next = moveId(existing, productId, placement);
+  const positions = renormalize(next);
+  await updateProductSortOrders(tx, [...positions.entries()].map(([id, sortOrder]) => ({ id, sortOrder })));
+  await insertAuditLog(tx, {
+    userId: actor.id,
+    action: "product.sort_change",
+    entity: "product_order",
+    entityId: "shop",
+    oldValues: { order: existing },
+    newValues: { order: next },
+    createdAt: now,
+  });
+}
+
+/** Same as `applyShopPlacement`, for the featured order (scoped to active, featured products only). */
+async function applyFeaturedPlacement(tx: DbClient, productId: number, placement: Placement, actor: Actor, now: Date): Promise<void> {
+  const existing = await lockOrderedFeaturedProductIds(tx);
+  const next = moveId(existing, productId, placement);
+  const positions = renormalize(next);
+  await updateProductFeaturedSortOrders(tx, [...positions.entries()].map(([id, featuredSortOrder]) => ({ id, featuredSortOrder })));
+  await insertAuditLog(tx, {
+    userId: actor.id,
+    action: "product.sort_change",
+    entity: "product_order",
+    entityId: "featured",
+    oldValues: { order: existing },
+    newValues: { order: next },
+    createdAt: now,
+  });
+}
+
+// ── Sale price display (read-only; reuses features/pricing, no new pricing logic) ──────────────
+
+export type SaleInfo = { original: string; discounted: string } | null;
+
+/**
+ * One discount load (`getVariantPricer`), then `priceVariant` per row in memory — cheap even for a
+ * full page of staff rows (features/pricing/service.ts already does this once per request).
+ * Computed from `products.price` (no variant override): the list and edit header already show
+ * that as *the* price, and variant pricing stays out of scope until phase 3.
+ */
+async function computeSaleInfo(rows: { id: number; price: string; categoryId: number; parentCategoryId: number | null }[]): Promise<Map<number, SaleInfo>> {
+  const pricer = await getVariantPricer();
+  const map = new Map<number, SaleInfo>();
+  for (const row of rows) {
+    const price = pricer({ id: row.id, price: decimalToPaisa(row.price), categoryId: row.categoryId, parentCategoryId: row.parentCategoryId }, null);
+    map.set(row.id, isDiscounted(price) ? { original: paisaToDecimal(price.basePrice), discounted: paisaToDecimal(price.unitPrice) } : null);
+  }
+  return map;
+}
+
 type ProductAuditFields = Pick<ProductRow, "name" | "slug" | "categoryId" | "shortDescription" | "description" | "price" | "weightGrams" | "isFeatured" | "status">;
 
 function productAuditValues(product: ProductAuditFields) {
@@ -116,6 +211,7 @@ export type StaffProductListItem = {
   stock: number;
   status: ProductStatus;
   isFeatured: boolean;
+  salePrice: SaleInfo;
 };
 
 export async function listStaffProducts(
@@ -125,7 +221,11 @@ export async function listStaffProducts(
   const offset = (query.page - 1) * query.pageSize;
   const { rows, total } = await listProductsPage({ tab, q: query.q, categoryId: query.categoryId, limit: query.pageSize, offset });
   const ids = rows.map((row) => row.id);
-  const [stockSums, images] = await Promise.all([getActiveStockSumsByProductIds(ids), getPrimaryImagesByProductId(ids)]);
+  const [stockSums, images, saleInfo] = await Promise.all([
+    getActiveStockSumsByProductIds(ids),
+    getPrimaryImagesByProductId(ids),
+    computeSaleInfo(rows),
+  ]);
 
   const items: StaffProductListItem[] = rows.map((row, index) => ({
     serial: offset + index + 1,
@@ -138,6 +238,7 @@ export async function listStaffProducts(
     stock: stockSums.get(row.id) ?? 0,
     status: row.status,
     isFeatured: row.isFeatured,
+    salePrice: saleInfo.get(row.id) ?? null,
   }));
 
   return { items, total, page: query.page, pageSize: query.pageSize, pageCount: Math.max(1, Math.ceil(total / query.pageSize)) };
@@ -154,13 +255,27 @@ export type ProductEditFormData = {
   variant: ProductVariantRow | null;
   /** Set only when it has more than one (the 8 seeded samples) — shown as a read-only summary. */
   multipleVariants: ProductVariantRow[] | null;
+  salePrice: SaleInfo;
+  /** 1-based current position in the shop order, and how many products share that order. */
+  shopPosition: number;
+  shopTotal: number;
+  /** Null unless the product is currently featured — its current position in the featured order. */
+  featuredPosition: number | null;
+  featuredTotal: number;
 };
 
 export async function getProductForEdit(id: number): Promise<ProductEditFormData | null> {
   const product = await getProductById(id);
   if (!product) return null;
-  const [variants, images] = await Promise.all([getVariantsByProductId(db, id), getPrimaryImagesByProductId([id])]);
+  const [variants, images, parentCategoryId, shopOrder, featuredOrder] = await Promise.all([
+    getVariantsByProductId(db, id),
+    getPrimaryImagesByProductId([id]),
+    getCategoryParentId(product.categoryId),
+    getOrderedProductIds(db),
+    getOrderedFeaturedProductIds(db),
+  ]);
   const image = images.get(id);
+  const saleInfoMap = await computeSaleInfo([{ id: product.id, price: product.price, categoryId: product.categoryId, parentCategoryId }]);
 
   return {
     product,
@@ -169,6 +284,11 @@ export async function getProductForEdit(id: number): Promise<ProductEditFormData
     imageHeight: image?.height ?? null,
     variant: variants.length === 1 ? variants[0] : null,
     multipleVariants: variants.length > 1 ? variants : null,
+    salePrice: saleInfoMap.get(id) ?? null,
+    shopPosition: shopOrder.indexOf(id) + 1,
+    shopTotal: shopOrder.length,
+    featuredPosition: product.isFeatured ? featuredOrder.indexOf(id) + 1 : null,
+    featuredTotal: featuredOrder.length,
   };
 }
 
@@ -179,8 +299,14 @@ export async function createProduct(rawInput: unknown, actor: Actor): Promise<St
   if (!parsedProduct.success) return invalid(parsedProduct.error);
   const parsedVariant = defaultVariantCreateSchema.safeParse(rawInput);
   if (!parsedVariant.success) return invalid(parsedVariant.error);
+  const parsedShopPlacement = shopPlacementCreateSchema.safeParse(rawInput);
+  if (!parsedShopPlacement.success) return invalid(parsedShopPlacement.error);
+  const parsedFeaturedPlacement = featuredPlacementCreateSchema.safeParse(rawInput);
+  if (!parsedFeaturedPlacement.success) return invalid(parsedFeaturedPlacement.error);
   const input: ProductInput = parsedProduct.data;
   const variantInput = parsedVariant.data;
+  const shopPlacement: ShopPlacementInput = parsedShopPlacement.data;
+  const featuredPlacement: FeaturedPlacementInput = parsedFeaturedPlacement.data;
 
   try {
     const id = await db.transaction(async (tx) => {
@@ -225,6 +351,14 @@ export async function createProduct(rawInput: unknown, actor: Actor): Promise<St
         newValues: { ...productAuditValues(input), sku: variantInput.sku, stock: variantInput.stock },
         createdAt: now,
       });
+
+      const shopPlacementValue = toPlacement(shopPlacement.shopPlacement, shopPlacement.shopPosition);
+      if (shopPlacementValue) await applyShopPlacement(tx, id, shopPlacementValue, actor, now);
+      if (input.isFeatured) {
+        const featuredPlacementValue = toPlacement(featuredPlacement.featuredPlacement, featuredPlacement.featuredPosition);
+        if (featuredPlacementValue) await applyFeaturedPlacement(tx, id, featuredPlacementValue, actor, now);
+      }
+
       return id;
     });
     return { ok: true, id };
@@ -242,7 +376,13 @@ export async function createProduct(rawInput: unknown, actor: Actor): Promise<St
 export async function updateProductById(id: number, rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsedProduct = productInputSchema.safeParse(rawInput);
   if (!parsedProduct.success) return invalid(parsedProduct.error);
+  const parsedShopPlacement = shopPlacementEditSchema.safeParse(rawInput);
+  if (!parsedShopPlacement.success) return invalid(parsedShopPlacement.error);
+  const parsedFeaturedPlacement = featuredPlacementEditSchema.safeParse(rawInput);
+  if (!parsedFeaturedPlacement.success) return invalid(parsedFeaturedPlacement.error);
   const input: ProductInput = parsedProduct.data;
+  const shopPlacement: ShopPlacementEditInput = parsedShopPlacement.data;
+  const featuredPlacement: FeaturedPlacementEditInput = parsedFeaturedPlacement.data;
 
   let replacedImagePath: string | null = null;
   try {
@@ -323,6 +463,16 @@ export async function updateProductById(id: number, rawInput: unknown, actor: Ac
           newValues: { isFeatured: input.isFeatured },
           createdAt: now,
         });
+      }
+
+      const shopPlacementValue = toPlacement(shopPlacement.shopPlacement, shopPlacement.shopPosition);
+      if (shopPlacementValue) await applyShopPlacement(tx, id, shopPlacementValue, actor, now);
+      if (input.isFeatured) {
+        // A product newly turned Featured has no "current position" to keep — default to the end.
+        const becameFeatured = !product.isFeatured;
+        const effective = becameFeatured && featuredPlacement.featuredPlacement === "keep" ? "end" : featuredPlacement.featuredPlacement;
+        const featuredPlacementValue = toPlacement(effective, featuredPlacement.featuredPosition);
+        if (featuredPlacementValue) await applyFeaturedPlacement(tx, id, featuredPlacementValue, actor, now);
       }
 
       const currentImage = await getPrimaryImageByProductId(tx, id);

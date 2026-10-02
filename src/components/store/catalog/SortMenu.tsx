@@ -6,6 +6,7 @@ import { listingHref, type ListingState } from "@/components/store/catalog/listi
 import { SHOP_SORTS, type ShopSort } from "@/features/catalog/listing";
 
 const SORT_LABELS: Record<ShopSort, string> = {
+  recommended: "Recommended",
   newest: "Newest",
   price_asc: "Price: Low to High",
   price_desc: "Price: High to Low",

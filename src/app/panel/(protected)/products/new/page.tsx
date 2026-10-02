@@ -3,7 +3,7 @@ import { ProductForm } from "@/components/panel/products/ProductForm";
 import { ProductFormHeader } from "@/components/panel/products/ProductFormHeader";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { productBackHrefSchema } from "@/features/catalog/schemas";
-import { getActiveCategoryGroups } from "@/features/catalog/products-staff-service";
+import { getActiveCategoryGroups, getPlacementTotals } from "@/features/catalog/products-staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { createProductAction } from "@/app/panel/(protected)/products/actions";
 
@@ -11,7 +11,7 @@ export default async function NewProductPage({ searchParams }: { searchParams: P
   await requirePermission(PERMISSIONS.PRODUCT_CREATE);
   const { back } = await searchParams;
   const backHref = productBackHrefSchema.parse(back) ?? "/panel/products";
-  const categoryGroups = await getActiveCategoryGroups();
+  const [categoryGroups, { shopTotal, featuredTotal }] = await Promise.all([getActiveCategoryGroups(), getPlacementTotals()]);
 
   return (
     <>
@@ -23,6 +23,8 @@ export default async function NewProductPage({ searchParams }: { searchParams: P
         categoryGroups={categoryGroups}
         variant={{ sku: "", stock: 0, priceOverride: null }}
         multipleVariantsSummary={null}
+        shopPosition={{ current: null, total: shopTotal }}
+        featuredPosition={{ current: null, total: featuredTotal }}
         backHref={backHref}
         initial={{
           id: null,

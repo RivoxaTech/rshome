@@ -3,10 +3,11 @@
 import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { generateSlug } from "@/features/catalog/slug";
-import { PRODUCT_STATUSES, type ProductStatus } from "@/features/catalog/schemas";
+import { PLACEMENT_CREATE, PLACEMENT_EDIT, PRODUCT_STATUSES, type PlacementCreate, type PlacementEdit, type ProductStatus } from "@/features/catalog/schemas";
 import type { CategoryGroup, ProductVariantRow } from "@/features/catalog/products-staff-repo";
 import type { StaffActionResult } from "@/features/catalog/staff-service";
 import { decimalToPaisa, percentPriceChange } from "@/features/pricing/money";
+import { Listbox, type ListboxItem } from "@/components/panel/Listbox";
 import { MediaImageField } from "@/components/panel/MediaImageField";
 import { Switch } from "@/components/panel/Switch";
 
@@ -45,12 +46,82 @@ function Field({ id, label, error, children }: { id: string; label: string; erro
 const inputClass =
   "border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none";
 
+/** The product's current position in the relevant order; `current` is null on create, and on edit while not yet featured. */
+export type PlacementPosition = { current: number | null; total: number };
+
+const PLACEMENT_LABELS: Record<PlacementCreate, string> = { top: "At the top", end: "At the end", position: "At position" };
+
+/**
+ * One "Show in shop"/"Show in featured strip" radio group (S10 phase 2b). On create, End is the
+ * default and there's no "keep" option; on edit, "Keep current position" is the default so saving
+ * the rest of the form never silently moves the product. The position number input only posts
+ * when "At position" is selected — a disabled input isn't included in FormData.
+ */
+function PlacementField({
+  legend,
+  fieldPrefix,
+  mode,
+  position,
+  error,
+}: {
+  legend: string;
+  fieldPrefix: "shop" | "featured";
+  mode: "create" | "edit";
+  position: PlacementPosition;
+  error?: string;
+}) {
+  const options: readonly (PlacementCreate | PlacementEdit)[] = mode === "edit" ? PLACEMENT_EDIT : PLACEMENT_CREATE;
+  const defaultValue: PlacementCreate | PlacementEdit = mode === "edit" ? "keep" : "end";
+  const [value, setValue] = useState<PlacementCreate | PlacementEdit>(defaultValue);
+  const placementName = `${fieldPrefix}Placement`;
+  const positionName = `${fieldPrefix}Position`;
+  // A new row (create), or this row being newly added to a list it wasn't in before (edit), goes
+  // after everything currently there, so the position field's default/max account for that extra slot.
+  const maxPosition = position.current !== null ? position.total : position.total + 1;
+
+  return (
+    <fieldset className="flex flex-col gap-1.5">
+      <legend className="text-sm font-medium">{legend}</legend>
+      <div className="flex flex-col gap-1.5">
+        {options.map((option) => (
+          <label key={option} className="flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name={placementName}
+              value={option}
+              defaultChecked={option === defaultValue}
+              onChange={() => setValue(option)}
+              className="accent-primary"
+            />
+            {option === "keep" ? `Keep current position${position.current ? ` (${position.current} of ${position.total})` : ""}` : PLACEMENT_LABELS[option]}
+            {option === "position" && (
+              <input
+                type="number"
+                name={positionName}
+                min={1}
+                max={maxPosition}
+                defaultValue={position.current ?? maxPosition}
+                disabled={value !== "position"}
+                aria-label={`${legend} position`}
+                className={`${inputClass} w-16 px-2 py-1 disabled:opacity-40`}
+              />
+            )}
+          </label>
+        ))}
+      </div>
+      {error && <p className="text-destructive text-xs">{error}</p>}
+    </fieldset>
+  );
+}
+
 export function ProductForm({
   mode,
   initial,
   categoryGroups,
   variant,
   multipleVariantsSummary,
+  shopPosition,
+  featuredPosition,
   action,
   backHref,
   actionsSlot,
@@ -62,6 +133,10 @@ export function ProductForm({
   variant: DefaultVariantFormValues | null;
   /** More than one variant (the 8 seeded samples): a read-only summary instead of inline fields. */
   multipleVariantsSummary: ProductVariantRow[] | null;
+  /** Current shop-order position (`current` is null on create). */
+  shopPosition: PlacementPosition;
+  /** Current featured-order position (`current` is null on create, or on edit while not yet featured). */
+  featuredPosition: PlacementPosition;
   action: (state: StaffActionResult | null, formData: FormData) => Promise<StaffActionResult>;
   /** Where Cancel returns to: the products list, with the search/tab/page/rows the user came from. */
   backHref: string;
@@ -79,6 +154,7 @@ export function ProductForm({
   const [price, setPrice] = useState(initial.price);
   const [isFeatured, setIsFeatured] = useState(initial.isFeatured);
   const [status, setStatus] = useState<ProductStatus>(initial.status);
+  const [categoryId, setCategoryId] = useState(initial.categoryId !== null ? String(initial.categoryId) : "");
   const [priceConfirm, setPriceConfirm] = useState<{ oldPaisa: number; newPaisa: number; percent: number } | null>(null);
 
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
@@ -141,28 +217,18 @@ export function ProductForm({
         </Field>
 
         <Field id="categoryId" label="Category" error={fieldErrors?.categoryId}>
-          <select id="categoryId" name="categoryId" defaultValue={initial.categoryId ?? ""} required className={inputClass}>
-            <option value="" disabled>
-              Choose a category
-            </option>
-            {categoryGroups.map((group) =>
-              group.parent ? (
-                <optgroup key={group.parent.id} label={group.parent.name}>
-                  {group.options.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : (
-                group.options.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
-                ))
-              ),
-            )}
-          </select>
+          <Listbox
+            id="categoryId"
+            name="categoryId"
+            value={categoryId}
+            onChange={setCategoryId}
+            placeholder="Choose a category"
+            ariaLabel="Category"
+            items={categoryGroups.flatMap((group): ListboxItem[] => {
+              const options = group.options.map((option) => ({ value: String(option.id), label: option.name }));
+              return group.parent ? [{ groupLabel: group.parent.name }, ...options] : options;
+            })}
+          />
         </Field>
 
         <Field id="shortDescription" label="Short description" error={fieldErrors?.shortDescription}>
@@ -225,19 +291,25 @@ export function ProductForm({
         )}
 
         <Field id="status" label="Status" error={fieldErrors?.status}>
-          <select id="status" name="status" value={status} onChange={(event) => setStatus(event.target.value as ProductStatus)} className={inputClass}>
-            {PRODUCT_STATUSES.map((value) => (
-              <option key={value} value={value}>
-                {STATUS_LABELS[value]}
-              </option>
-            ))}
-          </select>
+          <Listbox
+            id="status"
+            name="status"
+            value={status}
+            onChange={(value) => setStatus(value as ProductStatus)}
+            ariaLabel="Status"
+            items={PRODUCT_STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
+          />
           <p className="text-muted-foreground text-xs">Draft stays off the storefront; Archived hides it but keeps it on past orders.</p>
         </Field>
 
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium">Featured</span>
           <Switch name="isFeatured" checked={isFeatured} onChange={setIsFeatured} />
+        </div>
+
+        <div className="border-border flex flex-col gap-4 border-t pt-4">
+          <PlacementField legend="Show in shop" fieldPrefix="shop" mode={mode} position={shopPosition} error={fieldErrors?.shopPosition} />
+          {isFeatured && <PlacementField legend="Show in featured strip" fieldPrefix="featured" mode={mode} position={featuredPosition} error={fieldErrors?.featuredPosition} />}
         </div>
 
         <div className="border-border flex flex-col gap-3 border-t pt-4">

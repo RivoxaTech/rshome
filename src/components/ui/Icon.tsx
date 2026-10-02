@@ -56,6 +56,8 @@ export const ICON_PATHS = {
   star: "M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.2-5.4 3.2 1.3-6L3.3 9.2l6.1-.6z",
   // Archive quick action (S10 phase 2): a storage box with its lid.
   archive: "M3 7h18v3H3zM5 10v10h14V10M9 14h6",
+  // Drag handle (S10 phase 2b, /panel/products/arrange): a six-dot grip.
+  grip: "M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01",
 } as const;
 
 /**

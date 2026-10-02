@@ -4,6 +4,7 @@ import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { generateSlug } from "@/features/catalog/slug";
 import type { ParentOption, StaffActionResult } from "@/features/catalog/staff-service";
+import { Listbox } from "@/components/panel/Listbox";
 import { MediaImageField } from "@/components/panel/MediaImageField";
 import { Switch } from "@/components/panel/Switch";
 
@@ -69,6 +70,7 @@ export function CategoryForm({
   const [slug, setSlug] = useState(initial.slug);
   const slugTouched = useRef(mode === "edit");
   const [isActive, setIsActive] = useState(initial.isActive);
+  const [parentId, setParentId] = useState(initial.parentId !== null ? String(initial.parentId) : "");
 
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
   const formError = state && !state.ok && !fieldErrors ? state.error : undefined;
@@ -124,20 +126,15 @@ export function CategoryForm({
         />
 
         <Field id="parentId" label="Parent category" error={fieldErrors?.parentId}>
-          <select
+          <Listbox
             id="parentId"
             name="parentId"
-            defaultValue={initial.parentId ?? ""}
+            value={parentId}
+            onChange={setParentId}
             disabled={hasChildren}
-            className={`${inputClass} disabled:opacity-50`}
-          >
-            <option value="">No parent</option>
-            {parentOptions.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-          </select>
+            ariaLabel="Parent category"
+            items={[{ value: "", label: "No parent" }, ...parentOptions.map((option) => ({ value: String(option.id), label: option.name }))]}
+          />
           {hasChildren && (
             <p className="text-muted-foreground text-xs">This category has sub-categories, so it can&apos;t be given a parent itself.</p>
           )}
@@ -145,7 +142,9 @@ export function CategoryForm({
 
         <Field id="sortOrder" label="Sort order" error={fieldErrors?.sortOrder}>
           <input id="sortOrder" name="sortOrder" type="number" defaultValue={initial.sortOrder} min={0} max={100_000} step={1} className={inputClass} />
-          <p className="text-muted-foreground text-xs">Lower numbers show first.</p>
+          <p className="text-muted-foreground text-xs">
+            Lower numbers show first — in the storefront header menu, the shop page&apos;s category filter, the home page&apos;s Collections cards, and this panel&apos;s own lists and parent dropdowns.
+          </p>
         </Field>
 
         <div className="flex items-center justify-between gap-2">

@@ -3,7 +3,7 @@
  * — `products-staff-service.ts` owns the slug/SKU/category checks, audit rows and the delete guard.
  * Mirrors `staff-repo.ts` (categories, S10 phase 1).
  */
-import { and, asc, count, desc, eq, inArray, like, ne, or, sum, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, like, ne, or, sql, sum, type SQL } from "drizzle-orm";
 import { db, type DbClient } from "@/server/db/client";
 import { categories, productImages, productVariants, products } from "@/server/db/schema/catalog";
 import { orderItems } from "@/server/db/schema/orders";
@@ -26,7 +26,9 @@ function statusCondition(tab: ProductTab): SQL | undefined {
   return tab === "all" ? undefined : eq(products.status, tab);
 }
 
-export type StaffProductListRow = ProductRow & { categoryName: string };
+// `parentCategoryId` is needed to resolve a category-targeted discount against a product in a
+// child category (features/pricing/pricing.ts#discountMatchesProduct checks both levels).
+export type StaffProductListRow = ProductRow & { categoryName: string; parentCategoryId: number | null };
 
 export async function listProductsPage(filter: {
   tab: ProductTab;
@@ -42,7 +44,7 @@ export async function listProductsPage(filter: {
 
   const [rows, [total]] = await Promise.all([
     db
-      .select({ product: products, categoryName: categories.name })
+      .select({ product: products, categoryName: categories.name, parentCategoryId: categories.parentId })
       .from(products)
       .innerJoin(categories, eq(categories.id, products.categoryId))
       .where(where)
@@ -52,7 +54,7 @@ export async function listProductsPage(filter: {
     db.select({ count: count() }).from(products).where(where),
   ]);
 
-  return { rows: rows.map((row) => ({ ...row.product, categoryName: row.categoryName })), total: total.count };
+  return { rows: rows.map((row) => ({ ...row.product, categoryName: row.categoryName, parentCategoryId: row.parentCategoryId })), total: total.count };
 }
 
 export type ProductStatusCounts = Record<ProductTab, number>;
@@ -213,4 +215,99 @@ export async function getActiveCategoryGroups(includeId?: number): Promise<Categ
 export async function getCategoryByIdActive(id: number): Promise<{ id: number; isActive: boolean } | undefined> {
   const [row] = await db.select({ id: categories.id, isActive: categories.isActive }).from(categories).where(eq(categories.id, id));
   return row;
+}
+
+/** For category-targeted discount matching against a product's own category or its parent. */
+export async function getCategoryParentId(categoryId: number): Promise<number | null> {
+  const [row] = await db.select({ parentId: categories.parentId }).from(categories).where(eq(categories.id, categoryId));
+  return row?.parentId ?? null;
+}
+
+// ── Manual ordering (S10 phase 2b): shop order (global) / featured order (featured+active only) ─
+
+/** Every product id in shop-order, optionally scoped to one category (its own relative order). */
+export async function getOrderedProductIds(client: DbClient, categoryId?: number): Promise<number[]> {
+  const where = categoryId !== undefined ? eq(products.categoryId, categoryId) : undefined;
+  const rows = await client.select({ id: products.id }).from(products).where(where).orderBy(asc(products.sortOrder), asc(products.id));
+  return rows.map((row) => row.id);
+}
+
+/** Same as `getOrderedProductIds`, but under `SELECT … FOR UPDATE` — held before an arrange save or placement change writes. */
+export async function lockOrderedProductIds(tx: DbClient, categoryId?: number): Promise<number[]> {
+  const where = categoryId !== undefined ? eq(products.categoryId, categoryId) : undefined;
+  const rows = await tx.select({ id: products.id }).from(products).where(where).orderBy(asc(products.sortOrder), asc(products.id)).for("update");
+  return rows.map((row) => row.id);
+}
+
+/** Every active, featured product id in featured-order — the only products the Featured order concerns. */
+export async function getOrderedFeaturedProductIds(client: DbClient): Promise<number[]> {
+  const rows = await client
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.isFeatured, true), eq(products.status, "active")))
+    .orderBy(asc(products.featuredSortOrder), asc(products.id));
+  return rows.map((row) => row.id);
+}
+
+/** Same as `getOrderedFeaturedProductIds`, but under `SELECT … FOR UPDATE`. */
+export async function lockOrderedFeaturedProductIds(tx: DbClient): Promise<number[]> {
+  const rows = await tx
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.isFeatured, true), eq(products.status, "active")))
+    .orderBy(asc(products.featuredSortOrder), asc(products.id))
+    .for("update");
+  return rows.map((row) => row.id);
+}
+
+/** Totals for the create form's placement fields: every product, and active+featured products. */
+export async function getProductCount(): Promise<number> {
+  const [row] = await db.select({ count: count() }).from(products);
+  return row.count;
+}
+
+export async function getFeaturedProductCount(): Promise<number> {
+  const [row] = await db.select({ count: count() }).from(products).where(and(eq(products.isFeatured, true), eq(products.status, "active")));
+  return row.count;
+}
+
+/** Rows for the arrange page: id, name, thumbnail, status, featured — in the order given by `ids`. */
+export type ArrangeRow = { id: number; name: string; status: ProductRow["status"]; isFeatured: boolean; categoryId: number };
+
+export async function getProductsByIds(ids: number[]): Promise<Map<number, ArrangeRow>> {
+  if (ids.length === 0) return new Map();
+  const rows = await db
+    .select({ id: products.id, name: products.name, status: products.status, isFeatured: products.isFeatured, categoryId: products.categoryId })
+    .from(products)
+    .where(inArray(products.id, ids));
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
+/** One `UPDATE … SET sort_order = CASE id WHEN … END` — a single round trip for up to a few hundred rows. */
+export async function updateProductSortOrders(tx: DbClient, updates: { id: number; sortOrder: number }[]): Promise<void> {
+  if (updates.length === 0) return;
+  const caseExpr = sql.join([sql`case id`, ...updates.map((u) => sql`when ${u.id} then ${u.sortOrder}`), sql`else sort_order end`], sql` `);
+  await tx
+    .update(products)
+    .set({ sortOrder: caseExpr })
+    .where(
+      inArray(
+        products.id,
+        updates.map((u) => u.id),
+      ),
+    );
+}
+
+export async function updateProductFeaturedSortOrders(tx: DbClient, updates: { id: number; featuredSortOrder: number }[]): Promise<void> {
+  if (updates.length === 0) return;
+  const caseExpr = sql.join([sql`case id`, ...updates.map((u) => sql`when ${u.id} then ${u.featuredSortOrder}`), sql`else featured_sort_order end`], sql` `);
+  await tx
+    .update(products)
+    .set({ featuredSortOrder: caseExpr })
+    .where(
+      inArray(
+        products.id,
+        updates.map((u) => u.id),
+      ),
+    );
 }

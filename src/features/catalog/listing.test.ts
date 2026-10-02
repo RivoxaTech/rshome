@@ -2,15 +2,19 @@ import { describe, expect, it } from "vitest";
 import { paginate, sortProducts, type SortableProduct } from "./listing";
 
 const items: SortableProduct[] = [
-  { id: 1, createdAt: new Date("2026-09-01T00:00:00Z"), fromPrice: 50000 },
-  { id: 2, createdAt: new Date("2026-09-03T00:00:00Z"), fromPrice: 100000 },
-  { id: 3, createdAt: new Date("2026-09-02T00:00:00Z"), fromPrice: 200000 },
-  { id: 4, createdAt: new Date("2026-09-02T00:00:00Z"), fromPrice: 100000 },
+  { id: 1, createdAt: new Date("2026-09-01T00:00:00Z"), fromPrice: 50000, sortOrder: 3 },
+  { id: 2, createdAt: new Date("2026-09-03T00:00:00Z"), fromPrice: 100000, sortOrder: 1 },
+  { id: 3, createdAt: new Date("2026-09-02T00:00:00Z"), fromPrice: 200000, sortOrder: 0 },
+  { id: 4, createdAt: new Date("2026-09-02T00:00:00Z"), fromPrice: 100000, sortOrder: 1 },
 ];
 
 const ids = (list: SortableProduct[]) => list.map((item) => item.id);
 
 describe("sortProducts", () => {
+  it("sorts recommended by sortOrder ascending, ties newest first", () => {
+    expect(ids(sortProducts(items, "recommended"))).toEqual([3, 2, 4, 1]);
+  });
+
   it("sorts newest first, breaking equal times on the higher id", () => {
     expect(ids(sortProducts(items, "newest"))).toEqual([2, 4, 3, 1]);
   });

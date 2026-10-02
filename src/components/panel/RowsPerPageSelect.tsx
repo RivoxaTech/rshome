@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { buildListPath } from "@/components/panel/list-path";
+import { Listbox } from "@/components/panel/Listbox";
 
 /** Rows per page, beside the search box so it never fights the table for space below. The URL is built from plain props. */
 export function RowsPerPageSelect({
@@ -24,22 +25,15 @@ export function RowsPerPageSelect({
   const router = useRouter();
 
   return (
-    <label className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs whitespace-nowrap">
+    <div className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs whitespace-nowrap">
       <span className="hidden sm:inline">Rows</span>
-      <select
-        value={pageSize}
-        onChange={(event) =>
-          router.push(buildListPath(basePath, tabSlug, { q, category, page: 1, pageSize: Number(event.target.value) }, defaultPageSize))
-        }
-        aria-label="Rows per page"
-        className="border-input bg-background text-foreground rounded-md border px-1 py-1 text-xs"
-      >
-        {options.map((size) => (
-          <option key={size} value={size}>
-            {size}
-          </option>
-        ))}
-      </select>
-    </label>
+      <Listbox
+        value={String(pageSize)}
+        items={options.map((size) => ({ value: String(size), label: String(size) }))}
+        ariaLabel="Rows per page"
+        className="w-16 text-xs [&_summary]:px-1 [&_summary]:py-1"
+        onChange={(value) => router.push(buildListPath(basePath, tabSlug, { q, category, page: 1, pageSize: Number(value) }, defaultPageSize))}
+      />
+    </div>
   );
 }

@@ -94,6 +94,12 @@ export async function ProductsPageBody({ searchParams }: { searchParams: Record<
               defaultPageSize={PRODUCT_DEFAULT_PAGE_SIZE}
             />
             <Link
+              href="/panel/products/arrange"
+              className="border-input hover:bg-secondary shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium whitespace-nowrap"
+            >
+              Arrange products
+            </Link>
+            <Link
               href={`/panel/products/new?back=${encodeURIComponent(backHref)}`}
               className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap"
             >

@@ -10,7 +10,7 @@ const firstValue = (value: unknown) => (Array.isArray(value) ? value[0] : value)
 export const listingQuerySchema = z.object({
   q: z.preprocess(firstValue, z.string().trim().max(100).optional()).catch(undefined),
   category: z.preprocess(firstValue, z.string().max(191).optional()).catch(undefined),
-  sort: z.preprocess(firstValue, z.enum(SHOP_SORTS)).catch("newest"),
+  sort: z.preprocess(firstValue, z.enum(SHOP_SORTS)).catch("recommended"),
   page: z.preprocess(firstValue, z.coerce.number().int().min(1).max(10_000)).catch(1),
 });
 
@@ -186,3 +186,66 @@ export type ProductListQuery = z.infer<typeof productListQuerySchema>;
 export const productBackHrefSchema = z
   .preprocess(firstQueryValue, z.string().max(300).regex(/^\/panel\/products(\?[\w=&%.+-]*)?$/).optional())
   .catch(undefined);
+
+// ── Panel: manual ordering placement (S10 phase 2b) ─────────────────────────────────────────────
+
+export const PLACEMENT_CREATE = ["top", "end", "position"] as const;
+export const PLACEMENT_EDIT = ["keep", "top", "end", "position"] as const;
+export type PlacementCreate = (typeof PLACEMENT_CREATE)[number];
+export type PlacementEdit = (typeof PLACEMENT_EDIT)[number];
+
+/** `""`/missing -> `undefined`, so a position left blank isn't coerced to 0/NaN. */
+const optionalPosition = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? undefined : value),
+  z.coerce.number().int("Enter a whole number.").min(1, "Use 1 or higher.").optional(),
+);
+
+/** The create form's "Show in shop" radio group; End is the default, Position requires a number. */
+export const shopPlacementCreateSchema = z
+  .object({ shopPlacement: z.enum(PLACEMENT_CREATE).catch("end"), shopPosition: optionalPosition })
+  .refine((value) => value.shopPlacement !== "position" || value.shopPosition !== undefined, { message: "Enter a position.", path: ["shopPosition"] });
+export type ShopPlacementInput = z.infer<typeof shopPlacementCreateSchema>;
+
+/** The create form's "Show in featured strip" radio group — only parsed while Featured is on. */
+export const featuredPlacementCreateSchema = z
+  .object({ featuredPlacement: z.enum(PLACEMENT_CREATE).catch("end"), featuredPosition: optionalPosition })
+  .refine((value) => value.featuredPlacement !== "position" || value.featuredPosition !== undefined, {
+    message: "Enter a position.",
+    path: ["featuredPosition"],
+  });
+export type FeaturedPlacementInput = z.infer<typeof featuredPlacementCreateSchema>;
+
+/** The edit form's version: "Keep current position" is the default, so the rest of the form never silently moves it. */
+export const shopPlacementEditSchema = z
+  .object({ shopPlacement: z.enum(PLACEMENT_EDIT).catch("keep"), shopPosition: optionalPosition })
+  .refine((value) => value.shopPlacement !== "position" || value.shopPosition !== undefined, { message: "Enter a position.", path: ["shopPosition"] });
+export type ShopPlacementEditInput = z.infer<typeof shopPlacementEditSchema>;
+
+export const featuredPlacementEditSchema = z
+  .object({ featuredPlacement: z.enum(PLACEMENT_EDIT).catch("keep"), featuredPosition: optionalPosition })
+  .refine((value) => value.featuredPlacement !== "position" || value.featuredPosition !== undefined, {
+    message: "Enter a position.",
+    path: ["featuredPosition"],
+  });
+export type FeaturedPlacementEditInput = z.infer<typeof featuredPlacementEditSchema>;
+
+/** The arrange page's per-row "Move to…" quick action and its drag-drop save, same placement shape. */
+export const moveToPlacementSchema = z
+  .object({ placement: z.enum(PLACEMENT_CREATE), position: optionalPosition })
+  .refine((value) => value.placement !== "position" || value.position !== undefined, { message: "Enter a position.", path: ["position"] });
+export type MoveToPlacementInput = z.infer<typeof moveToPlacementSchema>;
+
+/** `/panel/products/arrange`'s full drag-drop save: called directly from the client (not a `<form>`), so this is the one boundary check its payload gets. */
+const orderedIdsSchema = z
+  .array(z.coerce.number().int().positive())
+  .max(500, "Too many products in one save.")
+  .refine((ids) => new Set(ids).size === ids.length, "Duplicate product id.");
+
+export const saveShopOrderSchema = z.object({
+  categoryId: z.coerce.number().int().positive().optional(),
+  orderedIds: orderedIdsSchema,
+});
+export type SaveShopOrderInput = z.infer<typeof saveShopOrderSchema>;
+
+export const saveFeaturedOrderSchema = z.object({ orderedIds: orderedIdsSchema });
+export type SaveFeaturedOrderInput = z.infer<typeof saveFeaturedOrderSchema>;

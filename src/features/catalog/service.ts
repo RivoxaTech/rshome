@@ -124,6 +124,7 @@ type PricedListingProduct = {
   id: number;
   createdAt: Date;
   fromPrice: Paisa;
+  sortOrder: number;
   cheapest: VariantPrice;
   priceFrom: boolean;
   singleVariant: ProductCard["singleVariant"];
@@ -155,7 +156,7 @@ async function priceListingProducts(rows: ListingProductRow[]): Promise<PricedLi
     const priceFrom = prices.some((price) => price.unitPrice !== cheapest.unitPrice);
     const singleVariant =
       productVariants.length === 1 ? { id: productVariants[0].id, soldOut: productVariants[0].stock <= 0 } : null;
-    return [{ row, id: row.id, createdAt: row.createdAt, fromPrice: cheapest.unitPrice, cheapest, priceFrom, singleVariant }];
+    return [{ row, id: row.id, createdAt: row.createdAt, fromPrice: cheapest.unitPrice, sortOrder: row.sortOrder, cheapest, priceFrom, singleVariant }];
   });
 }
 

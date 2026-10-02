@@ -38,6 +38,20 @@ function StatusPill({ status }: { status: ProductStatus }) {
   );
 }
 
+/** Reuses the existing pricing module's discount resolution only — no new pricing logic here. */
+function PriceCell({ price, salePrice }: { price: string; salePrice: StaffProductListItem["salePrice"] }) {
+  if (!salePrice) return <>{formatMoney(decimalToPaisa(price))}</>;
+  return (
+    <span className="flex flex-col">
+      <span className="flex items-center gap-1.5">
+        <span className="font-medium text-red-600 dark:text-red-400">{formatMoney(decimalToPaisa(salePrice.discounted))}</span>
+        <span className="inline-flex items-center rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400">On sale</span>
+      </span>
+      <span className="text-muted-foreground text-xs line-through">{formatMoney(decimalToPaisa(salePrice.original))}</span>
+    </span>
+  );
+}
+
 function detailHref(id: number, backHref: string): string {
   return `/panel/products/${id}?back=${encodeURIComponent(backHref)}`;
 }
@@ -63,7 +77,9 @@ function ProductRow({ item, backHref }: { item: StaffProductListItem; backHref: 
         </Link>
       </td>
       <td className="text-muted-foreground px-3 py-2">{item.categoryName}</td>
-      <td className="text-muted-foreground px-3 py-2 whitespace-nowrap">{formatMoney(decimalToPaisa(item.price))}</td>
+      <td className="text-muted-foreground px-3 py-2 whitespace-nowrap">
+        <PriceCell price={item.price} salePrice={item.salePrice} />
+      </td>
       <td className={`px-3 py-2 ${item.stock === 0 ? "font-medium text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>{item.stock}</td>
       <td className="px-3 py-2">
         <div className="flex items-center gap-1" onClick={stop}>
@@ -96,7 +112,9 @@ function ProductCard({ item, backHref }: { item: StaffProductListItem; backHref:
             </div>
           </div>
           <p className="text-muted-foreground mt-0.5 truncate text-xs">{item.categoryName}</p>
-          <p className="text-sm font-medium">{formatMoney(decimalToPaisa(item.price))}</p>
+          <p className="text-sm font-medium">
+            <PriceCell price={item.price} salePrice={item.salePrice} />
+          </p>
         </div>
       </div>
       <div className="mt-2.5 flex items-center justify-between" onClick={stop}>

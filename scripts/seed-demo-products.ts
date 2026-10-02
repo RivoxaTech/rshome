@@ -65,6 +65,8 @@ async function getCategoryIdBySlug(slug: string): Promise<number> {
   return category.id;
 }
 
+type Placement = "top" | "end" | "position";
+
 type SeedProduct = {
   name: string;
   slug: string;
@@ -73,6 +75,12 @@ type SeedProduct = {
   status: "draft" | "active" | "archived";
   isFeatured?: boolean;
   shortDescription?: string;
+  /** Manual ordering (S10 phase 2b): interleaves demo products among the sample ones instead of
+   *  always appending at the end, so the arrange page has real reordering to do. Default "end". */
+  shopPlacement?: Placement;
+  shopPosition?: number;
+  featuredPlacement?: Placement;
+  featuredPosition?: number;
 };
 
 async function placeProduct(product: SeedProduct, sku: string, stock: number, actorId: number): Promise<void> {
@@ -93,6 +101,10 @@ async function placeProduct(product: SeedProduct, sku: string, stock: number, ac
       imagePathHeight: "",
       sku,
       stock: String(stock),
+      shopPlacement: product.shopPlacement ?? "end",
+      ...(product.shopPosition !== undefined ? { shopPosition: String(product.shopPosition) } : {}),
+      featuredPlacement: product.featuredPlacement ?? "end",
+      ...(product.featuredPosition !== undefined ? { featuredPosition: String(product.featuredPosition) } : {}),
     },
     { id: actorId },
   );
@@ -100,12 +112,29 @@ async function placeProduct(product: SeedProduct, sku: string, stock: number, ac
 }
 
 const BASE_PRODUCTS: SeedProduct[] = [
-  { name: "Hand-Painted Serving Bowl", slug: "demo-hand-painted-serving-bowl", categorySlug: "tableware", price: "2200.00", status: "active", isFeatured: true },
-  { name: "Brass Candle Holder", slug: "demo-brass-candle-holder", categorySlug: "decor", price: "1800.00", status: "active" },
-  { name: "Linen Table Runner", slug: "demo-linen-table-runner", categorySlug: "tableware", price: "1500.00", status: "active" },
+  {
+    name: "Hand-Painted Serving Bowl",
+    slug: "demo-hand-painted-serving-bowl",
+    categorySlug: "tableware",
+    price: "2200.00",
+    status: "active",
+    isFeatured: true,
+    shopPlacement: "top",
+  },
+  { name: "Brass Candle Holder", slug: "demo-brass-candle-holder", categorySlug: "decor", price: "1800.00", status: "active", isFeatured: true, featuredPlacement: "top" },
+  { name: "Linen Table Runner", slug: "demo-linen-table-runner", categorySlug: "tableware", price: "1500.00", status: "active", shopPlacement: "position", shopPosition: 3 },
   { name: "Copper Tea Set", slug: "demo-copper-tea-set", categorySlug: "tea-sets", price: "4500.00", status: "draft" },
   { name: "Rattan Serving Tray", slug: "demo-rattan-serving-tray", categorySlug: "trays", price: "2600.00", status: "archived" },
-  { name: "Engraved Wooden Tray", slug: "demo-engraved-wooden-tray", categorySlug: "trays", price: "2100.00", status: "active" },
+  {
+    name: "Engraved Wooden Tray",
+    slug: "demo-engraved-wooden-tray",
+    categorySlug: "trays",
+    price: "2100.00",
+    status: "active",
+    isFeatured: true,
+    featuredPlacement: "position",
+    featuredPosition: 2,
+  },
 ];
 
 const MANY_CATEGORY_SLUGS = ["tableware", "tea-sets", "trays", "decor"] as const;
@@ -117,12 +146,17 @@ function manyProduct(index: number): SeedProduct {
   const noun = MANY_NOUNS[(index * 3 + 1) % MANY_NOUNS.length];
   const categorySlug = MANY_CATEGORY_SLUGS[index % MANY_CATEGORY_SLUGS.length];
   const name = `${adjective} ${noun} ${index + 1}`;
+  // A mix of top/position/end so the 40 extra rows interleave with everything already seeded,
+  // rather than only ever appending — real reordering for the arrange page's pagination QA.
+  const shopPlacement: Placement = index % 7 === 0 ? "top" : index % 5 === 0 ? "position" : "end";
   return {
     name,
     slug: `demo-many-${index + 1}`,
     categorySlug,
     price: `${1200 + (index % 20) * 150}.00`,
     status: index % 11 === 0 ? "draft" : index % 13 === 0 ? "archived" : "active",
+    shopPlacement,
+    shopPosition: shopPlacement === "position" ? 5 + (index % 10) : undefined,
   };
 }
 

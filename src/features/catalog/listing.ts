@@ -1,7 +1,7 @@
 /** Pure sort and pagination for the shop grid (no DB), so both are unit-tested. */
 import type { Paisa } from "@/features/pricing/money";
 
-export const SHOP_SORTS = ["newest", "price_asc", "price_desc"] as const;
+export const SHOP_SORTS = ["recommended", "newest", "price_asc", "price_desc"] as const;
 export type ShopSort = (typeof SHOP_SORTS)[number];
 
 export type SortableProduct = {
@@ -9,10 +9,17 @@ export type SortableProduct = {
   createdAt: Date;
   /** The price the card shows: the cheapest active variant's discounted unit price. */
   fromPrice: Paisa;
+  /** Staff-controlled display order (S10 phase 2b, `products.sort_order`). */
+  sortOrder: number;
 };
 
 function byNewest(a: SortableProduct, b: SortableProduct): number {
   return b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id;
+}
+
+/** Lower `sortOrder` first; ties (and products sharing a value) fall back to newest first. */
+function byRecommended(a: SortableProduct, b: SortableProduct): number {
+  return a.sortOrder - b.sortOrder || byNewest(a, b);
 }
 
 /** Equal prices fall back to newest first, so the order is stable across pages. */
@@ -22,7 +29,9 @@ export function sortProducts<T extends SortableProduct>(items: T[], sort: ShopSo
       ? (a: T, b: T) => a.fromPrice - b.fromPrice || byNewest(a, b)
       : sort === "price_desc"
         ? (a: T, b: T) => b.fromPrice - a.fromPrice || byNewest(a, b)
-        : byNewest;
+        : sort === "newest"
+          ? byNewest
+          : byRecommended;
   return [...items].sort(compare);
 }
 
