@@ -1,18 +1,19 @@
 import { cache } from "react";
 import {
-  getActiveCategories,
   getActiveListingProducts,
   getActiveProductBySlug,
   getActiveVariantsByProductIds,
   getFeaturedActiveProducts,
   getPrimaryImagesByProductId,
   getProductImages,
+  listAllCategories,
   type ListingProductRow,
   type ProductImageRow,
   type VariantRow,
 } from "@/features/catalog/repo";
 import { paginate, sortProducts, type ShopSort } from "@/features/catalog/listing";
 import { variantAttributesSchema } from "@/features/catalog/schemas";
+import { visibleCategoryIds } from "@/features/catalog/visibility";
 import { toDisplayPrice, type DisplayPrice } from "@/features/pricing/display";
 import { decimalToPaisa, type Paisa } from "@/features/pricing/money";
 import type { PricingProduct, VariantPrice } from "@/features/pricing/pricing";
@@ -88,22 +89,35 @@ function stockStateOf(stock: number): StockState {
 
 // Server Components in the same request share these via React's cache() (ARCHITECTURE.md §5);
 // pages render per request, so this never goes stale across a deploy or a settings change.
+/**
+ * Only the categories the storefront should show: a hidden category disappears, and so does an
+ * otherwise-active child of a hidden parent (S10 phase 1, one level of nesting) — the rule lives
+ * in `visibleCategoryIds` (pure, unit-tested) and is applied once here rather than per component.
+ */
 export const getStoreCategories = cache(async (): Promise<StoreCategory[]> => {
-  const rows = await getActiveCategories();
-  return rows.map((row) => ({
-    id: row.id,
-    parentId: row.parentId,
-    name: row.name,
-    slug: row.slug,
-    description: row.description,
-    imagePath: row.imagePath,
-  }));
+  const rows = await listAllCategories();
+  const visible = visibleCategoryIds(rows);
+  return rows
+    .filter((row) => visible.has(row.id))
+    .map((row) => ({
+      id: row.id,
+      parentId: row.parentId,
+      name: row.name,
+      slug: row.slug,
+      description: row.description,
+      imagePath: row.imagePath,
+    }));
 });
 
 export async function getCategoryBySlug(slug: string): Promise<StoreCategory | null> {
   const categories = await getStoreCategories();
   return categories.find((category) => category.slug === slug) ?? null;
 }
+
+/** The visible categories' ids, for filtering product listings/details by the same rule. */
+const getVisibleCategoryIds = cache(async (): Promise<Set<number>> => {
+  return new Set((await getStoreCategories()).map((category) => category.id));
+});
 
 type PricedListingProduct = {
   row: ListingProductRow;
@@ -115,19 +129,23 @@ type PricedListingProduct = {
   singleVariant: ProductCard["singleVariant"];
 };
 
-/** Prices every active variant; a product with no active variant has nothing to sell and is dropped. */
+/**
+ * Prices every active variant; a product with no active variant has nothing to sell and is
+ * dropped. Also drops a product whose category (or whose category's parent) is hidden — the
+ * single choke point both the shop grid and the home page's featured list pass through, so the
+ * active-category rule only has to be applied once (S10 phase 1).
+ */
 async function priceListingProducts(rows: ListingProductRow[]): Promise<PricedListingProduct[]> {
-  const [pricer, variants] = await Promise.all([
-    getVariantPricer(),
-    getActiveVariantsByProductIds(rows.map((row) => row.id)),
-  ]);
+  const [pricer, visibleIds] = await Promise.all([getVariantPricer(), getVisibleCategoryIds()]);
+  const visibleRows = rows.filter((row) => visibleIds.has(row.categoryId));
+  const variants = await getActiveVariantsByProductIds(visibleRows.map((row) => row.id));
 
   const variantsByProduct = new Map<number, VariantRow[]>();
   for (const variant of variants) {
     variantsByProduct.set(variant.productId, [...(variantsByProduct.get(variant.productId) ?? []), variant]);
   }
 
-  return rows.flatMap((row) => {
+  return visibleRows.flatMap((row) => {
     const product = toPricingProduct(row);
     const productVariants = variantsByProduct.get(row.id) ?? [];
     const prices = productVariants.map((variant) => priceOf(pricer, product, variant));
@@ -218,10 +236,11 @@ export const getProductDetail = cache(async (slug: string): Promise<ProductDetai
   const product = await getActiveProductBySlug(slug);
   if (!product) return null;
 
-  const [variants, images, pricer] = await Promise.all([
+  const [variants, images, pricer, visibleIds] = await Promise.all([
     getActiveVariantsByProductIds([product.id]),
     getProductImages(product.id),
     getVariantPricer(),
+    getVisibleCategoryIds(),
   ]);
   if (variants.length === 0) return null;
 
@@ -231,7 +250,7 @@ export const getProductDetail = cache(async (slug: string): Promise<ProductDetai
     name: product.name,
     shortDescription: product.shortDescription,
     description: product.description,
-    category: { name: product.categoryName, slug: product.categorySlug, isActive: product.categoryIsActive },
+    category: { name: product.categoryName, slug: product.categorySlug, isActive: visibleIds.has(product.categoryId) },
     images: images.map(toImage),
     optionName: optionNameOf(variants),
     variants: variants.map((variant) => ({

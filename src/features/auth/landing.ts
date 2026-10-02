@@ -3,16 +3,20 @@ import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 /**
  * Where a signed-in user lands, in the fixed priority order from ARCHITECTURE.md §4.5 / DATABASE.md
  * DB18: dashboard, orders (bank, then COD — one permission covers both pages, bank is just the
- * preferred landing), wholesale, products, settings, users, audit. Used for the post-login
+ * preferred landing), wholesale, products, categories, settings, users, audit. Used for the post-login
  * redirect, the `/panel` dashboard page when the viewer lacks `dashboard.view`, the login page
  * when already signed in, and the 403 page's back link. `settings` checks either settings
- * permission, since Admin and Developer each hold a different half of it.
+ * permission, since Admin and Developer each hold a different half of it. Categories sits after
+ * products (S10 phase 1): the Developer holds both by default and keeps landing on products
+ * unchanged; the entry exists so a role holding only `category.manage` still lands on its own page
+ * instead of falling back to `/panel/account`.
  */
 const PRIORITY: { permissions: PermissionKey[]; href: string }[] = [
   { permissions: [PERMISSIONS.DASHBOARD_VIEW], href: "/panel" },
   { permissions: [PERMISSIONS.ORDER_VIEW], href: "/panel/orders/bank" },
   { permissions: [PERMISSIONS.WHOLESALE_VIEW], href: "/panel/wholesale" },
   { permissions: [PERMISSIONS.PRODUCT_VIEW], href: "/panel/products" },
+  { permissions: [PERMISSIONS.CATEGORY_MANAGE], href: "/panel/categories" },
   { permissions: [PERMISSIONS.SETTINGS_BANK, PERMISSIONS.SETTINGS_MANAGE], href: "/panel/settings" },
   { permissions: [PERMISSIONS.USER_MANAGE], href: "/panel/users" },
   { permissions: [PERMISSIONS.AUDIT_VIEW], href: "/panel/audit-log" },

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { mkdir, rename, stat } from "node:fs/promises";
+import { mkdir, rename, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 import sharp, { type Metadata } from "sharp";
 import { env } from "@/server/env";
@@ -71,6 +71,23 @@ export async function processMediaImage(
   }
 
   return { path: `${subdir}/${basename}`, width, height };
+}
+
+/**
+ * Deletes the generated WebP sizes for a media image (CLAUDE.md #5: a category/product delete
+ * removes its image files safely, never outside `UPLOAD_DIR/media`). Missing files are ignored.
+ */
+export async function deleteMediaImage(mediaPath: string): Promise<void> {
+  const mediaRoot = path.join(env.UPLOAD_DIR, "media");
+  for (const width of WIDTHS) {
+    const filePath = path.resolve(mediaRoot, `${mediaPath}-${width}.webp`);
+    if (!filePath.startsWith(mediaRoot + path.sep)) continue;
+    try {
+      await unlink(filePath);
+    } catch {
+      // Already gone.
+    }
+  }
 }
 
 /**

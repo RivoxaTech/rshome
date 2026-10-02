@@ -6,8 +6,13 @@ export type CategoryRow = typeof categories.$inferSelect;
 export type ProductImageRow = typeof productImages.$inferSelect;
 export type VariantRow = typeof productVariants.$inferSelect;
 
-export function getActiveCategories(): Promise<CategoryRow[]> {
-  return db.select().from(categories).where(eq(categories.isActive, true)).orderBy(asc(categories.sortOrder));
+/**
+ * Every category, active or not (a handful of rows): `features/catalog/service.ts` computes which
+ * ones are actually visible (a hidden parent hides its children too, S10 phase 1), so the whole
+ * table is needed here rather than a `WHERE is_active` filter.
+ */
+export function listAllCategories(): Promise<CategoryRow[]> {
+  return db.select().from(categories).orderBy(asc(categories.sortOrder), asc(categories.id));
 }
 
 // What a product card and the discount lookup need; no long description (TEXT) in lists.
@@ -69,7 +74,6 @@ export async function getActiveProductBySlug(slug: string) {
       parentCategoryId: categories.parentId,
       categoryName: categories.name,
       categorySlug: categories.slug,
-      categoryIsActive: categories.isActive,
     })
     .from(products)
     .innerJoin(categories, eq(categories.id, products.categoryId))

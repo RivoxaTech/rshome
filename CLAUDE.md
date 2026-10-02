@@ -38,6 +38,7 @@ Deployed to cPanel shared hosting (Passenger) as a `standalone` build. Never rel
 
 ## UI rules
 Storefront must match the demo exactly: fonts, colours, spacing, icons, logo text, hover and scroll behaviour, mobile layout. Extract tokens into Tailwind config first. The storefront itself is unchanged by the panel work below. Admin and developer panels share the storefront's colour palette (the same CSS variables) — not a separate utilitarian look — but use their own type and corners: Inter, 0.5rem radii, not the storefront's serif/display pairing or its near-zero radius, and their layouts stay dense and functional (tables, forms), not storefront-style pages.
+Never render a `<form>` inside another `<form>`: it's invalid HTML and silently breaks which form a submit actually reaches. A dialog with its own Server Action (e.g. a delete confirmation) must render its `<form>` outside the page's own save/edit form, not as a child passed into it (see ARCHITECTURE.md D49).
 
 ## Workflow
 - Plan before code for each slice. Follow the sequence in `docs/BUILD_PLAN.md`.

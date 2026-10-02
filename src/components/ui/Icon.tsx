@@ -48,6 +48,10 @@ export const ICON_PATHS = {
   wholesale: "M3 8l9-5 9 5-9 5-9-5zM3 8v8l9 5 9-5V8M12 13v8M3 8l9 5M21 8l-9 5",
   // Average order value stat card (S16): an upward sparkline.
   trendingUp: "M3 17l6-6 4 4 8-9M15 6h6v6",
+  // Categories nav item (S10 phase 1): a price tag outline.
+  tag: "M3 11V3h8l10 10-8 8L3 11zM7 7h.01",
+  // Upload picker (S10 phase 1): an arrow into a tray.
+  upload: "M12 16V4M7 9l5-5 5 5M4 16v4h16v-4",
 } as const;
 
 /**

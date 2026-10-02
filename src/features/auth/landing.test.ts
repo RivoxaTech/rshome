@@ -24,4 +24,9 @@ describe("firstAllowedPath", () => {
     const permissions = new Set<PermissionKey>([PERMISSIONS.SETTINGS_MANAGE]);
     expect(firstAllowedPath(permissions)).toBe("/panel/settings");
   });
+
+  it("lands a partial role with only category.manage on categories", () => {
+    const permissions = new Set<PermissionKey>([PERMISSIONS.CATEGORY_MANAGE]);
+    expect(firstAllowedPath(permissions)).toBe("/panel/categories");
+  });
 });
