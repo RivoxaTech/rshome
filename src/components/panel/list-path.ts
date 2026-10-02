@@ -13,12 +13,13 @@
 export function buildListPath(
   basePath: string,
   tabSlug: string | undefined,
-  { q, page, pageSize }: { q?: string; page?: number; pageSize?: number },
+  { q, page, pageSize, category }: { q?: string; page?: number; pageSize?: number; category?: string },
   defaultPageSize: number,
 ): string {
   const params = new URLSearchParams();
   if (tabSlug) params.set("tab", tabSlug);
   if (q) params.set("q", q);
+  if (category) params.set("category", category);
   if (page && page > 1) params.set("page", String(page));
   if (pageSize && pageSize !== defaultPageSize) params.set("pageSize", String(pageSize));
   const search = params.toString();

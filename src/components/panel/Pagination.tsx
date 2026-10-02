@@ -22,6 +22,7 @@ export function Pagination({
   basePath,
   tabSlug,
   q,
+  category,
   page,
   pageCount,
   total,
@@ -31,6 +32,7 @@ export function Pagination({
   basePath: string;
   tabSlug?: string;
   q?: string;
+  category?: string;
   page: number;
   pageCount: number;
   total: number;
@@ -38,7 +40,7 @@ export function Pagination({
   defaultPageSize: number;
 }) {
   if (total === 0) return null;
-  const pageHref = (target: number) => buildListPath(basePath, tabSlug, { q, page: target, pageSize }, defaultPageSize);
+  const pageHref = (target: number) => buildListPath(basePath, tabSlug, { q, category, page: target, pageSize }, defaultPageSize);
   const start = (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
   const linkClass = "rounded-md px-2.5 py-1.5 hover:bg-secondary";

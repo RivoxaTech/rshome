@@ -4,7 +4,7 @@ import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { generateSlug } from "@/features/catalog/slug";
 import type { ParentOption, StaffActionResult } from "@/features/catalog/staff-service";
-import { CategoryImageField } from "@/components/panel/categories/CategoryImageField";
+import { MediaImageField } from "@/components/panel/MediaImageField";
 import { Switch } from "@/components/panel/Switch";
 
 export type CategoryFormValues = {
@@ -115,7 +115,13 @@ export function CategoryForm({
           <textarea id="description" name="description" defaultValue={initial.description ?? ""} rows={3} maxLength={500} className={inputClass} />
         </Field>
 
-        <CategoryImageField name="imagePath" initialPath={initial.imagePath} error={fieldErrors?.imagePath} />
+        <MediaImageField
+          name="imagePath"
+          subdir="categories"
+          initialPath={initial.imagePath}
+          helpText="WebP, up to 8 MB. Shown on the home page's Collections cards."
+          error={fieldErrors?.imagePath}
+        />
 
         <Field id="parentId" label="Parent category" error={fieldErrors?.parentId}>
           <select

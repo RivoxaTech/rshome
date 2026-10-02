@@ -46,7 +46,7 @@ describe.skipIf(!TEST_DATABASE_URL)("RBAC redesign (integration)", () => {
   let syncRolePermissions: typeof import("./repo").syncRolePermissions;
   let OrdersPageBody: typeof import("@/components/panel/orders/OrdersPageBody").OrdersPageBody;
   let OrderDetailPage: typeof import("@/components/panel/orders/detail/OrderDetailPage").OrderDetailPage;
-  let ProductsPage: (typeof import("@/app/panel/(protected)/products/page"))["default"];
+  let ProductsPageBody: typeof import("@/components/panel/products/ProductsPageBody").ProductsPageBody;
   let ordersActions: OrdersActions;
   let serveProof: (typeof import("@/app/api/files/proof/[id]/route"))["GET"];
   let createOrder: typeof import("@/features/checkout/service").createOrder;
@@ -79,7 +79,7 @@ describe.skipIf(!TEST_DATABASE_URL)("RBAC redesign (integration)", () => {
     ({ getPermissionKeysForRole, syncRolePermissions } = await import("./repo"));
     ({ OrdersPageBody } = await import("@/components/panel/orders/OrdersPageBody"));
     ({ OrderDetailPage } = await import("@/components/panel/orders/detail/OrderDetailPage"));
-    ProductsPage = (await import("@/app/panel/(protected)/products/page")).default;
+    ({ ProductsPageBody } = await import("@/components/panel/products/ProductsPageBody"));
     ordersActions = await import("@/app/panel/(protected)/orders/actions");
     ({ GET: serveProof } = await import("@/app/api/files/proof/[id]/route"));
     ({ createOrder } = await import("@/features/checkout/service"));
@@ -152,7 +152,7 @@ describe.skipIf(!TEST_DATABASE_URL)("RBAC redesign (integration)", () => {
     });
 
     it("can still open its own page (products)", async () => {
-      await expect(ProductsPage()).resolves.toBeDefined();
+      await expect(ProductsPageBody({ searchParams: {} })).resolves.toBeDefined();
     });
   });
 
@@ -160,7 +160,7 @@ describe.skipIf(!TEST_DATABASE_URL)("RBAC redesign (integration)", () => {
     beforeEach(() => signInAs(ADMIN_DEFAULT_PERMISSIONS));
 
     it("is refused on the products page", async () => {
-      await expectRedirectTo(() => ProductsPage(), "/panel/403");
+      await expectRedirectTo(() => ProductsPageBody({ searchParams: {} }), "/panel/403");
     });
 
     it("can still open its own orders counts", async () => {

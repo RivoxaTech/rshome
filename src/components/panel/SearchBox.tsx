@@ -10,6 +10,7 @@ export function SearchBox({
   initialQ,
   basePath,
   tabSlug,
+  category,
   pageSize,
   defaultPageSize,
   placeholder = "Search",
@@ -18,6 +19,7 @@ export function SearchBox({
   initialQ: string;
   basePath: string;
   tabSlug?: string;
+  category?: string;
   pageSize: number;
   defaultPageSize: number;
   placeholder?: string;
@@ -36,7 +38,7 @@ export function SearchBox({
   useEffect(() => {
     if (value === initialQ) return;
     const timer = setTimeout(() => {
-      router.replace(buildListPath(basePath, tabSlug, { q: value || undefined, pageSize }, defaultPageSize), { scroll: false });
+      router.replace(buildListPath(basePath, tabSlug, { q: value || undefined, category, pageSize }, defaultPageSize), { scroll: false });
     }, 300);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps

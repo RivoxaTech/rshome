@@ -8,6 +8,7 @@ export function RowsPerPageSelect({
   basePath,
   tabSlug,
   q,
+  category,
   pageSize,
   options,
   defaultPageSize,
@@ -15,6 +16,7 @@ export function RowsPerPageSelect({
   basePath: string;
   tabSlug?: string;
   q?: string;
+  category?: string;
   pageSize: number;
   options: readonly number[];
   defaultPageSize: number;
@@ -27,7 +29,7 @@ export function RowsPerPageSelect({
       <select
         value={pageSize}
         onChange={(event) =>
-          router.push(buildListPath(basePath, tabSlug, { q, page: 1, pageSize: Number(event.target.value) }, defaultPageSize))
+          router.push(buildListPath(basePath, tabSlug, { q, category, page: 1, pageSize: Number(event.target.value) }, defaultPageSize))
         }
         aria-label="Rows per page"
         className="border-input bg-background text-foreground rounded-md border px-1 py-1 text-xs"

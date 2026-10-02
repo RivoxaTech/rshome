@@ -7,12 +7,32 @@ import { Icon, ICON_PATHS } from "@/components/ui/Icon";
 /**
  * Uploads through `/api/panel/uploads` as soon as a file is picked (a Route Handler, not the
  * Server Action that saves the rest of the form — Server Actions cap their body at 1MB by
- * default, and a photo easily exceeds that). The hidden `imagePath` input carries the result the
- * save action actually needs; removing the file here only clears that input; the old file on disk
- * is only deleted once the save that replaces or clears it actually commits (features/catalog/staff-service.ts).
+ * default, and a photo easily exceeds that). Hidden inputs carry the result the save action
+ * actually needs: `${name}` (the path), and — when the save writes a `product_images` row, which
+ * requires non-null dimensions, unlike `categories.image_path` — `${name}Width`/`${name}Height`
+ * too. Removing the file here only clears those inputs; the old file on disk is only deleted once
+ * the save that replaces or clears it actually commits (features/catalog/*-staff-service.ts).
  */
-export function CategoryImageField({ name, initialPath, error }: { name: string; initialPath: string | null; error?: string }) {
+export function MediaImageField({
+  name,
+  subdir,
+  initialPath,
+  initialWidth = null,
+  initialHeight = null,
+  helpText,
+  error,
+}: {
+  name: string;
+  subdir: "categories" | "products";
+  initialPath: string | null;
+  initialWidth?: number | null;
+  initialHeight?: number | null;
+  helpText: string;
+  error?: string;
+}) {
   const [path, setPath] = useState(initialPath);
+  const [width, setWidth] = useState(initialWidth);
+  const [height, setHeight] = useState(initialHeight);
   const [busy, setBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -23,13 +43,16 @@ export function CategoryImageField({ name, initialPath, error }: { name: string;
     try {
       const body = new FormData();
       body.set("file", file);
+      body.set("subdir", subdir);
       const response = await fetch("/api/panel/uploads", { method: "POST", body });
-      const data = (await response.json()) as { path?: string; error?: string };
+      const data = (await response.json()) as { path?: string; width?: number; height?: number; error?: string };
       if (!response.ok || !data.path) {
         setUploadError(data.error ?? "Couldn't upload that image.");
         return;
       }
       setPath(data.path);
+      setWidth(data.width ?? null);
+      setHeight(data.height ?? null);
     } catch {
       setUploadError("Couldn't upload that image. Check your connection and try again.");
     } finally {
@@ -41,6 +64,8 @@ export function CategoryImageField({ name, initialPath, error }: { name: string;
     <div className="flex flex-col gap-2">
       <label className="text-sm font-medium">Image</label>
       <input type="hidden" name={name} value={path ?? ""} />
+      <input type="hidden" name={`${name}Width`} value={width ?? ""} />
+      <input type="hidden" name={`${name}Height`} value={height ?? ""} />
       <div className="flex items-center gap-3">
         {path ? (
           <Image src={path} alt="" width={80} height={80} className="h-20 w-20 rounded-lg object-cover" />
@@ -63,14 +88,18 @@ export function CategoryImageField({ name, initialPath, error }: { name: string;
             {path && (
               <button
                 type="button"
-                onClick={() => setPath(null)}
+                onClick={() => {
+                  setPath(null);
+                  setWidth(null);
+                  setHeight(null);
+                }}
                 className="text-muted-foreground hover:text-destructive text-xs font-medium"
               >
                 Remove
               </button>
             )}
           </div>
-          <p className="text-muted-foreground text-xs">WebP, up to 8 MB. Shown on the home page&apos;s Collections cards.</p>
+          <p className="text-muted-foreground text-xs">{helpText}</p>
         </div>
       </div>
       <input

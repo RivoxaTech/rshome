@@ -31,3 +31,14 @@ export function formatMoney(paisa: Paisa): string {
   const rupees = Math.round(paisa / 100);
   return `PKR ${rupees.toLocaleString("en-PK")}`;
 }
+
+/**
+ * How far `newPaisa` is from `oldPaisa`, as a signed percentage (e.g. 50 for a 50% increase, -50
+ * for a halving); `null` when there's no old price to compare against. Panel-only UI guard (S10
+ * phase 2: a product price edit over 50% either way asks for confirmation, a typo guard) — never a
+ * server-side rule.
+ */
+export function percentPriceChange(oldPaisa: Paisa, newPaisa: Paisa): number | null {
+  if (oldPaisa === 0) return null;
+  return ((newPaisa - oldPaisa) / Math.abs(oldPaisa)) * 100;
+}

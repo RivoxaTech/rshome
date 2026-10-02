@@ -52,6 +52,10 @@ export const ICON_PATHS = {
   tag: "M3 11V3h8l10 10-8 8L3 11zM7 7h.01",
   // Upload picker (S10 phase 1): an arrow into a tray.
   upload: "M12 16V4M7 9l5-5 5 5M4 16v4h16v-4",
+  // Featured toggle (S10 phase 2): a five-point star outline.
+  star: "M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.2-5.4 3.2 1.3-6L3.3 9.2l6.1-.6z",
+  // Archive quick action (S10 phase 2): a storage box with its lid.
+  archive: "M3 7h18v3H3zM5 10v10h14V10M9 14h6",
 } as const;
 
 /**

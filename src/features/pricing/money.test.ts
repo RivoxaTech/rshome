@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decimalToPaisa, formatMoney, paisaToDecimal } from "./money";
+import { decimalToPaisa, formatMoney, paisaToDecimal, percentPriceChange } from "./money";
 
 describe("decimalToPaisa", () => {
   it("converts a whole-rupee decimal", () => {
@@ -45,5 +45,26 @@ describe("formatMoney", () => {
   it("rounds half up to the nearest rupee", () => {
     expect(formatMoney(450050)).toBe("PKR 4,501");
     expect(formatMoney(450049)).toBe("PKR 4,500");
+  });
+});
+
+describe("percentPriceChange", () => {
+  it("is null with no old price to compare against", () => {
+    expect(percentPriceChange(0, 150000)).toBeNull();
+  });
+
+  it("is positive for an increase and negative for a decrease", () => {
+    expect(percentPriceChange(100000, 150000)).toBe(50);
+    expect(percentPriceChange(100000, 50000)).toBe(-50);
+  });
+
+  it("sits exactly at the 50% boundary either way", () => {
+    expect(percentPriceChange(100000, 150000)).toBe(50);
+    expect(percentPriceChange(100000, 150001)).toBeCloseTo(50.001, 2);
+    expect(percentPriceChange(100000, 149999)).toBeCloseTo(49.999, 2);
+  });
+
+  it("is zero for an unchanged price", () => {
+    expect(percentPriceChange(100000, 100000)).toBe(0);
   });
 });
