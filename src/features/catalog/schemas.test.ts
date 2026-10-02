@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultVariantCreateSchema,
-  defaultVariantEditSchema,
   productBackHrefSchema,
   productInputSchema,
   productListQuerySchema,
@@ -65,20 +64,6 @@ describe("defaultVariantCreateSchema", () => {
     expect(defaultVariantCreateSchema.safeParse({ sku: "RSH-001", stock: "10" }).success).toBe(true);
     expect(defaultVariantCreateSchema.safeParse({ sku: "", stock: "10" }).success).toBe(false);
     expect(defaultVariantCreateSchema.safeParse({ sku: "RSH-001", stock: "-1" }).success).toBe(false);
-  });
-});
-
-describe("defaultVariantEditSchema", () => {
-  it("extends create with an optional price override that defaults to null", () => {
-    const result = defaultVariantEditSchema.safeParse({ sku: "RSH-001", stock: "10", priceOverride: "" });
-    expect(result.success).toBe(true);
-    if (result.success) expect(result.data.priceOverride).toBeNull();
-  });
-
-  it("normalises a given price override the same way as the product price", () => {
-    const result = defaultVariantEditSchema.safeParse({ sku: "RSH-001", stock: "10", priceOverride: "999.5" });
-    expect(result.success).toBe(true);
-    if (result.success) expect(result.data.priceOverride).toBe("999.50");
   });
 });
 

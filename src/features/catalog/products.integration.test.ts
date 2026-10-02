@@ -214,7 +214,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       expect(await db.select().from(productImages).where(eq(productImages.productId, created.id!))).toHaveLength(0);
     });
 
-    it("updates general fields, the inline variant fields, and writes audit rows", async () => {
+    it("updates general fields and writes an audit row; the variant is untouched (phase 3a: variants have their own card and actions)", async () => {
       const created = await staffService.createProduct(validInput(categoryId), { id: actorId });
       if (!created.ok) throw new Error("unreachable");
 
@@ -228,8 +228,9 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       const [product] = await db.select().from(products).where(eq(products.id, created.id!));
       expect(product.name).toBe("Large Ceramic Vase");
 
+      // Stray sku/stock fields on a product save never reach the variant any more.
       const [variant] = await db.select().from(productVariants).where(eq(productVariants.productId, created.id!));
-      expect(variant).toMatchObject({ sku: "TEST-VASE-SKU-2", stock: 25 });
+      expect(variant).toMatchObject({ sku: "TEST-VASE-SKU", stock: 10 });
 
       expect(await auditRows(created.id!, "product.update")).toHaveLength(1);
     });
@@ -702,15 +703,11 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       if (!created.ok) throw new Error("unreachable");
 
       await expectRedirectTo(
-        () =>
-          panelActions.updateProductAction(
-            null,
-            form({ ...validInput(categoryId, { slug: "action-update-me", sku: "ACTION-UPDATE-SKU", stock: "3" }), id: created.id! }),
-          ),
+        () => panelActions.updateProductAction(null, form({ ...validInput(categoryId, { slug: "action-update-me", name: "Updated by action", price: "1600.00" }), id: created.id! })),
         "/panel/products",
       );
-      const [variant] = await db.select().from(productVariants).where(eq(productVariants.productId, created.id!));
-      expect(variant.stock).toBe(3);
+      const [product] = await db.select().from(products).where(eq(products.id, created.id!));
+      expect(product).toMatchObject({ name: "Updated by action", price: "1600.00" });
     });
 
     it("archiveProductAction and restoreProductAction toggle status without redirecting", async () => {

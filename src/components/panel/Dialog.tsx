@@ -9,11 +9,14 @@ export function Dialog({
   onClose,
   title,
   children,
+  widthClassName = "max-w-md",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  /** A Tailwind max-width class, for a dialog whose content wants more room than the default `max-w-md`. */
+  widthClassName?: string;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -38,7 +41,7 @@ export function Dialog({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="bg-card text-foreground border-border shadow-soft relative flex max-h-[85vh] w-full max-w-md flex-col rounded-lg border outline-none"
+        className={`bg-card text-foreground border-border shadow-soft relative flex max-h-[85vh] w-full ${widthClassName} flex-col rounded-lg border outline-none`}
       >
         <div className="border-border flex shrink-0 items-center justify-between border-b px-5 py-3.5">
           <h2 className="text-[15px] font-semibold">{title}</h2>
@@ -51,7 +54,7 @@ export function Dialog({
             <Icon d={ICON_PATHS.close} className="h-4 w-4" />
           </button>
         </div>
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        <div className="thin-scrollbar overflow-y-auto px-5 py-4">{children}</div>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { useActionState, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { generateSlug } from "@/features/catalog/slug";
 import { PLACEMENT_CREATE, PLACEMENT_EDIT, PRODUCT_STATUSES, type PlacementCreate, type PlacementEdit, type ProductStatus } from "@/features/catalog/schemas";
-import type { CategoryGroup, ProductVariantRow } from "@/features/catalog/products-staff-repo";
+import type { CategoryGroup } from "@/features/catalog/products-staff-repo";
 import type { StaffActionResult } from "@/features/catalog/staff-service";
 import { decimalToPaisa, percentPriceChange } from "@/features/pricing/money";
 import { Listbox, type ListboxItem } from "@/components/panel/Listbox";
@@ -27,7 +27,8 @@ export type ProductFormValues = {
   imageHeight: number | null;
 };
 
-export type DefaultVariantFormValues = { sku: string; stock: number; priceOverride: string | null };
+/** The create form's one "Default" variant; on edit, variants live in their own card (`VariantsSection`). */
+export type DefaultVariantFormValues = { sku: string; stock: number };
 
 const STATUS_LABELS: Record<ProductStatus, string> = { draft: "Draft", active: "Active", archived: "Archived" };
 
@@ -118,8 +119,7 @@ export function ProductForm({
   mode,
   initial,
   categoryGroups,
-  variant,
-  multipleVariantsSummary,
+  defaultVariant,
   shopPosition,
   featuredPosition,
   action,
@@ -129,10 +129,8 @@ export function ProductForm({
   mode: "create" | "edit";
   initial: ProductFormValues;
   categoryGroups: CategoryGroup[];
-  /** The one default variant's editable fields — present on create, and on edit while it's still the only variant. */
-  variant: DefaultVariantFormValues | null;
-  /** More than one variant (the 8 seeded samples): a read-only summary instead of inline fields. */
-  multipleVariantsSummary: ProductVariantRow[] | null;
+  /** Create only: the "Default" variant's SKU and stock, inserted with the product. Null on edit (the variants card owns them). */
+  defaultVariant: DefaultVariantFormValues | null;
   /** Current shop-order position (`current` is null on create). */
   shopPosition: PlacementPosition;
   /** Current featured-order position (`current` is null on create, or on edit while not yet featured). */
@@ -312,43 +310,24 @@ export function ProductForm({
           {isFeatured && <PlacementField legend="Show in featured strip" fieldPrefix="featured" mode={mode} position={featuredPosition} error={fieldErrors?.featuredPosition} />}
         </div>
 
-        <div className="border-border flex flex-col gap-3 border-t pt-4">
-          <h2 className="text-sm font-semibold">Default variant</h2>
-          {variant ? (
+        {defaultVariant && (
+          <div className="border-border flex flex-col gap-3 border-t pt-4">
+            <h2 className="text-sm font-semibold">Default variant</h2>
             <div className="flex flex-col gap-4 sm:flex-row">
               <div className="flex-1">
                 <Field id="sku" label="SKU" error={fieldErrors?.sku}>
-                  <input id="sku" name="sku" defaultValue={variant.sku} required maxLength={64} className={`${inputClass} font-mono`} />
+                  <input id="sku" name="sku" defaultValue={defaultVariant.sku} required maxLength={64} className={`${inputClass} font-mono`} />
                 </Field>
               </div>
               <div className="flex-1">
                 <Field id="stock" label="Stock" error={fieldErrors?.stock}>
-                  <input id="stock" name="stock" type="number" defaultValue={variant.stock} min={0} step={1} required className={inputClass} />
+                  <input id="stock" name="stock" type="number" defaultValue={defaultVariant.stock} min={0} step={1} required className={inputClass} />
                 </Field>
               </div>
             </div>
-          ) : null}
-          {mode === "edit" && variant && (
-            <Field id="priceOverride" label="Price override (PKR)" error={fieldErrors?.priceOverride}>
-              <input id="priceOverride" name="priceOverride" defaultValue={variant.priceOverride ?? ""} inputMode="decimal" className={inputClass} />
-              <p className="text-muted-foreground text-xs">Leave blank to use the product price above.</p>
-            </Field>
-          )}
-          {multipleVariantsSummary && (
-            <div className="flex flex-col gap-2">
-              <p className="text-muted-foreground text-xs">This product has {multipleVariantsSummary.length} variants. Manage variants in phase 3.</p>
-              <ul className="border-border divide-border flex flex-col divide-y rounded-md border text-sm">
-                {multipleVariantsSummary.map((row) => (
-                  <li key={row.id} className="flex items-center justify-between px-3 py-2">
-                    <span>{row.label}</span>
-                    <span className="text-muted-foreground font-mono text-xs">{row.sku}</span>
-                    <span className="text-muted-foreground text-xs">{row.stock} in stock</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+            <p className="text-muted-foreground text-xs">Colour/size variants, price overrides and more SKUs are added on the edit page after the product is created.</p>
+          </div>
+        )}
 
         {formError && <p className="text-destructive text-sm">{formError}</p>}
 

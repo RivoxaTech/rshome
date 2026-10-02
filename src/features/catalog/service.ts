@@ -12,7 +12,7 @@ import {
   type VariantRow,
 } from "@/features/catalog/repo";
 import { paginate, sortProducts, type ShopSort } from "@/features/catalog/listing";
-import { variantAttributesSchema } from "@/features/catalog/schemas";
+import { parseVariantAttributes } from "@/features/catalog/variants";
 import { visibleCategoryIds } from "@/features/catalog/visibility";
 import { toDisplayPrice, type DisplayPrice } from "@/features/pricing/display";
 import { decimalToPaisa, type Paisa } from "@/features/pricing/money";
@@ -213,19 +213,11 @@ export async function listProducts(options: {
   };
 }
 
-function parseAttributes(raw: string): Record<string, string> {
-  try {
-    return variantAttributesSchema.parse(JSON.parse(raw));
-  } catch {
-    return {};
-  }
-}
-
 /** "Size" when every variant has exactly one attribute and it's the same one; otherwise "Option". */
 function optionNameOf(variants: VariantRow[]): string {
   const keys = new Set<string>();
   for (const variant of variants) {
-    const variantKeys = Object.keys(parseAttributes(variant.attributes));
+    const variantKeys = Object.keys(parseVariantAttributes(variant.attributes));
     if (variantKeys.length !== 1) return "Option";
     keys.add(variantKeys[0]);
   }

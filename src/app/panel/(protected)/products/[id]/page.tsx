@@ -4,6 +4,7 @@ import { ArchiveRestoreButton } from "@/components/panel/products/ProductRowActi
 import { DeleteProductDialog } from "@/components/panel/products/DeleteProductDialog";
 import { ProductForm } from "@/components/panel/products/ProductForm";
 import { ProductFormHeader } from "@/components/panel/products/ProductFormHeader";
+import { VariantsSection } from "@/components/panel/products/variants/VariantsSection";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { productBackHrefSchema } from "@/features/catalog/schemas";
 import { checkProductDeletable, getActiveCategoryGroups, getProductForEdit } from "@/features/catalog/products-staff-service";
@@ -27,14 +28,14 @@ export default async function EditProductPage({
 
   const formData = await getProductForEdit(productId);
   if (!formData) notFound();
-  const { product, imagePath, imageWidth, imageHeight, variant, multipleVariants, salePrice, shopPosition, shopTotal, featuredPosition, featuredTotal } = formData;
+  const { product, imagePath, imageWidth, imageHeight, variants, salePrice, shopPosition, shopTotal, featuredPosition, featuredTotal } = formData;
 
   const [categoryGroups, deleteGuard] = await Promise.all([getActiveCategoryGroups(product.categoryId), checkProductDeletable(productId)]);
 
   return (
     <>
       <PanelPageTitle title={product.name} />
-      <ProductFormHeader title={product.name} backHref={backHref} salePrice={salePrice} />
+      <ProductFormHeader title={product.name} backHref={backHref} salePrice={salePrice} variantCount={variants.length} />
       <ProductForm
         // Remounts fresh whenever the row changes underneath it (e.g. the delete dialog's "Archive
         // instead" updates the status without navigating away) — otherwise the controlled fields'
@@ -43,8 +44,7 @@ export default async function EditProductPage({
         mode="edit"
         action={updateProductAction}
         categoryGroups={categoryGroups}
-        variant={variant ? { sku: variant.sku, stock: variant.stock, priceOverride: variant.priceOverride } : null}
-        multipleVariantsSummary={multipleVariants}
+        defaultVariant={null}
         shopPosition={{ current: shopPosition, total: shopTotal }}
         featuredPosition={{ current: featuredPosition, total: featuredTotal }}
         backHref={backHref}
@@ -70,6 +70,11 @@ export default async function EditProductPage({
           </div>
         }
       />
+
+      {/* Its own card below and outside the save form: every variant control is a `<form>` of its own (D49, D53). */}
+      <div className="mt-6">
+        <VariantsSection product={{ id: product.id, name: product.name, price: product.price, status: product.status }} variants={variants} />
+      </div>
     </>
   );
 }

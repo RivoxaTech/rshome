@@ -58,6 +58,10 @@ export const ICON_PATHS = {
   archive: "M3 7h18v3H3zM5 10v10h14V10M9 14h6",
   // Drag handle (S10 phase 2b, /panel/products/arrange): a six-dot grip.
   grip: "M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01",
+  // Edit quick action (S10 phase 3a, the variants card): a pencil outline.
+  edit: "M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z",
+  // Activate/deactivate toggle (S10 phase 3a, the variants card): a power glyph.
+  power: "M12 2v9M18.4 6.6a8 8 0 11-12.8 0",
 } as const;
 
 /**

@@ -6,10 +6,8 @@ import Image from "next/image";
 import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Listbox, type ListboxItem } from "@/components/panel/Listbox";
-import { useStaffAction } from "@/components/panel/use-staff-action";
+import { MoveToControl } from "@/components/panel/MoveToControl";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
-import { PLACEMENT_CREATE, type PlacementCreate } from "@/features/catalog/schemas";
 import type { ArrangeItem } from "@/features/catalog/arrange-service";
 import {
   moveFeaturedProductAction,
@@ -22,45 +20,11 @@ export type ArrangeScope = { kind: "shop"; categoryId?: number } | { kind: "feat
 
 const STATUS_LABEL: Record<ArrangeItem["status"], string> = { active: "Active", draft: "Draft", archived: "Archived" };
 
-/** The per-row "Move to top/end/position N" quick action — the usual tiny-form quick action shape. */
-function MoveToControl({ scope, item, total }: { scope: ArrangeScope; item: ArrangeItem; total: number }) {
-  const router = useRouter();
-  const action = scope.kind === "shop" ? moveShopProductAction : moveFeaturedProductAction;
-  const { formAction, pending } = useStaffAction(action, () => router.refresh());
-  const [placement, setPlacement] = useState<PlacementCreate>("end");
-  const placementItems: ListboxItem[] = PLACEMENT_CREATE.map((option) => ({
-    value: option,
-    label: option === "top" ? "Top" : option === "end" ? "End" : "Position",
-  }));
-
-  return (
-    <form action={formAction} className="flex items-center gap-1.5">
-      <input type="hidden" name="productId" value={item.id} />
-      {scope.kind === "shop" && scope.categoryId !== undefined && <input type="hidden" name="categoryId" value={scope.categoryId} />}
-      <Listbox
-        name="placement"
-        value={placement}
-        items={placementItems}
-        ariaLabel={`Move ${item.name} to`}
-        className="w-24 shrink-0 text-xs [&_summary]:px-1.5 [&_summary]:py-1"
-        onChange={(value) => setPlacement(value as PlacementCreate)}
-      />
-      {placement === "position" && (
-        <input
-          type="number"
-          name="position"
-          min={1}
-          max={total}
-          defaultValue={1}
-          aria-label={`Position for ${item.name}`}
-          className="border-input bg-background w-14 rounded-md border px-1.5 py-1 text-xs"
-        />
-      )}
-      <button type="submit" disabled={pending} className="border-input hover:bg-secondary rounded-md border px-2 py-1 text-xs font-medium disabled:opacity-50">
-        {pending ? "…" : "Move"}
-      </button>
-    </form>
-  );
+/** The per-row move, through the shared `MoveToControl` (S10 phase 3a generalised it out of here for the variants card). */
+function ArrangeMove({ scope, item, total }: { scope: ArrangeScope; item: ArrangeItem; total: number }) {
+  const hiddenFields: Record<string, string | number> = { productId: item.id };
+  if (scope.kind === "shop" && scope.categoryId !== undefined) hiddenFields.categoryId = scope.categoryId;
+  return <MoveToControl action={scope.kind === "shop" ? moveShopProductAction : moveFeaturedProductAction} hiddenFields={hiddenFields} total={total} itemName={item.name} />;
 }
 
 function ArrangeRow({ scope, item, total }: { scope: ArrangeScope; item: ArrangeItem; total: number }) {
@@ -87,7 +51,7 @@ function ArrangeRow({ scope, item, total }: { scope: ArrangeScope; item: Arrange
         <p className={`truncate text-sm ${muted ? "text-muted-foreground" : "font-medium"}`}>{item.name}</p>
         {muted && <p className="text-muted-foreground text-xs">{STATUS_LABEL[item.status]}</p>}
       </div>
-      <MoveToControl scope={scope} item={item} total={total} />
+      <ArrangeMove scope={scope} item={item} total={total} />
     </li>
   );
 }

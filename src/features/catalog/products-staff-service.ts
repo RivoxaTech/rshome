@@ -1,10 +1,9 @@
 /**
  * The panel's products CRUD (S10 phase 2, BUILD_PLAN.md S10): every write locks the row(s) it
  * touches (`SELECT … FOR UPDATE`) and records `audit_logs` rows (CLAUDE.md #10), mirroring
- * `staff-service.ts` (categories, S10 phase 1). A product gets exactly one variant in this phase
- * (full variant CRUD is phase 3): created alongside it, and editable inline only while it's still
- * the product's only variant — a product with several (the 8 seeded samples) shows a read-only
- * summary instead.
+ * `staff-service.ts` (categories, S10 phase 1). A new product gets one "Default" variant (SKU +
+ * stock) in the same transaction; everything else about variants is `variants-staff-service.ts`
+ * (phase 3a), surfaced on the edit page as its own card outside the product form.
  */
 import type { ZodError } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
@@ -21,13 +20,11 @@ import type { StaffActionResult } from "./staff-service";
 export type { StaffActionResult };
 import {
   defaultVariantCreateSchema,
-  defaultVariantEditSchema,
   featuredPlacementCreateSchema,
   featuredPlacementEditSchema,
   productInputSchema,
   shopPlacementCreateSchema,
   shopPlacementEditSchema,
-  type DefaultVariantEditInput,
   type FeaturedPlacementEditInput,
   type FeaturedPlacementInput,
   type ProductInput,
@@ -40,7 +37,6 @@ import {
   countOrderItemsByProductId,
   deleteProduct,
   deleteProductImagesByProductId,
-  deleteVariantsByProductId,
   getActiveCategoryGroups,
   getActiveStockSumsByProductIds,
   getCategoryByIdActive,
@@ -52,25 +48,21 @@ import {
   getPrimaryImageByProductId,
   getProductById,
   getProductStatusCounts,
-  getVariantsByProductId,
   insertProduct,
   insertProductImage,
-  insertVariant,
   listProductsPage,
   lockOrderedFeaturedProductIds,
   lockOrderedProductIds,
   lockProductById,
-  lockVariantById,
-  skuInUse,
   slugInUse,
   updateProduct,
   updateProductFeaturedSortOrders,
   updateProductImage,
   updateProductSortOrders,
-  updateVariant,
   type ProductRow,
-  type ProductVariantRow,
 } from "./products-staff-repo";
+import { deleteVariantsByProductId, insertVariant, skuInUse } from "./variants-staff-repo";
+import { getPanelVariants, type PanelVariant } from "./variants-staff-service";
 
 export { getActiveCategoryGroups, getProductStatusCounts };
 
@@ -103,8 +95,9 @@ async function assertSlugAvailable(slug: string, excludeId?: number): Promise<vo
   if (await slugInUse(slug, excludeId)) throw new ProductActionError("That slug is already in use. Choose another.");
 }
 
-async function assertSkuAvailable(sku: string, excludeId?: number): Promise<void> {
-  if (await skuInUse(sku, excludeId)) throw new ProductActionError("That SKU is already in use. Choose another.");
+/** Only the create form posts a SKU (its "Default" variant); every later SKU change goes through the variants card. */
+async function assertSkuAvailable(sku: string): Promise<void> {
+  if (await skuInUse(sku)) throw new ProductActionError("That SKU is already in use. Choose another.");
 }
 
 /** A category must exist and be active — unless it's the product's own current category, kept on save even if since hidden. */
@@ -251,10 +244,8 @@ export type ProductEditFormData = {
   imagePath: string | null;
   imageWidth: number | null;
   imageHeight: number | null;
-  /** Set only while this product has exactly one variant — its fields are then editable inline. */
-  variant: ProductVariantRow | null;
-  /** Set only when it has more than one (the 8 seeded samples) — shown as a read-only summary. */
-  multipleVariants: ProductVariantRow[] | null;
+  /** Every variant in display order, for the edit page's variants card (S10 phase 3a). */
+  variants: PanelVariant[];
   salePrice: SaleInfo;
   /** 1-based current position in the shop order, and how many products share that order. */
   shopPosition: number;
@@ -268,7 +259,7 @@ export async function getProductForEdit(id: number): Promise<ProductEditFormData
   const product = await getProductById(id);
   if (!product) return null;
   const [variants, images, parentCategoryId, shopOrder, featuredOrder] = await Promise.all([
-    getVariantsByProductId(db, id),
+    getPanelVariants(id),
     getPrimaryImagesByProductId([id]),
     getCategoryParentId(product.categoryId),
     getOrderedProductIds(db),
@@ -282,8 +273,7 @@ export async function getProductForEdit(id: number): Promise<ProductEditFormData
     imagePath: image?.path ?? null,
     imageWidth: image?.width ?? null,
     imageHeight: image?.height ?? null,
-    variant: variants.length === 1 ? variants[0] : null,
-    multipleVariants: variants.length > 1 ? variants : null,
+    variants,
     salePrice: saleInfoMap.get(id) ?? null,
     shopPosition: shopOrder.indexOf(id) + 1,
     shopTotal: shopOrder.length,
@@ -393,17 +383,6 @@ export async function updateProductById(id: number, rawInput: unknown, actor: Ac
       await assertSlugAvailable(input.slug, id);
       await assertCategoryValid(input.categoryId, product.categoryId);
 
-      const variants = await getVariantsByProductId(tx, id);
-      let variant: ProductVariantRow | null = null;
-      let variantInput: DefaultVariantEditInput | null = null;
-      if (variants.length === 1) {
-        const parsedVariant = defaultVariantEditSchema.safeParse(rawInput);
-        if (!parsedVariant.success) throw new ProductActionError(parsedVariant.error.issues[0]?.message ?? "Please check the variant fields.");
-        variantInput = parsedVariant.data;
-        variant = (await lockVariantById(tx, variants[0].id)) ?? null;
-        if (variant) await assertSkuAvailable(variantInput.sku, variant.id);
-      }
-
       const now = new Date();
       await updateProduct(tx, id, {
         categoryId: input.categoryId,
@@ -417,10 +396,6 @@ export async function updateProductById(id: number, rawInput: unknown, actor: Ac
         status: input.status,
         updatedAt: now,
       });
-
-      if (variant && variantInput) {
-        await updateVariant(tx, variant.id, { sku: variantInput.sku, stock: variantInput.stock, priceOverride: variantInput.priceOverride, updatedAt: now });
-      }
 
       await insertAuditLog(tx, {
         userId: actor.id,
@@ -490,7 +465,7 @@ export async function updateProductById(id: number, rawInput: unknown, actor: Ac
   } catch (error) {
     if (error instanceof ProductActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
     if ((error as { errno?: number }).errno === DUPLICATE_ENTRY) {
-      return { ok: false, error: "That slug or SKU is already in use. Choose another." };
+      return { ok: false, error: "That slug is already in use. Choose another.", fieldErrors: { slug: "That slug is already in use. Choose another." } };
     }
     throw error;
   }

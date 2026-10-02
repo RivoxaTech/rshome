@@ -4,7 +4,7 @@ import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
 import type { SaleInfo } from "@/features/catalog/products-staff-service";
 
 /** The back chevron + title row shared by the new/edit product pages (mirrors the category form header). */
-export function ProductFormHeader({ title, backHref, salePrice }: { title: string; backHref: string; salePrice?: SaleInfo }) {
+export function ProductFormHeader({ title, backHref, salePrice, variantCount }: { title: string; backHref: string; salePrice?: SaleInfo; variantCount?: number }) {
   return (
     <div className="mb-1 flex flex-wrap items-center gap-2">
       <Link
@@ -15,6 +15,11 @@ export function ProductFormHeader({ title, backHref, salePrice }: { title: strin
         <Icon d={ICON_PATHS.chevronLeft} className="h-4 w-4" />
       </Link>
       <h1 className="text-base font-semibold">{title}</h1>
+      {variantCount !== undefined && (
+        <span className="text-muted-foreground text-xs">
+          · {variantCount} {variantCount === 1 ? "variant" : "variants"}
+        </span>
+      )}
       {salePrice && (
         <span className="flex items-center gap-1.5 text-xs">
           <span className="font-medium text-red-600 dark:text-red-400">{formatMoney(decimalToPaisa(salePrice.discounted))}</span>

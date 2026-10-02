@@ -21,8 +21,7 @@ export default async function NewProductPage({ searchParams }: { searchParams: P
         mode="create"
         action={createProductAction}
         categoryGroups={categoryGroups}
-        variant={{ sku: "", stock: 0, priceOverride: null }}
-        multipleVariantsSummary={null}
+        defaultVariant={{ sku: "", stock: 0 }}
         shopPosition={{ current: null, total: shopTotal }}
         featuredPosition={{ current: null, total: featuredTotal }}
         backHref={backHref}

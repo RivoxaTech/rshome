@@ -3,7 +3,10 @@
  *
  *   npm run db:seed:products            places 6 tagged products (a mix of statuses, categories
  *                                        and one featured) through the real `createProduct`
- *                                        service, so the transaction/audit path is exercised.
+ *                                        service, so the transaction/audit path is exercised;
+ *                                        three of them then get 2-4 colour/size variants through
+ *                                        the real `createVariant` service (phase 3a), one with a
+ *                                        price override, one sold out, one inactive.
  *                                        `-- --many` adds 40 more (varied names) for pagination
  *                                        testing.
  *   npm run db:reset:products            removes exactly the tagged products (their variants and
@@ -16,6 +19,7 @@
 import "../src/server/load-env";
 import { eq, inArray, like } from "drizzle-orm";
 import { createProduct, type StaffActionResult } from "../src/features/catalog/products-staff-service";
+import { createVariant } from "../src/features/catalog/variants-staff-service";
 import { db, pool } from "../src/server/db/client";
 import { roles, users } from "../src/server/db/schema/access-control";
 import { categories, productImages, productVariants, products } from "../src/server/db/schema/catalog";
@@ -81,9 +85,26 @@ type SeedProduct = {
   shopPosition?: number;
   featuredPlacement?: Placement;
   featuredPosition?: number;
+  /** Extra variants added after the product's "Default" one (S10 phase 3a). */
+  variants?: SeedVariant[];
 };
 
-async function placeProduct(product: SeedProduct, sku: string, stock: number, actorId: number): Promise<void> {
+/** A demo variant, posted exactly as the Add-variant dialog would (indexed attribute fields). */
+type SeedVariant = { sku: string; attributes: Record<string, string>; stock: number; priceOverride?: string; isActive?: boolean };
+
+async function placeVariants(productId: number, variants: SeedVariant[], actorId: number): Promise<void> {
+  for (const variant of variants) {
+    const attributeFields = Object.fromEntries(Object.entries(variant.attributes).flatMap(([key, value], index) => [[`attributeKey${index}`, key], [`attributeValue${index}`, value]]));
+    const result = await createVariant(
+      productId,
+      { label: "", sku: variant.sku, priceOverride: variant.priceOverride ?? "", stock: String(variant.stock), weightGrams: "", isActive: variant.isActive === false ? "false" : "true", ...attributeFields },
+      { id: actorId },
+    );
+    if (!result.ok) throw new Error(`createVariant failed for "${variant.sku}": ${result.error}`);
+  }
+}
+
+async function placeProduct(product: SeedProduct, sku: string, stock: number, actorId: number): Promise<number> {
   const categoryId = await getCategoryIdBySlug(product.categorySlug);
   const result: StaffActionResult = await createProduct(
     {
@@ -109,6 +130,8 @@ async function placeProduct(product: SeedProduct, sku: string, stock: number, ac
     { id: actorId },
   );
   if (!result.ok) throw new Error(`createProduct failed for "${product.name}": ${result.error}`);
+  if (product.variants) await placeVariants(result.id!, product.variants, actorId);
+  return result.id!;
 }
 
 const BASE_PRODUCTS: SeedProduct[] = [
@@ -120,9 +143,41 @@ const BASE_PRODUCTS: SeedProduct[] = [
     status: "active",
     isFeatured: true,
     shopPlacement: "top",
+    // Colour + Size pairs: a price override, a sold-out one and an inactive one, for the variants card and the storefront picker.
+    variants: [
+      { sku: "DEMO-BOWL-BLUE-S", attributes: { Colour: "Blue", Size: "Small" }, stock: 8 },
+      { sku: "DEMO-BOWL-BLUE-L", attributes: { Colour: "Blue", Size: "Large" }, stock: 3, priceOverride: "2600.00" },
+      { sku: "DEMO-BOWL-GREEN-S", attributes: { Colour: "Green", Size: "Small" }, stock: 0 },
+      { sku: "DEMO-BOWL-GREEN-L", attributes: { Colour: "Green", Size: "Large" }, stock: 5, priceOverride: "2600.00", isActive: false },
+    ],
   },
-  { name: "Brass Candle Holder", slug: "demo-brass-candle-holder", categorySlug: "decor", price: "1800.00", status: "active", isFeatured: true, featuredPlacement: "top" },
-  { name: "Linen Table Runner", slug: "demo-linen-table-runner", categorySlug: "tableware", price: "1500.00", status: "active", shopPlacement: "position", shopPosition: 3 },
+  {
+    name: "Brass Candle Holder",
+    slug: "demo-brass-candle-holder",
+    categorySlug: "decor",
+    price: "1800.00",
+    status: "active",
+    isFeatured: true,
+    featuredPlacement: "top",
+    variants: [
+      { sku: "DEMO-CANDLE-ANTIQUE", attributes: { Finish: "Antique" }, stock: 6 },
+      { sku: "DEMO-CANDLE-POLISHED", attributes: { Finish: "Polished" }, stock: 2, priceOverride: "1950.00" },
+    ],
+  },
+  {
+    name: "Linen Table Runner",
+    slug: "demo-linen-table-runner",
+    categorySlug: "tableware",
+    price: "1500.00",
+    status: "active",
+    shopPlacement: "position",
+    shopPosition: 3,
+    variants: [
+      { sku: "DEMO-RUNNER-NATURAL", attributes: { Colour: "Natural" }, stock: 12 },
+      { sku: "DEMO-RUNNER-CHARCOAL", attributes: { Colour: "Charcoal" }, stock: 4 },
+      { sku: "DEMO-RUNNER-SAGE", attributes: { Colour: "Sage" }, stock: 0 },
+    ],
+  },
   { name: "Copper Tea Set", slug: "demo-copper-tea-set", categorySlug: "tea-sets", price: "4500.00", status: "draft" },
   { name: "Rattan Serving Tray", slug: "demo-rattan-serving-tray", categorySlug: "trays", price: "2600.00", status: "archived" },
   {

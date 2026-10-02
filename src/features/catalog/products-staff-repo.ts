@@ -1,9 +1,11 @@
 /**
  * The panel's products CRUD (S10 phase 2): DB access only, no business rules (ARCHITECTURE.md §2)
  * — `products-staff-service.ts` owns the slug/SKU/category checks, audit rows and the delete guard.
- * Mirrors `staff-repo.ts` (categories, S10 phase 1).
+ * Mirrors `staff-repo.ts` (categories, S10 phase 1). Variant queries moved to
+ * `variants-staff-repo.ts` in phase 3a.
  */
 import { and, asc, count, desc, eq, inArray, like, ne, or, sql, sum, type SQL } from "drizzle-orm";
+// Variant queries (incl. the create form's "Default" variant) live in `variants-staff-repo.ts` (S10 phase 3a).
 import { db, type DbClient } from "@/server/db/client";
 import { categories, productImages, productVariants, products } from "@/server/db/schema/catalog";
 import { orderItems } from "@/server/db/schema/orders";
@@ -11,8 +13,6 @@ import type { ProductTab } from "./schemas";
 
 export type ProductRow = typeof products.$inferSelect;
 export type ProductUpdate = Partial<typeof products.$inferInsert>;
-export type ProductVariantRow = typeof productVariants.$inferSelect;
-export type ProductVariantUpdate = Partial<typeof productVariants.$inferInsert>;
 export type ProductImageRow = typeof productImages.$inferSelect;
 
 /** LIKE treats `%` and `_` as wildcards and `\` as its escape: a search is matched literally. */
@@ -111,11 +111,6 @@ export async function deleteProduct(tx: DbClient, id: number): Promise<void> {
   await tx.delete(products).where(eq(products.id, id));
 }
 
-/** Deleted before the product row itself: neither FK has `ON DELETE CASCADE`. */
-export async function deleteVariantsByProductId(tx: DbClient, productId: number): Promise<void> {
-  await tx.delete(productVariants).where(eq(productVariants.productId, productId));
-}
-
 /** Returns the removed rows' media paths, so the caller can delete their on-disk files after commit. */
 export async function deleteProductImagesByProductId(tx: DbClient, productId: number): Promise<string[]> {
   const rows = await tx.select({ path: productImages.path }).from(productImages).where(eq(productImages.productId, productId));
@@ -127,33 +122,6 @@ export async function deleteProductImagesByProductId(tx: DbClient, productId: nu
 export async function countOrderItemsByProductId(productId: number): Promise<number> {
   const [row] = await db.select({ count: count() }).from(orderItems).where(eq(orderItems.productId, productId));
   return row.count;
-}
-
-// ── The default variant ─────────────────────────────────────────────────────────────────────
-
-/** Takes a `DbClient` (pool or an open transaction) so a caller already inside a transaction sees its own uncommitted writes. */
-export async function getVariantsByProductId(client: DbClient, productId: number): Promise<ProductVariantRow[]> {
-  return client.select().from(productVariants).where(eq(productVariants.productId, productId)).orderBy(asc(productVariants.sortOrder), asc(productVariants.id));
-}
-
-export async function lockVariantById(tx: DbClient, id: number): Promise<ProductVariantRow | undefined> {
-  const [row] = await tx.select().from(productVariants).where(eq(productVariants.id, id)).for("update");
-  return row;
-}
-
-export async function skuInUse(sku: string, excludeId?: number): Promise<boolean> {
-  const where = excludeId ? and(eq(productVariants.sku, sku), ne(productVariants.id, excludeId)) : eq(productVariants.sku, sku);
-  const [row] = await db.select({ id: productVariants.id }).from(productVariants).where(where).limit(1);
-  return !!row;
-}
-
-export async function insertVariant(tx: DbClient, values: typeof productVariants.$inferInsert): Promise<number> {
-  const [result] = await tx.insert(productVariants).values(values);
-  return result.insertId;
-}
-
-export async function updateVariant(tx: DbClient, id: number, values: ProductVariantUpdate): Promise<void> {
-  await tx.update(productVariants).set(values).where(eq(productVariants.id, id));
 }
 
 // ── The main image (phase 2: zero or one row, sort_order 0; multi-image is phase 3) ────────────

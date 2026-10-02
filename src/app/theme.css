@@ -168,6 +168,26 @@
   }
 }
 
+/* A slim, theme-coloured scrollbar for panel overflow areas (dialogs, the variants list), instead of the browser's chunky default. */
+@utility thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  &::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 9999px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted-foreground);
+  }
+}
+
 @utility eyebrow {
   font-size: 0.6875rem;
   letter-spacing: 0.32em;

@@ -2,6 +2,9 @@ import { z } from "zod";
 import { decimalToPaisa, paisaToDecimal } from "@/features/pricing/money";
 import { SHOP_SORTS } from "./listing";
 import { SLUG_PATTERN } from "./slug";
+import { ATTRIBUTE_SLOTS, generateVariantLabel, validateAttributePairs } from "./variants";
+
+export { variantAttributesSchema } from "./variants";
 
 // Next hands repeated query keys over as arrays (?sort=a&sort=b); only the first counts.
 const firstValue = (value: unknown) => (Array.isArray(value) ? value[0] : value);
@@ -17,9 +20,6 @@ export const listingQuerySchema = z.object({
 export type ListingQuery = z.infer<typeof listingQuerySchema>;
 
 export const slugSchema = z.string().min(1).max(191);
-
-/** product_variants.attributes, e.g. {"Colour":"Red","Size":"Large"} (DATABASE.md DB2). */
-export const variantAttributesSchema = z.record(z.string(), z.string());
 
 // ── Panel: categories CRUD (S10 phase 1) ───────────────────────────────────────────────────────
 
@@ -149,19 +149,85 @@ export const productInputSchema = z.object({
 
 export type ProductInput = z.infer<typeof productInputSchema>;
 
-/** The default variant's own fields, created alongside the product (S10 phase 2: one variant only). */
-export const defaultVariantCreateSchema = z.object({
-  sku: z.string().trim().min(1, "Enter a SKU.").max(64, "Keep this under 64 characters."),
-  stock: z.coerce.number().int("Enter a whole number.").min(0, "Use 0 or higher."),
-});
+const skuField = z.string().trim().min(1, "Enter a SKU.").max(64, "Keep this under 64 characters.");
+const stockField = z.coerce.number().int("Enter a whole number.").min(0, "Use 0 or higher.").max(1_000_000, "Enter a smaller number.");
 
-/** On edit, the single default variant also exposes its price override (not offered on create). */
-export const defaultVariantEditSchema = defaultVariantCreateSchema.extend({
-  priceOverride: optionalMoneyField,
-});
+/** The create form's one "Default" variant (SKU + stock); every later variant goes through `variantInputSchema`. */
+export const defaultVariantCreateSchema = z.object({ sku: skuField, stock: stockField });
 
 export type DefaultVariantCreateInput = z.infer<typeof defaultVariantCreateSchema>;
-export type DefaultVariantEditInput = z.infer<typeof defaultVariantEditSchema>;
+
+// ── Panel: variant CRUD (S10 phase 3a) ──────────────────────────────────────────────────────────
+
+/** `""`/missing -> `""`: an attribute row the dialog left blank, or a label left for auto-generation. */
+const blankableText = (max: number, message: string) => z.preprocess((value) => (value === null || value === undefined ? "" : value), z.string().trim().max(max, message));
+
+/**
+ * The Add/Edit variant dialog posts its attribute rows as `attributeKey0`/`attributeValue0` …
+ * `attributeKey4`/`attributeValue4` (one pair per row, `MAX_VARIANT_ATTRIBUTES` rows) — plain
+ * indexed fields rather than a JSON blob, so a test can post the literal wire format.
+ */
+const attributeFields = Object.fromEntries(
+  ATTRIBUTE_SLOTS.flatMap((index) => [
+    [`attributeKey${index}`, blankableText(40, "Keep attribute names under 40 characters.")],
+    [`attributeValue${index}`, blankableText(80, "Keep attribute values under 80 characters.")],
+  ]),
+);
+
+/**
+ * Shared by the dialog (field errors as the Developer types) and the Server Action (the only check
+ * that matters). Attribute rows are validated by `validateAttributePairs` (trimmed, no half-filled
+ * row, no duplicate name, at most five); a blank label is auto-generated from the attribute values
+ * ("Red / Large", or "Default" with none). SKU uniqueness and the same-attributes rule against the
+ * product's other variants need the rows, so the service checks them under the row lock.
+ */
+export const variantInputSchema = z
+  .object({
+    label: blankableText(150, "Keep this under 150 characters."),
+    sku: skuField,
+    priceOverride: optionalMoneyField,
+    stock: stockField,
+    weightGrams: optionalInt(100_000),
+    isActive: activeField,
+    ...attributeFields,
+  })
+  .superRefine((value, ctx) => {
+    const { errors } = validateAttributePairs(attributePairsOf(value));
+    for (const error of errors) {
+      ctx.addIssue({ code: "custom", path: [`attribute${error.field === "key" ? "Key" : "Value"}${error.index}`], message: error.message });
+    }
+  })
+  .transform((value) => {
+    const { attributes } = validateAttributePairs(attributePairsOf(value));
+    return {
+      label: value.label || generateVariantLabel(attributes),
+      sku: value.sku,
+      priceOverride: value.priceOverride,
+      stock: value.stock,
+      weightGrams: value.weightGrams,
+      isActive: value.isActive,
+      attributes,
+    };
+  });
+
+function attributePairsOf(value: Record<string, unknown>): { key: string; value: string }[] {
+  return ATTRIBUTE_SLOTS.map((index) => ({ key: String(value[`attributeKey${index}`] ?? ""), value: String(value[`attributeValue${index}`] ?? "") }));
+}
+
+export type VariantInput = z.infer<typeof variantInputSchema>;
+
+/** The list row's inline "adjust stock" control. */
+export const variantStockSchema = z.object({ stock: stockField });
+
+/** The variants list's drag-drop save: called directly from the client (not a `<form>`), same shape as the arrange page's. */
+export const saveVariantOrderSchema = z.object({
+  productId: z.coerce.number().int().positive(),
+  orderedIds: z
+    .array(z.coerce.number().int().positive())
+    .max(200, "Too many variants in one save.")
+    .refine((ids) => new Set(ids).size === ids.length, "Duplicate variant id."),
+});
+export type SaveVariantOrderInput = z.infer<typeof saveVariantOrderSchema>;
 
 export const PRODUCT_TABS = ["all", ...PRODUCT_STATUSES] as const;
 export type ProductTab = (typeof PRODUCT_TABS)[number];

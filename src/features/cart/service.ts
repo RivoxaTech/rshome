@@ -1,6 +1,6 @@
 import { features } from "@/config/features";
 import { getPrimaryImagesByProductId } from "@/features/catalog/repo";
-import { variantAttributesSchema } from "@/features/catalog/schemas";
+import { parseVariantAttributes } from "@/features/catalog/variants";
 import { decimalToPaisa } from "@/features/pricing/money";
 import { normalizeCouponCode } from "@/features/pricing/pricing";
 import { loadCoupon, priceCart } from "@/features/pricing/service";
@@ -21,11 +21,7 @@ export type CartQuoteResult = { ok: true; quote: CartQuote } | { ok: false; erro
 
 /** A variant with attributes shows its label ("Red / Large"); a simple product's only variant doesn't. */
 export function hasDisplayableAttributes(raw: string): boolean {
-  try {
-    return Object.keys(variantAttributesSchema.parse(JSON.parse(raw))).length > 0;
-  } catch {
-    return false;
-  }
+  return Object.keys(parseVariantAttributes(raw)).length > 0;
 }
 
 function toCartVariant(row: CartVariantRow, image: CartVariant["image"]): CartVariant {
