@@ -11,7 +11,7 @@ import { auditLogs } from "@/server/db/schema/audit";
 import { categories, productImages, productVariants, products } from "@/server/db/schema/catalog";
 import { pushSubscriptions } from "@/server/db/schema/notify";
 import { orderItems, orderStatusHistory, orders, paymentProofs } from "@/server/db/schema/orders";
-import { couponUsages, coupons } from "@/server/db/schema/promotions";
+import { couponUsages, coupons, discountTargets, discounts } from "@/server/db/schema/promotions";
 import { settings } from "@/server/db/schema/settings";
 import { shippingZoneAreas, shippingZones } from "@/server/db/schema/shipping";
 import { wholesaleInquiries, wholesaleInquiryItems, wholesaleInquiryNotes } from "@/server/db/schema/wholesale";
@@ -46,6 +46,9 @@ export async function resetTables(db: Db): Promise<void> {
     orderItems,
     orders,
     coupons,
+    // S12: no earlier suite ever reset these two, so discount rows leaked between tests.
+    discountTargets,
+    discounts,
     productImages,
     productVariants,
     products,

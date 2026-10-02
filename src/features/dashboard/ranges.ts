@@ -5,7 +5,9 @@
  * MariaDB timezone tables (which the host's MariaDB may not have loaded).
  */
 
-export const KARACHI_OFFSET_MS = 5 * 60 * 60 * 1000;
+import { KARACHI_OFFSET_MS } from "@/lib/karachi-datetime";
+
+export { KARACHI_OFFSET_MS };
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The Karachi calendar day an instant falls on, as an integer day count since the epoch. */

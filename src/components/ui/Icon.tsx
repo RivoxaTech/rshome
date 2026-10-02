@@ -62,6 +62,10 @@ export const ICON_PATHS = {
   edit: "M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z",
   // Activate/deactivate toggle (S10 phase 3a, the variants card): a power glyph.
   power: "M12 2v9M18.4 6.6a8 8 0 11-12.8 0",
+  // Discounts nav item (S12): a percent sign.
+  percent: "M19 5L5 19M7.5 9a2 2 0 100-4 2 2 0 000 4zM16.5 19a2 2 0 100-4 2 2 0 000 4z",
+  // Coupons nav item (S13): a ticket with notched sides.
+  ticket: "M4 7h16v3a2 2 0 000 4v3H4v-3a2 2 0 000-4V7zM14 7v10",
 } as const;
 
 /**

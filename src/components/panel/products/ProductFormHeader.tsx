@@ -1,20 +1,11 @@
-import Link from "next/link";
-import { Icon, ICON_PATHS } from "@/components/ui/Icon";
+import { PanelFormHeader } from "@/components/panel/PanelFormHeader";
 import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
 import type { SaleInfo } from "@/features/catalog/products-staff-service";
 
-/** The back chevron + title row shared by the new/edit product pages (mirrors the category form header). */
+/** The back chevron + title row shared by the new/edit product pages, plus the variant count and the read-only "On sale" price. */
 export function ProductFormHeader({ title, backHref, salePrice, variantCount }: { title: string; backHref: string; salePrice?: SaleInfo; variantCount?: number }) {
   return (
-    <div className="mb-1 flex flex-wrap items-center gap-2">
-      <Link
-        href={backHref}
-        aria-label="Back to products"
-        className="text-muted-foreground hover:bg-secondary hover:text-foreground -ml-1.5 shrink-0 rounded-md p-1.5"
-      >
-        <Icon d={ICON_PATHS.chevronLeft} className="h-4 w-4" />
-      </Link>
-      <h1 className="text-base font-semibold">{title}</h1>
+    <PanelFormHeader title={title} backHref={backHref} backLabel="Back to products">
       {variantCount !== undefined && (
         <span className="text-muted-foreground text-xs">
           · {variantCount} {variantCount === 1 ? "variant" : "variants"}
@@ -27,6 +18,6 @@ export function ProductFormHeader({ title, backHref, salePrice, variantCount }: 
           <span className="inline-flex items-center rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:text-red-400">On sale</span>
         </span>
       )}
-    </div>
+    </PanelFormHeader>
   );
 }

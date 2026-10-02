@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { decimalToPaisa, paisaToDecimal } from "@/features/pricing/money";
+import { moneyField, optionalMoneyField } from "@/features/pricing/schemas";
 import { CATEGORY_MEDIA_PATH_PATTERN, PRODUCT_MEDIA_PATH_PATTERN } from "@/server/storage/media-paths";
 import { SHOP_SORTS } from "./listing";
 import { SLUG_PATTERN } from "./slug";
@@ -120,29 +120,8 @@ export const categoryBackHrefSchema = z
 
 // ── Panel: products CRUD (S10 phase 2) ──────────────────────────────────────────────────────────
 
-const MONEY_PATTERN = /^\d{1,10}(\.\d{1,2})?$/;
-
-/**
- * A PKR amount typed as plain text, round-tripped through the paisa helpers (CLAUDE.md #6: never a
- * float) so only a normalised DECIMAL(12,2) string (e.g. "1500.00") is ever stored or compared.
- */
-const moneyField = (message = "Enter a valid amount, e.g. 1500 or 1500.00.") =>
-  z
-    .string()
-    .trim()
-    .regex(MONEY_PATTERN, message)
-    .transform((value) => paisaToDecimal(decimalToPaisa(value)));
-
-/** `""`/missing -> `null`, so an optional override is stored as NULL rather than an empty string. */
-const optionalMoneyField = z.preprocess(
-  (value) => (value === "" || value === null || value === undefined ? null : value),
-  z
-    .string()
-    .trim()
-    .regex(MONEY_PATTERN, "Enter a valid amount, e.g. 1500 or 1500.00.")
-    .transform((value) => paisaToDecimal(decimalToPaisa(value)))
-    .nullable(),
-);
+// `moneyField`/`optionalMoneyField` live in `features/pricing/schemas.ts` (shared with the
+// discounts and coupons forms since S12/S13).
 
 /** `""`/missing -> `null`, same shape as `optionalText` above but for an integer field (weight in grams). */
 const optionalInt = (max: number) =>

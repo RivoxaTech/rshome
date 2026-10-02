@@ -25,7 +25,9 @@
     "db:reset:dashboard": "tsx scripts/seed-demo-dashboard.ts reset",
     "db:seed:dashboard": "tsx scripts/seed-demo-dashboard.ts seed",
     "db:reset:products": "tsx scripts/seed-demo-products.ts reset",
-    "db:seed:products": "tsx scripts/seed-demo-products.ts seed"
+    "db:seed:products": "tsx scripts/seed-demo-products.ts seed",
+    "db:reset:discounts": "tsx scripts/seed-demo-promotions.ts reset",
+    "db:seed:discounts": "tsx scripts/seed-demo-promotions.ts seed"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
