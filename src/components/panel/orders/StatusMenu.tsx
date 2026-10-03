@@ -7,9 +7,12 @@ import { ACTION_LABELS } from "@/components/panel/orders/action-labels";
 import { TAB_COLORS } from "@/components/panel/orders/tab-colors";
 import type { OpenDialog } from "@/components/panel/orders/types";
 import type { OrderControl } from "@/features/orders/staff-service";
-import type { StatusAction } from "@/features/orders/transitions";
+import type { StatusAction, OrderTab } from "@/features/orders/transitions";
 
 const MENU_WIDTH = 224; // w-56
+
+/** Shorter wording for this pill only — `control.statusLabel` itself stays unabbreviated where there's room (the detail page's own header pill). */
+const PILL_LABELS: Partial<Record<OrderTab, string>> = { pending_delivery: "Pending DC" };
 
 type Position = { top: number; left: number; openUpward: boolean };
 
@@ -88,7 +91,7 @@ export function StatusMenu({
   };
 
   const colors = TAB_COLORS[control.tab];
-  const label = control.statusLabel;
+  const label = PILL_LABELS[control.tab] ?? control.statusLabel;
 
   if (rows.length === 0) {
     return (

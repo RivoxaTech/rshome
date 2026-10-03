@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { changePasswordAction, type ChangePasswordState } from "@/app/panel/(protected)/account/actions";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 const initialState: ChangePasswordState = undefined;
 
@@ -23,15 +24,7 @@ function Field({
       <label htmlFor={id} className="text-sm font-medium">
         {label}
       </label>
-      <input
-        id={id}
-        name={name}
-        type="password"
-        autoComplete={autoComplete}
-        required
-        aria-invalid={!!error}
-        className="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-      />
+      <PasswordInput id={id} name={name} autoComplete={autoComplete} required aria-invalid={!!error} />
       {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );

@@ -34,6 +34,12 @@ export async function skuInUse(sku: string, excludeId?: number): Promise<boolean
   return !!row;
 }
 
+/** CSV import matches a variant to update by SKU (S18), and flags a SKU already owned by a different product. */
+export async function getVariantBySku(sku: string): Promise<{ id: number; productId: number } | undefined> {
+  const [row] = await db.select({ id: productVariants.id, productId: productVariants.productId }).from(productVariants).where(eq(productVariants.sku, sku));
+  return row;
+}
+
 export async function insertVariant(tx: DbClient, values: typeof productVariants.$inferInsert): Promise<number> {
   const [result] = await tx.insert(productVariants).values(values);
   return result.insertId;

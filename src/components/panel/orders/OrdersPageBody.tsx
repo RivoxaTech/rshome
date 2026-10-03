@@ -7,6 +7,7 @@ import { DEFAULT_PAGE_SIZE, METHOD_PAGES, PAGE_SIZE_OPTIONS, TAB_INFO, ordersPat
 import type { PaymentMethod } from "@/features/orders/status";
 import { requirePermission } from "@/server/auth/permissions";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
+import { OrderExportDialog } from "@/components/panel/orders/OrderExportDialog";
 import { OrderTabs } from "@/components/panel/orders/OrderTabs";
 import { OrdersTable } from "@/components/panel/orders/OrdersTable";
 import { OrdersTableSkeleton } from "@/components/panel/orders/OrdersTableSkeleton";
@@ -74,7 +75,10 @@ export async function OrdersPageBody({
     <>
       <PanelPageTitle title={METHOD_PAGES[method].title} />
       <div className="flex flex-col gap-3">
-        <OrderTabs method={method} currentTab={tab} counts={counts} q={query.q} pageSize={query.pageSize} />
+        <div className="flex items-center justify-between gap-2">
+          <OrderTabs method={method} currentTab={tab} counts={counts} q={query.q} pageSize={query.pageSize} />
+          <OrderExportDialog method={method} currentTab={tab} />
+        </div>
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1 sm:max-w-[360px]">
             <SearchBox

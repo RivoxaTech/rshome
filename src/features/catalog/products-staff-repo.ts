@@ -58,6 +58,59 @@ export async function listProductsPage(filter: {
   return { rows: rows.map((row) => ({ ...row.product, categoryName: row.categoryName, parentCategoryId: row.parentCategoryId })), total: total.count };
 }
 
+// ── CSV export (S18): one row per variant, product columns repeated ────────────────────────────
+
+export type ProductExportRow = {
+  name: string;
+  slug: string;
+  categorySlug: string;
+  status: ProductRow["status"];
+  shortDescription: string | null;
+  description: string | null;
+  isFeatured: boolean;
+  price: string;
+  sku: string;
+  label: string;
+  attributes: string;
+  stock: number;
+  priceOverride: string | null;
+  isActive: boolean;
+};
+
+export async function listProductsForExport(filter: { tab: ProductTab; q?: string; categoryId?: number; limit: number }): Promise<{ rows: ProductExportRow[]; truncated: boolean }> {
+  const conditions = [statusCondition(filter.tab), filter.q ? searchCondition(filter.q) : undefined, filter.categoryId ? eq(products.categoryId, filter.categoryId) : undefined].filter(
+    (condition): condition is SQL => condition !== undefined,
+  );
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const rows = await db
+    .select({
+      name: products.name,
+      slug: products.slug,
+      categorySlug: categories.slug,
+      status: products.status,
+      shortDescription: products.shortDescription,
+      description: products.description,
+      isFeatured: products.isFeatured,
+      price: products.price,
+      sku: productVariants.sku,
+      label: productVariants.label,
+      attributes: productVariants.attributes,
+      stock: productVariants.stock,
+      priceOverride: productVariants.priceOverride,
+      isActive: productVariants.isActive,
+    })
+    .from(products)
+    .innerJoin(categories, eq(categories.id, products.categoryId))
+    .innerJoin(productVariants, eq(productVariants.productId, products.id))
+    .where(where)
+    .orderBy(asc(products.id), asc(productVariants.sortOrder))
+    .limit(filter.limit + 1);
+
+  const truncated = rows.length > filter.limit;
+  return { rows: truncated ? rows.slice(0, filter.limit) : rows, truncated };
+}
+
 export type ProductStatusCounts = Record<ProductTab, number>;
 
 /** One grouped count query for the tab bar; "all" is the sum. */
@@ -153,6 +206,18 @@ export async function getActiveCategoryGroups(includeId?: number): Promise<Categ
 
 export async function getCategoryByIdActive(id: number): Promise<{ id: number; isActive: boolean } | undefined> {
   const [row] = await db.select({ id: categories.id, isActive: categories.isActive }).from(categories).where(eq(categories.id, id));
+  return row;
+}
+
+/** CSV import matches a row's category by slug (S18), same active-only rule as `getCategoryByIdActive`. */
+export async function getCategoryBySlugActive(slug: string): Promise<{ id: number; isActive: boolean } | undefined> {
+  const [row] = await db.select({ id: categories.id, isActive: categories.isActive }).from(categories).where(eq(categories.slug, slug));
+  return row;
+}
+
+/** CSV import matches a product to update by slug (S18), never by id — the file never carries one. */
+export async function getProductBySlug(slug: string): Promise<ProductRow | undefined> {
+  const [row] = await db.select().from(products).where(eq(products.slug, slug));
   return row;
 }
 

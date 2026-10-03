@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, inArray, isNull, like, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNull, like, lte, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { normalizePhone } from "@/lib/phone";
 import { db, type DbClient } from "@/server/db/client";
@@ -19,7 +19,7 @@ const contains = (text: string) => `%${text.replace(/[\%_]/g, "\$&")}%`;
  * Each tab in SQL, within one payment method's page: the same rules as `orderTab` in
  * transitions.ts (checked over every enum combination by the integration tests).
  */
-const TAB_CONDITIONS: Record<OrderTab, SQL | undefined> = {
+export const TAB_CONDITIONS: Record<OrderTab, SQL | undefined> = {
   need_review: or(
     eq(orders.orderStatus, "awaiting_shipping_quote"),
     and(eq(orders.paymentMethod, "cod"), eq(orders.orderStatus, "pending")),
@@ -265,4 +265,67 @@ export async function deleteOrderCascade(tx: DbClient, orderId: number): Promise
   await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
   await tx.delete(orders).where(eq(orders.id, orderId));
   return { proofFilePaths: proofs.map((proof) => proof.filePath) };
+}
+
+// ── CSV export (S18) ────────────────────────────────────────────────────────────────────────────
+
+export type OrderExportRow = {
+  orderNumber: string;
+  createdAt: Date;
+  orderStatus: (typeof orders.$inferSelect)["orderStatus"];
+  paymentMethod: PaymentMethod;
+  paymentStatus: (typeof orders.$inferSelect)["paymentStatus"];
+  customerName: string;
+  phone: string;
+  city: string;
+  country: string;
+  itemsCount: number;
+  subtotal: string;
+  discountTotal: string;
+  shippingTotal: string | null;
+  total: string;
+  couponCode: string | null;
+};
+
+/** Every order matching the export's filters, newest first, capped at `limit` (+1 to detect truncation). */
+export async function listOrdersForExport(filter: {
+  method: PaymentMethod | "all";
+  tab: OrderTab | "all";
+  from: Date;
+  to: Date;
+  limit: number;
+}): Promise<{ rows: OrderExportRow[]; truncated: boolean }> {
+  const conditions = [
+    filter.method === "all" ? undefined : eq(orders.paymentMethod, filter.method),
+    filter.tab === "all" ? undefined : TAB_CONDITIONS[filter.tab],
+    gte(orders.createdAt, filter.from),
+    lte(orders.createdAt, filter.to),
+  ].filter((condition): condition is SQL => condition !== undefined);
+  const where = and(...conditions);
+
+  const rows = await db
+    .select({
+      orderNumber: orders.orderNumber,
+      createdAt: orders.createdAt,
+      orderStatus: orders.orderStatus,
+      paymentMethod: orders.paymentMethod,
+      paymentStatus: orders.paymentStatus,
+      customerName: orders.customerName,
+      phone: orders.phone,
+      city: orders.city,
+      country: orders.country,
+      itemsCount: sql<number>`(select count(*) from ${orderItems} where ${orderItems.orderId} = ${orders.id})`,
+      subtotal: orders.subtotal,
+      discountTotal: orders.discountTotal,
+      shippingTotal: orders.shippingTotal,
+      total: orders.total,
+      couponCode: orders.couponCode,
+    })
+    .from(orders)
+    .where(where)
+    .orderBy(desc(orders.createdAt), desc(orders.id))
+    .limit(filter.limit + 1);
+
+  const truncated = rows.length > filter.limit;
+  return { rows: truncated ? rows.slice(0, filter.limit) : rows, truncated };
 }

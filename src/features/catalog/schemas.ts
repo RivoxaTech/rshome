@@ -161,8 +161,8 @@ export const productInputSchema = z.object({
 
 export type ProductInput = z.infer<typeof productInputSchema>;
 
-const skuField = z.string().trim().min(1, "Enter a SKU.").max(64, "Keep this under 64 characters.");
-const stockField = z.coerce.number().int("Enter a whole number.").min(0, "Use 0 or higher.").max(1_000_000, "Enter a smaller number.");
+export const skuField = z.string().trim().min(1, "Enter a SKU.").max(64, "Keep this under 64 characters.");
+export const stockField = z.coerce.number().int("Enter a whole number.").min(0, "Use 0 or higher.").max(1_000_000, "Enter a smaller number.");
 
 /** The create form's one "Default" variant (SKU + stock); every later variant goes through `variantInputSchema`. */
 export const defaultVariantCreateSchema = z.object({ sku: skuField, stock: stockField });

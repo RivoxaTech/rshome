@@ -74,6 +74,21 @@ export const ICON_PATHS = {
     "M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z",
   /** The panel's Bank & contact nav item (S14): a payment card. */
   card: "M3 6h18v12H3zM3 10h18M7 15h3",
+  // Password show/hide toggle (login + account change-password, S18 polish): an open eye…
+  eye: "M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7zM12 15a3 3 0 100-6 3 3 0 000 6z",
+  // …and the same eye with a strike-through, for "hide".
+  eyeOff:
+    "M3 3l18 18M9.9 4.24A10.94 10.94 0 0112 4c7 0 11 7 11 7a13.2 13.2 0 01-3.22 3.88M6.1 6.1A13.2 13.2 0 001 11s4 7 11 7a10.9 10.9 0 005.09-1.25M10.6 10.6a3 3 0 104.24 4.24",
+  // The order detail page's "Print slip" button (S18 polish): a printer outline.
+  printer: "M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z",
+  // Export buttons' icon-only mobile form (S18 polish): an arrow down into a tray.
+  download: "M12 3v12M7 10l5 5 5-5M4 19h16",
+  // "New product"'s icon-only mobile form (S18 polish): a plus sign.
+  plus: "M12 5v14M5 12h14",
+  // "Arrange products"' icon-only mobile form (S18 polish): stacked up/down chevrons — `grip`'s
+  // six zero-length dots are too faint to read at a 16px toolbar-icon size (fine at the larger
+  // drag-handle size it was designed for).
+  reorder: "M7 10l5-5 5 5M7 14l5 5 5-5",
 } as const;
 
 /**

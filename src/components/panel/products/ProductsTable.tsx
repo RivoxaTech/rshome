@@ -138,7 +138,7 @@ export function ProductsTable({ items, backHref }: { items: StaffProductListItem
   return (
     <>
       <div className="bg-card border-border hidden rounded-lg border p-4 md:block">
-        <div className="overflow-x-auto">
+        <div className="thin-scrollbar overflow-x-auto">
           <table className="w-full border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="bg-muted/60 text-muted-foreground text-xs">

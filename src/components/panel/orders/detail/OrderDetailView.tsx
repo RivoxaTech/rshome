@@ -18,12 +18,19 @@ import { Icon, ICON_PATHS } from "@/components/ui/Icon";
 import type { StaffOrderView } from "@/features/orders/staff-service";
 import { METHOD_PAGES } from "@/features/orders/transitions";
 
+/** The slip/print button only appears once there's something worth packing to print: Processing onward, never Need review/Pending delivery charge (and never a closed order). */
+const PRINTABLE_TABS: ReadonlySet<string> = new Set(["processing", "delivery", "completed"]);
+
 export function OrderDetailView({ order, backHref }: { order: StaffOrderView; backHref: string }) {
   const [openDialog, setOpenDialog] = useState<OpenDialog>(null);
   const [approveStartsRejecting, setApproveStartsRejecting] = useState(false);
   const { control } = order;
   const statusColors = TAB_COLORS[control.tab];
   const paymentColors = PAYMENT_STATUS_COLORS[order.paymentStatus];
+  // "Screenshot to check" (proof_submitted) is already surfaced by the Check-screenshot primary
+  // action below — showing it again as a pill here is redundant, unlike every other payment status.
+  const showPaymentPill = order.paymentStatus !== "proof_submitted";
+  const showPrintButton = PRINTABLE_TABS.has(control.tab);
 
   const openDialogFresh = (next: OpenDialog) => {
     setApproveStartsRejecting(false);
@@ -35,36 +42,81 @@ export function OrderDetailView({ order, backHref }: { order: StaffOrderView; ba
       {/* The header's own title bar shows only the breadcrumb; the page below has the title once. */}
       <PanelPageTitle title={`${METHOD_PAGES[order.paymentMethod].title} / ${order.orderNumber}`} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-          <Link
-            href={backHref}
-            aria-label="Back to the orders list"
-            className="text-muted-foreground hover:bg-secondary hover:text-foreground -ml-1.5 shrink-0 rounded-md p-1.5"
-          >
-            <Icon d={ICON_PATHS.chevronLeft} className="h-4 w-4" />
-          </Link>
-          <h1 className="text-base font-semibold">Order {order.orderNumber}</h1>
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${statusColors.bg} ${statusColors.text}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${statusColors.dot}`} />
-            {control.statusLabel}
-          </span>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${paymentColors.bg} ${paymentColors.text}`}>{order.paymentStatusLabel}</span>
-          {/* One line from here up on phones too; the method/date pair moves below with the actions instead. */}
-          <span className="text-muted-foreground hidden items-center gap-1 text-xs sm:inline-flex">
-            <Icon d={ICON_PATHS.calendar} className="h-3.5 w-3.5" />
-            {order.paymentMethodLabel} · Placed {order.placedAt}
-          </span>
+      <div className="flex flex-col gap-1.5">
+        {/* The order number and the actions always share this one row, at every width: the title
+            truncates with an ellipsis instead of wrapping (it never needs to — the full number is
+            also in the breadcrumb above and the URL), so the actions never get pushed onto their
+            own line by a long title. The status/payment pills render twice on purpose — inline
+            here (room for them from `sm` up) and on their own row below (narrower than `sm`) —
+            rather than one reflowing copy, which is what let a pill drag the actions down with it
+            before. */}
+        <div className="flex items-center justify-between gap-2 sm:gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
+            <Link
+              href={backHref}
+              aria-label="Back to the orders list"
+              className="text-muted-foreground hover:bg-secondary hover:text-foreground -ml-1 shrink-0 rounded-md p-1 sm:-ml-1.5 sm:p-1.5"
+            >
+              <Icon d={ICON_PATHS.chevronLeft} className="h-4 w-4" />
+            </Link>
+            <h1 className="min-w-0 truncate text-sm font-semibold sm:text-base">
+              <span className="hidden sm:inline">Order </span>
+              {order.orderNumber}
+            </h1>
+            <span className={`hidden shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium sm:inline-flex ${statusColors.bg} ${statusColors.text}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${statusColors.dot}`} />
+              {control.statusLabel}
+            </span>
+            {showPaymentPill && (
+              <span className={`hidden shrink-0 rounded-full px-2 py-0.5 text-xs font-medium sm:inline-block ${paymentColors.bg} ${paymentColors.text}`}>
+                {order.paymentStatusLabel}
+              </span>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+            {showPrintButton && (
+              <Link
+                href={`/panel/orders/${order.orderNumber}/slip?autoprint=1`}
+                target="_blank"
+                aria-label="Print slip"
+                className="border-input hover:bg-secondary hidden h-9 shrink-0 items-center gap-1.5 rounded-lg border px-4 text-sm font-medium whitespace-nowrap sm:flex"
+              >
+                <Icon d={ICON_PATHS.printer} className="h-4 w-4 shrink-0" />
+                Print slip
+              </Link>
+            )}
+            <OrderPrimaryActions control={control} setOpenDialog={openDialogFresh} />
+          </div>
         </div>
-        {/* On phones this is its own row (method, then date, then the actions on the right); from
-            `sm` the wrapper disappears (`display: contents`) and both children rejoin the row above. */}
-        <div className="flex w-full items-center justify-between gap-3 sm:contents">
-          <p className="text-muted-foreground text-xs leading-relaxed sm:hidden">
-            <span className="block">{order.paymentMethodLabel}</span>
-            <span className="block">Placed {order.placedAt}</span>
-          </p>
-          <OrderPrimaryActions control={control} setOpenDialog={openDialogFresh} />
+        {/* Below `sm`, the pills and the (icon-only) print-slip shortcut move to their own row,
+            freeing the title row for just the order number and the primary action/⋮ — the title
+            row's only two members then, so the order number never has to compete for width and
+            truncate. */}
+        <div className="flex flex-wrap items-center justify-between gap-1.5 sm:hidden">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${statusColors.bg} ${statusColors.text}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${statusColors.dot}`} />
+              {control.statusLabel}
+            </span>
+            {showPaymentPill && (
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${paymentColors.bg} ${paymentColors.text}`}>{order.paymentStatusLabel}</span>
+            )}
+          </div>
+          {showPrintButton && (
+            <Link
+              href={`/panel/orders/${order.orderNumber}/slip?autoprint=1`}
+              target="_blank"
+              aria-label="Print slip"
+              className="border-input hover:bg-secondary flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border"
+            >
+              <Icon d={ICON_PATHS.printer} className="h-4 w-4 shrink-0" />
+            </Link>
+          )}
         </div>
+        <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+          <Icon d={ICON_PATHS.calendar} className="h-3.5 w-3.5" />
+          Placed {order.placedAt}
+        </span>
       </div>
 
       {/*

@@ -43,12 +43,12 @@ export function OrderPrimaryActions({
   if (!primary && closing.length === 0) return null;
 
   return (
-    <div className="flex shrink-0 items-center gap-1.5">
+    <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
       {primary && (
         <button
           type="button"
           onClick={() => setOpenDialog(primary.action)}
-          className="bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium hover:opacity-90"
+          className="bg-primary text-primary-foreground flex h-9 shrink-0 items-center rounded-lg px-2.5 text-xs font-medium whitespace-nowrap hover:opacity-90 sm:px-4 sm:text-sm"
         >
           {ACTION_LABELS[primary.action]}
         </button>

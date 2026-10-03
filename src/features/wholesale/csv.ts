@@ -1,15 +1,11 @@
 /**
- * The wholesale inquiries CSV export (S17): pure and unit-tested. UTF-8 with a leading BOM (Excel
- * needs it to read accents correctly), CRLF row endings, and spreadsheet formula injection
- * defeated by prefixing a value that starts with `=`, `+`, `-`, `@` or a tab with an apostrophe.
+ * The wholesale inquiries CSV export (S17): pure and unit-tested. Row/column formatting here;
+ * the BOM/CRLF/quoting/formula-injection rules live once in `features/csv/writer.ts` (S18),
+ * shared with the product and order CSV exports.
  */
-const FORMULA_PREFIXES = ["=", "+", "-", "@", "\t"];
+import { buildCsv, escapeCsvField } from "@/features/csv/writer";
 
-export function escapeCsvField(value: string): string {
-  let field = FORMULA_PREFIXES.some((prefix) => value.startsWith(prefix)) ? `'${value}` : value;
-  if (/[",\r\n]/.test(field)) field = `"${field.replace(/"/g, '""')}"`;
-  return field;
-}
+export { escapeCsvField };
 
 export type WholesaleCsvRow = {
   id: number;
@@ -28,29 +24,23 @@ export type WholesaleCsvRow = {
 
 const HEADERS = ["ID", "Date", "Name", "Business", "Business type", "Phone", "Email", "City", "Needed by", "Status", "Items", "Message"];
 
-function toRow(values: readonly string[]): string {
-  return values.map(escapeCsvField).join(",");
+function toValues(row: WholesaleCsvRow): string[] {
+  return [
+    String(row.id),
+    row.createdAt,
+    row.name,
+    row.business,
+    row.businessType,
+    row.phone,
+    row.email,
+    row.city,
+    row.neededByDate,
+    row.status,
+    row.items,
+    row.message,
+  ];
 }
 
 export function buildWholesaleCsv(rows: WholesaleCsvRow[]): string {
-  const lines = [toRow(HEADERS)];
-  for (const row of rows) {
-    lines.push(
-      toRow([
-        String(row.id),
-        row.createdAt,
-        row.name,
-        row.business,
-        row.businessType,
-        row.phone,
-        row.email,
-        row.city,
-        row.neededByDate,
-        row.status,
-        row.items,
-        row.message,
-      ]),
-    );
-  }
-  return `﻿${lines.join("\r\n")}\r\n`;
+  return buildCsv(HEADERS, rows.map(toValues));
 }

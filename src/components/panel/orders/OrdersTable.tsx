@@ -20,8 +20,9 @@ function stop(event: React.MouseEvent | React.KeyboardEvent) {
   event.stopPropagation();
 }
 
+/** A corner badge (not inline before the order number, which used to push it onto a second line at narrow widths). */
 function AlertDot() {
-  return <span title="Screenshot to check" className="bg-destructive inline-block h-1.5 w-1.5 shrink-0 rounded-full" />;
+  return <span title="Screenshot to check" className="bg-destructive absolute top-1 left-1 h-2 w-2 rounded-full" />;
 }
 
 const TRASH_LABEL: Record<Exclude<TrashAction, null>, string> = {
@@ -62,13 +63,11 @@ function OrderTableRow({ item, method, backHref }: { item: StaffOrderListItem; m
       }`}
     >
       <td className="text-muted-foreground px-3 py-3.5">{item.serial}</td>
-      <td className="px-3 py-3.5">
-        <div className="flex items-center gap-1.5">
-          {item.screenshotToCheck && <AlertDot />}
-          <Link href={href} onClick={stop} className="text-primary font-medium hover:underline">
-            {item.orderNumber}
-          </Link>
-        </div>
+      <td className="relative px-3 py-3.5">
+        {item.screenshotToCheck && <AlertDot />}
+        <Link href={href} onClick={stop} className="text-primary font-medium hover:underline">
+          {item.orderNumber}
+        </Link>
       </td>
       <td className="text-muted-foreground px-3 py-3.5 whitespace-nowrap">
         {item.placedDate}
@@ -94,15 +93,13 @@ function OrderCard({ item, method, backHref }: { item: StaffOrderListItem; metho
   const trash = trashActionForTab(item.control.tab);
 
   return (
-    <li onClick={() => router.push(href)} className="bg-card border-border cursor-pointer rounded-lg border p-3.5">
+    <li onClick={() => router.push(href)} className="bg-card border-border relative cursor-pointer rounded-lg border p-3.5">
+      {item.screenshotToCheck && <AlertDot />}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            {item.screenshotToCheck && <AlertDot />}
-            <Link href={href} onClick={stop} className="text-primary font-medium hover:underline">
-              {item.orderNumber}
-            </Link>
-          </div>
+          <Link href={href} onClick={stop} className="text-primary font-medium hover:underline">
+            {item.orderNumber}
+          </Link>
           <p className="mt-0.5 truncate text-sm">{item.customerName}</p>
           <p className="text-muted-foreground text-xs">
             {item.placedDate} · {item.placedTime}
@@ -137,7 +134,7 @@ export function OrdersTable({
   return (
     <>
       <div className="bg-card border-border hidden rounded-lg border p-4 md:block">
-        <div className="overflow-x-auto">
+        <div className="thin-scrollbar overflow-x-auto">
           <table className="w-full border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr className="bg-muted/60 text-muted-foreground text-xs">

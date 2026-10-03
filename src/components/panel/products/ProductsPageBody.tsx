@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Icon, ICON_PATHS } from "@/components/ui/Icon";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { Pagination } from "@/components/panel/Pagination";
 import { RowsPerPageSelect } from "@/components/panel/RowsPerPageSelect";
@@ -66,7 +67,27 @@ export async function ProductsPageBody({ searchParams }: { searchParams: Record<
     <>
       <PanelPageTitle title="Products" />
       <div className="flex flex-col gap-2.5">
-        <ProductTabs currentTab={query.tab} counts={counts} q={query.q} category={categoryParam} />
+        <div className="flex items-center justify-between gap-2">
+          <ProductTabs currentTab={query.tab} counts={counts} q={query.q} category={categoryParam} />
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href={`/api/panel/products/export?tab=${query.tab}${query.q ? `&q=${encodeURIComponent(query.q)}` : ""}${categoryParam ? `&category=${categoryParam}` : ""}`}
+              aria-label="Export CSV"
+              className="border-input hover:bg-secondary inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium whitespace-nowrap sm:px-3"
+            >
+              <Icon d={ICON_PATHS.download} className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </Link>
+            <Link
+              href="/panel/products/import"
+              aria-label="Import CSV"
+              className="border-input hover:bg-secondary inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium whitespace-nowrap sm:px-3"
+            >
+              <Icon d={ICON_PATHS.upload} className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Import CSV</span>
+            </Link>
+          </div>
+        </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:max-w-[480px]">
             <div className="min-w-0 flex-1">
@@ -83,7 +104,23 @@ export async function ProductsPageBody({ searchParams }: { searchParams: Record<
             </div>
             <CategoryFilterSelect tab={query.tab} q={query.q} category={query.category} options={categories.map((category) => ({ id: category.id, name: category.name }))} />
           </div>
-          <div className="flex items-center justify-between gap-2 sm:justify-end">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Link
+              href="/panel/products/arrange"
+              aria-label="Arrange products"
+              className="border-input hover:bg-secondary inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium whitespace-nowrap sm:px-3"
+            >
+              <Icon d={ICON_PATHS.reorder} className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">Arrange products</span>
+            </Link>
+            <Link
+              href={`/panel/products/new?back=${encodeURIComponent(backHref)}`}
+              aria-label="New product"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium whitespace-nowrap sm:px-3"
+            >
+              <Icon d={ICON_PATHS.plus} className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">New product</span>
+            </Link>
             <RowsPerPageSelect
               basePath="/panel/products"
               tabSlug={query.tab === "all" ? undefined : query.tab}
@@ -93,18 +130,6 @@ export async function ProductsPageBody({ searchParams }: { searchParams: Record<
               options={PRODUCT_PAGE_SIZE_OPTIONS}
               defaultPageSize={PRODUCT_DEFAULT_PAGE_SIZE}
             />
-            <Link
-              href="/panel/products/arrange"
-              className="border-input hover:bg-secondary shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium whitespace-nowrap"
-            >
-              Arrange products
-            </Link>
-            <Link
-              href={`/panel/products/new?back=${encodeURIComponent(backHref)}`}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap"
-            >
-              New product
-            </Link>
           </div>
         </div>
         <Suspense key={`${query.tab}-${query.q ?? ""}-${categoryParam ?? ""}-${query.page}-${query.pageSize}`} fallback={<ProductsTableSkeleton />}>

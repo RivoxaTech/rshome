@@ -10,7 +10,7 @@ export default async function LoginPage() {
   const identity = await getStoreIdentity();
 
   return (
-    <div className="bg-background flex flex-1 items-center justify-center p-6">
+    <div className="bg-background flex min-h-dvh items-center justify-center p-6">
       <div className="bg-card border-border shadow-soft flex w-full max-w-sm flex-col gap-6 rounded-lg border p-8">
         <div>
           <p className="font-serif text-lg tracking-[0.3em] uppercase">{identity.logoText}</p>
