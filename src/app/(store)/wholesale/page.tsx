@@ -4,14 +4,19 @@ import { PageContainer } from "@/components/store/PageContainer";
 import { WholesaleForm } from "@/components/store/wholesale/WholesaleForm";
 import { features } from "@/config/features";
 import { siteConfig } from "@/config/site.config";
+import { buildStorefrontMetadata } from "@/features/seo/metadata";
 import { getContactInfo, getStoreIdentity } from "@/features/settings/service";
+import { env } from "@/server/env";
 
-export const metadata: Metadata = {
-  // The store layout's title template appends the store name from settings (S14).
+const DESCRIPTION = "Request wholesale pricing for tableware, tea sets, trays and decor for your business, event or venue.";
+
+// The store layout's title template appends the store name from settings (S14).
+export const metadata: Metadata = buildStorefrontMetadata({
+  appUrl: env.APP_URL,
+  path: "/wholesale",
   title: "Wholesale & Bulk Orders",
-  description:
-    "Request wholesale pricing for tableware, tea sets, trays and decor for your business, event or venue.",
-};
+  description: DESCRIPTION,
+});
 
 /** The wholesale inquiry page (REQUIREMENTS SF-08). Off when `features.wholesale` is off. */
 export default async function WholesalePage() {

@@ -2,6 +2,7 @@ import { cache } from "react";
 import {
   getActiveListingProducts,
   getActiveProductBySlug,
+  getActiveProductsForSitemap,
   getActiveVariantsByProductIds,
   getFeaturedActiveProducts,
   getPrimaryImagesByProductId,
@@ -15,9 +16,10 @@ import { paginate, sortProducts, type ShopSort } from "@/features/catalog/listin
 import { parseVariantAttributes } from "@/features/catalog/variants";
 import { visibleCategoryIds } from "@/features/catalog/visibility";
 import { toDisplayPrice, type DisplayPrice } from "@/features/pricing/display";
-import { decimalToPaisa, type Paisa } from "@/features/pricing/money";
+import { decimalToPaisa, paisaToDecimal, type Paisa } from "@/features/pricing/money";
 import type { PricingProduct, VariantPrice } from "@/features/pricing/pricing";
 import { getVariantPricer, type VariantPricer } from "@/features/pricing/service";
+import { productAvailability, type JsonLdAvailability } from "@/features/seo/jsonld";
 
 export const SHOP_PAGE_SIZE = 12;
 /** At or below this many units a variant shows "Only N left". */
@@ -58,6 +60,9 @@ export type VariantOption = {
   stockState: StockState;
 };
 
+/** The data a Product JSON-LD block needs (features/seo/jsonld.ts), from the cheapest active variant. */
+export type ProductSeoFacts = { sku: string; price: string; availability: JsonLdAvailability };
+
 export type ProductDetail = {
   id: number;
   name: string;
@@ -68,6 +73,7 @@ export type ProductDetail = {
   /** The picker heading, e.g. "Size", when every variant varies by the same single attribute. */
   optionName: string;
   variants: VariantOption[];
+  seo: ProductSeoFacts;
 };
 
 function toImage(row: ProductImageRow): ProductImage {
@@ -238,6 +244,11 @@ export const getProductDetail = cache(async (slug: string): Promise<ProductDetai
   if (variants.length === 0) return null;
 
   const pricingProduct = toPricingProduct(product);
+  const pricedVariants = variants.map((variant) => ({ variant, priced: priceOf(pricer, pricingProduct, variant) }));
+  // Same "cheapest active variant" rule priceListingProducts uses for cards: one representative
+  // price/stock for the Product JSON-LD's single Offer, not an AggregateOffer per variant.
+  const cheapest = pricedVariants.reduce((best, current) => (current.priced.unitPrice < best.priced.unitPrice ? current : best));
+
   return {
     id: product.id,
     name: product.name,
@@ -246,12 +257,25 @@ export const getProductDetail = cache(async (slug: string): Promise<ProductDetai
     category: { name: product.categoryName, slug: product.categorySlug, isActive: visibleIds.has(product.categoryId) },
     images: images.map(toImage),
     optionName: optionNameOf(variants),
-    variants: variants.map((variant) => ({
+    variants: pricedVariants.map(({ variant, priced }) => ({
       id: variant.id,
       label: variant.label,
-      price: toDisplayPrice(priceOf(pricer, pricingProduct, variant)),
+      price: toDisplayPrice(priced),
       stock: variant.stock,
       stockState: stockStateOf(variant.stock),
     })),
+    seo: {
+      sku: cheapest.variant.sku,
+      price: paisaToDecimal(cheapest.priced.unitPrice),
+      availability: productAvailability(stockStateOf(cheapest.variant.stock)),
+    },
   };
+});
+
+export type SitemapProductEntry = { slug: string; updatedAt: Date };
+
+/** Active products in a visible category, for `app/sitemap.ts` — slug and last-updated time only. */
+export const getSitemapProducts = cache(async (): Promise<SitemapProductEntry[]> => {
+  const [rows, visibleIds] = await Promise.all([getActiveProductsForSitemap(), getVisibleCategoryIds()]);
+  return rows.filter((row) => visibleIds.has(row.categoryId)).map((row) => ({ slug: row.slug, updatedAt: row.updatedAt }));
 });

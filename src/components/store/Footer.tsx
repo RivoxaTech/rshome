@@ -1,5 +1,9 @@
+import Link from "next/link";
 import { whatsAppHref } from "@/components/store/WhatsAppButton";
+import { POWERED_BY } from "@/config/credit";
+import { PAGES } from "@/content/pages";
 import type { Contact, SocialLinks } from "@/features/settings/schemas";
+import { copyrightLine } from "@/lib/copyright";
 
 const LINK = "hover:text-champagne transition-colors";
 
@@ -21,8 +25,8 @@ export function Footer({
   socialLinks: SocialLinks;
 }) {
   return (
-    <footer className="bg-card px-6 py-16 lg:px-10">
-      <div className="mx-auto grid max-w-[1400px] gap-10 lg:grid-cols-3">
+    <footer className="bg-card">
+      <div className="mx-auto grid max-w-[1400px] gap-10 px-6 py-16 lg:grid-cols-4 lg:px-10">
         <div>
           <p className="font-serif text-xl tracking-[0.35em] uppercase">{logoText}</p>
           <p className="text-muted-foreground mt-4 text-xs leading-relaxed">{footerTagline}</p>
@@ -43,10 +47,43 @@ export function Footer({
             </a>
           )}
         </div>
+        {/* Data-driven from src/content/pages.ts (S19): adding a page there adds its link here, nothing else to wire up. */}
+        <div className="flex flex-col gap-2 text-xs tracking-[0.2em] uppercase">
+          {PAGES.map((page) => (
+            <Link key={page.slug} href={`/${page.slug}`} className={LINK}>
+              {page.title}
+            </Link>
+          ))}
+        </div>
       </div>
-      <p className="text-muted-foreground mx-auto mt-12 max-w-[1400px] text-[10px] tracking-[0.2em] uppercase">
-        &copy; {new Date().getFullYear()} {storeName}. All rights reserved.
-      </p>
+      {/* A separate full-width bar, not more padding inside the cream section above, so there's no
+          dead space stacking up beneath the credit row (S19 polish, owner feedback). */}
+      <div className="bg-espresso text-background">
+        <div className="mx-auto flex max-w-[1400px] flex-col items-center gap-3 px-6 py-5 text-center lg:flex-row lg:items-center lg:justify-between lg:px-10 lg:text-left">
+          <p className="text-background/70 text-[10px] tracking-[0.2em] uppercase">{copyrightLine(storeName, new Date())}</p>
+          <a
+            href={POWERED_BY.url}
+            target="_blank"
+            rel="noopener"
+            aria-label={`Powered by ${POWERED_BY.name}, opens ${POWERED_BY.url} in a new tab`}
+            className="text-background/70 hover:text-champagne inline-flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase transition-colors"
+          >
+            Powered by
+            {POWERED_BY.logoPath ? (
+              // eslint-disable-next-line @next/next/no-img-element -- next/image's global custom loader (next.config.ts) expects the media pipeline's path shape, not a plain public/ asset.
+              <img
+                src={POWERED_BY.logoPath}
+                width={POWERED_BY.logoWidth}
+                height={POWERED_BY.logoHeight}
+                alt={POWERED_BY.name}
+                className="h-[18px] w-auto"
+              />
+            ) : (
+              POWERED_BY.name
+            )}
+          </a>
+        </div>
+      </div>
     </footer>
   );
 }

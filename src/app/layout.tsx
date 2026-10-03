@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Jost } from "next/font/google";
 import { FocusModality } from "@/components/ui/FocusModality";
 import { siteConfig } from "@/config/site.config";
+import { env } from "@/server/env";
 import "./theme.css";
 
 const cormorantGaramond = Cormorant_Garamond({
@@ -18,6 +19,7 @@ const jost = Jost({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(env.APP_URL),
   title: siteConfig.storeName,
   description: siteConfig.tagline,
 };

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { OrderPayment } from "@/components/store/orders/OrderPayment";
@@ -9,7 +10,10 @@ import { siteConfig } from "@/config/site.config";
 import { hasOrderAccess } from "@/features/checkout/order-access-cookie";
 import { orderNumberSchema } from "@/features/checkout/schemas";
 import { getCustomerOrder } from "@/features/orders/service";
+import { noindexRobots } from "@/features/seo/metadata";
 import { getBankAccounts, getContactInfo, getStoreIdentity } from "@/features/settings/service";
+
+export const metadata: Metadata = { robots: noindexRobots };
 
 const ROW = "flex items-center justify-between gap-4 text-xs tracking-[0.2em] uppercase";
 const SECTION = "border-border border-t pt-8";

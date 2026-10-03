@@ -89,3 +89,45 @@ export function MoreVerticalIcon({ className = "h-[18px] w-[18px]" }: { classNam
     </svg>
   );
 }
+
+/**
+ * Contact page social icons (S19 polish): stroke style matching this file's icon family (not
+ * `WhatsAppGlyph`'s filled brand mark, which the contact page reuses as-is) — a rounded frame, lens
+ * and flash dot, the same shape every major icon set uses for Instagram.
+ */
+export function InstagramGlyph({ className = "h-[18px] w-[18px]" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z" />
+      <path d="M17.5 6.5h.01" />
+    </svg>
+  );
+}
+
+/** Contact page social icons (S19 polish): the same ribbon outline most stroke icon sets use for Facebook. */
+export function FacebookGlyph({ className = "h-[18px] w-[18px]" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z" />
+    </svg>
+  );
+}

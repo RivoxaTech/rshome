@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { CollectionsSection } from "@/components/store/home/CollectionsSection";
 import { FeaturedSection } from "@/components/store/home/FeaturedSection";
 import { HeroSection } from "@/components/store/home/HeroSection";
@@ -6,7 +7,12 @@ import { WholesaleSection } from "@/components/store/home/WholesaleSection";
 import { WhySection } from "@/components/store/home/WhySection";
 import { features } from "@/config/features";
 import { homeContent } from "@/config/home-content";
+import { siteConfig } from "@/config/site.config";
 import { getHomeFeaturedProducts, getStoreCategories } from "@/features/catalog/service";
+import { buildOrganizationJsonLd, serializeJsonLd } from "@/features/seo/jsonld";
+import { buildStorefrontMetadata, canonicalUrl, mediaImageUrl } from "@/features/seo/metadata";
+import { getContactInfo, getSocialLinks, getStoreIdentity } from "@/features/settings/service";
+import { env } from "@/server/env";
 
 // Categories carry no width/height column, so the hero and story images use fixed sizes here
 // (CollectionsSection.tsx explains why that's fine for a fully CSS-constrained box).
@@ -15,8 +21,27 @@ const HERO_ACCENT_CATEGORY_SLUG = "tea-sets";
 const HERO_IMAGE_SIZE = { width: 1920, height: 1280 };
 const HERO_ACCENT_IMAGE_SIZE = { width: 1408, height: 1008 };
 
+export async function generateMetadata(): Promise<Metadata> {
+  const categories = await getStoreCategories();
+  const heroImagePath = categories.find((category) => category.slug === HERO_CATEGORY_SLUG)?.imagePath;
+
+  return buildStorefrontMetadata({
+    appUrl: env.APP_URL,
+    path: "/",
+    title: siteConfig.storeName,
+    description: siteConfig.tagline,
+    image: heroImagePath ? mediaImageUrl(env.APP_URL, heroImagePath) : undefined,
+  });
+}
+
 export default async function HomePage() {
-  const [categories, featuredProducts] = await Promise.all([getStoreCategories(), getHomeFeaturedProducts()]);
+  const [categories, featuredProducts, identity, contact, socialLinks] = await Promise.all([
+    getStoreCategories(),
+    getHomeFeaturedProducts(),
+    getStoreIdentity(),
+    getContactInfo(),
+    getSocialLinks(),
+  ]);
   const categoryBySlug = new Map(categories.map((category) => [category.slug, category]));
 
   const heroCategory = categoryBySlug.get(HERO_CATEGORY_SLUG);
@@ -27,8 +52,16 @@ export default async function HomePage() {
     return category?.imagePath ? [{ path: category.imagePath, alt: category.name }] : [];
   });
 
+  const organizationJsonLd = buildOrganizationJsonLd({
+    name: identity.storeName,
+    url: canonicalUrl(env.APP_URL, "/"),
+    telephone: contact.phone || null,
+    sameAs: [socialLinks.facebook, socialLinks.instagram].filter((link): link is string => Boolean(link)),
+  });
+
   return (
     <div className="bg-background text-foreground overflow-x-hidden">
+      <script type="application/ld+json">{serializeJsonLd(organizationJsonLd)}</script>
       {heroCategory?.imagePath && (
         <HeroSection
           eyebrow={homeContent.hero.eyebrow}

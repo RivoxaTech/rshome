@@ -1,9 +1,22 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CategoryChips, SearchForm } from "@/components/store/catalog/ListingControls";
 import { ListingLayout } from "@/components/store/catalog/ListingLayout";
 import type { ListingState } from "@/components/store/catalog/listing-href";
+import { siteConfig } from "@/config/site.config";
 import { listingQuerySchema } from "@/features/catalog/schemas";
 import { getCategoryBySlug, getStoreCategories, listProducts } from "@/features/catalog/service";
+import { buildStorefrontMetadata } from "@/features/seo/metadata";
+import { env } from "@/server/env";
+
+// Canonical is deliberately the bare path, ignoring ?category=/q=/sort=/page= — standard practice
+// for a faceted/paginated listing, so search engines see one URL per shop grid, not one per filter.
+export const metadata: Metadata = buildStorefrontMetadata({
+  appUrl: env.APP_URL,
+  path: "/shop",
+  title: "Shop",
+  description: siteConfig.tagline,
+});
 
 export default async function ShopPage({ searchParams }: PageProps<"/shop">) {
   const query = listingQuerySchema.parse(await searchParams);

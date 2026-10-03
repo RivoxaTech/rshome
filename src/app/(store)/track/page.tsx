@@ -1,6 +1,10 @@
+import type { Metadata } from "next";
 import { TrackForm } from "@/components/store/orders/TrackForm";
 import { PageContainer } from "@/components/store/PageContainer";
 import { orderNumberSchema } from "@/features/checkout/schemas";
+import { noindexRobots } from "@/features/seo/metadata";
+
+export const metadata: Metadata = { robots: noindexRobots };
 
 /** `?order=` prefills the number when the order page sent the customer here for lack of a cookie. */
 export default async function TrackPage({ searchParams }: PageProps<"/track">) {

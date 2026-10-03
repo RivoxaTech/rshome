@@ -67,6 +67,14 @@ export function getActiveListingProducts(filter: {
   return selectActiveListingProducts(...conditions);
 }
 
+/** Every active product's slug, category and last-updated time, for `app/sitemap.ts` (no pricing or images needed). */
+export function getActiveProductsForSitemap(): Promise<{ id: number; slug: string; categoryId: number; updatedAt: Date }[]> {
+  return db
+    .select({ id: products.id, slug: products.slug, categoryId: products.categoryId, updatedAt: products.updatedAt })
+    .from(products)
+    .where(eq(products.status, "active"));
+}
+
 export async function getActiveProductBySlug(slug: string) {
   const [row] = await db
     .select({

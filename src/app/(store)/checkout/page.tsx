@@ -1,9 +1,13 @@
+import type { Metadata } from "next";
 import { CheckoutForm } from "@/components/store/checkout/CheckoutForm";
 import { PageContainer } from "@/components/store/PageContainer";
 import { DEFAULT_COUNTRY, getCountryOptions } from "@/config/countries";
 import { features } from "@/config/features";
 import { siteConfig } from "@/config/site.config";
+import { noindexRobots } from "@/features/seo/metadata";
 import { getBankAccounts } from "@/features/settings/service";
+
+export const metadata: Metadata = { robots: noindexRobots };
 
 /** The cart comes from the browser (CartProvider); this frame sets the copy, the country list and the bank details. */
 export default async function CheckoutPage() {
