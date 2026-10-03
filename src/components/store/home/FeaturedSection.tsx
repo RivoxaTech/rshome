@@ -35,7 +35,7 @@ export function FeaturedSection({
             key={product.id}
             className="tilt-card bg-background group w-[280px] shrink-0 snap-start lg:w-[330px]"
           >
-            <Link href={`/product/${product.slug}`} className="relative block w-full overflow-hidden">
+            <Link href={`/product/${product.slug}`} className="relative block aspect-[3/4] w-full overflow-hidden">
               {product.image ? (
                 <Image
                   src={product.image.path}
@@ -43,10 +43,10 @@ export function FeaturedSection({
                   width={product.image.width}
                   height={product.image.height}
                   loading="lazy"
-                  className="h-[340px] w-full object-cover transition-transform duration-[900ms] group-hover:scale-105"
+                  className="h-full w-full object-cover transition-transform duration-[900ms] group-hover:scale-105"
                 />
               ) : (
-                <div className="bg-muted h-[340px] w-full" />
+                <div className="bg-muted h-full w-full" />
               )}
               {product.price.badge && <DiscountBadge label={product.price.badge} className="absolute top-3 left-3" />}
             </Link>

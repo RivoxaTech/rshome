@@ -69,10 +69,10 @@ export default async function ProductPage({ params }: PageProps<"/product/[slug]
         )}
       </nav>
 
-      <div className="mt-6 grid gap-10 lg:grid-cols-2 lg:gap-20">
+      <div className="mt-6 flex flex-col gap-10 lg:flex-row lg:items-stretch lg:gap-20">
         <ProductGallery images={product.images} name={product.name} />
 
-        <div className="lg:pt-4">
+        <div className="min-w-0 lg:flex-1 lg:pt-4">
           <h1 className="font-serif text-4xl leading-[1.05] lg:text-6xl">{product.name}</h1>
           {product.shortDescription && <p className="text-muted-foreground mt-3 text-sm">{product.shortDescription}</p>}
 

@@ -47,8 +47,11 @@ export function Footer({
             </a>
           )}
         </div>
-        {/* Data-driven from src/content/pages.ts (S19): adding a page there adds its link here, nothing else to wire up. */}
+        {/* Data-driven from src/content/pages.ts (S19): adding a page there adds its link here, nothing else to wire up. "Track your order" is the one link here that isn't a content page — it mirrors the header's own /track link (Header.tsx). */}
         <div className="flex flex-col gap-2 text-xs tracking-[0.2em] uppercase">
+          <Link href="/track" className={LINK}>
+            Track your order
+          </Link>
           {PAGES.map((page) => (
             <Link key={page.slug} href={`/${page.slug}`} className={LINK}>
               {page.title}

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useRef, useState } from "react";
 import type { ProductImage } from "@/features/catalog/service";
 
-const MAIN_IMAGE_SIZES = "(min-width: 1024px) 50vw, 100vw";
+const MAIN_IMAGE_SIZES = "(min-width: 1024px) 460px, 100vw";
 
 /**
  * A swipeable strip (native scroll-snap, so touch works without JS) with thumbnails that jump
@@ -14,7 +14,9 @@ export function ProductGallery({ images, name }: { images: ProductImage[]; name:
   const stripRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  if (images.length === 0) return <div className="bg-muted aspect-[4/5] w-full" />;
+  if (images.length === 0) {
+    return <div className="bg-muted aspect-[3/4] w-full lg:w-[460px]" />;
+  }
 
   function showImage(index: number) {
     const strip = stripRef.current;
@@ -29,14 +31,21 @@ export function ProductGallery({ images, name }: { images: ProductImage[]; name:
   }
 
   return (
-    <div>
+    // The photos are a true, uncropped 3:4 at every width — never stretched into a different
+    // shape. Below `lg` the strip is `w-full` (the full stacked column); at `lg` it's a tuned
+    // fixed width (`lg:w-[460px]`, 3:4 of that is ~613px tall) rather than a width derived from
+    // the purchase column's height — that approach (aspect-ratio + flex stretch + width:auto)
+    // doesn't resolve predictably once nested this deep and collapsed the text column to zero
+    // width in testing. A fixed width keeps the ratio exact and, for a typical amount of product
+    // copy, lands close to the purchase column's own height without any fragile CSS trick.
+    <div className="lg:w-[460px] lg:shrink-0">
       <div
         ref={stripRef}
         onScroll={onStripScroll}
-        className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto"
+        className="no-scrollbar flex aspect-[3/4] w-full snap-x snap-mandatory overflow-x-auto"
       >
         {images.map((image, index) => (
-          <div key={`${image.path}-${index}`} className="bg-muted aspect-[4/5] w-full shrink-0 snap-center overflow-hidden">
+          <div key={`${image.path}-${index}`} className="bg-muted h-full w-full shrink-0 snap-center overflow-hidden">
             <Image
               src={image.path}
               alt={image.alt ?? name}
@@ -52,7 +61,7 @@ export function ProductGallery({ images, name }: { images: ProductImage[]; name:
       </div>
 
       {images.length > 1 && (
-        <div className="mt-4 flex gap-3">
+        <div className="mt-4 flex shrink-0 gap-3">
           {images.map((image, index) => (
             <button
               key={`${image.path}-${index}`}

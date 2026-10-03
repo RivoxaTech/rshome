@@ -8,7 +8,9 @@ import { EMPTY_ITEM_ROW, WholesaleItemRows, type WholesaleItemRow } from "@/comp
 import { fieldErrorsOf } from "@/features/checkout/schemas";
 import { todayInKarachi, wholesaleInquiryInputSchema } from "@/features/wholesale/schemas";
 
-const SECTION = "border-border border-t pt-8";
+// Dashed, not a plain solid line: a solid `border-t` here reads as just another field's
+// underline (`CONTROL` in forms/fields.tsx is a solid `border-b`) rather than a section break.
+const SECTION = "border-border/70 border-t border-dashed pt-8";
 
 type BusinessTypeOption = { value: string; label: string };
 

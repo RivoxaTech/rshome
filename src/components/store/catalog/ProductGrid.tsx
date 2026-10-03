@@ -18,7 +18,7 @@ export function ProductGrid({ cards, emptyMessage }: { cards: ProductCard[]; emp
       {cards.map((card) => (
         <article key={card.id} className="tilt-card bg-card group flex flex-col">
           <Link href={`/product/${card.slug}`} className="block">
-            <div className="bg-muted relative aspect-[4/5] overflow-hidden">
+            <div className="bg-muted relative aspect-[3/4] overflow-hidden">
               {card.image && (
                 <Image
                   src={card.image.path}
