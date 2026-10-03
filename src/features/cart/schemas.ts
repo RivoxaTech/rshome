@@ -30,11 +30,18 @@ export type CartInput = z.infer<typeof cartInputSchema>;
 export type CartInputLine = CartInput["lines"][number];
 
 /**
- * A quote request: the stored cart plus, at checkout, the phone number the customer entered, so
- * a coupon's per-customer limit can be checked before the order is placed.
+ * A quote request: the stored cart plus, at checkout, the phone number the customer entered (so a
+ * coupon's per-customer limit can be checked before the order is placed) and the destination
+ * (country and city), so the shipping zone resolves exactly as `createOrder` will resolve it (S14:
+ * a `flat` zone prices its charge into the quote's total; a `quote` zone stays "to be confirmed").
+ * The cart page and drawer send neither, so their shipping is always pending.
  */
 export const cartQuoteRequestSchema = cartInputSchema.extend({
   phone: z.string().trim().max(32).nullable().default(null),
+  destination: z
+    .object({ country: z.string().trim().max(2), city: z.string().trim().max(100) })
+    .nullable()
+    .default(null),
 });
 
 export type CartQuoteRequest = z.infer<typeof cartQuoteRequestSchema>;

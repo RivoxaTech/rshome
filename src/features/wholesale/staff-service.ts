@@ -6,6 +6,7 @@
 import { cache } from "react";
 import { siteConfig } from "@/config/site.config";
 import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
+import { getStoreIdentity } from "@/features/settings/service";
 import { formatPhone } from "@/lib/phone";
 import { buildWholesaleCsv, type WholesaleCsvRow } from "./csv";
 import {
@@ -158,7 +159,7 @@ export async function getStaffWholesaleInquiry(id: number, permissions: Readonly
     status: inquiry.status,
     control,
     customer: { name: inquiry.name, phone: formatPhone(inquiry.phone), phoneDigits: inquiry.phone, email: inquiry.email },
-    whatsApp: { message: `Hello ${inquiry.name}, this is ${siteConfig.storeName} about your wholesale inquiry.` },
+    whatsApp: { message: `Hello ${inquiry.name}, this is ${(await getStoreIdentity()).storeName} about your wholesale inquiry.` },
     items: items.map((item) => ({ id: item.id, itemName: item.itemName, quantity: item.quantity, note: item.note })),
     activity,
     canAddNote: control.canManage,

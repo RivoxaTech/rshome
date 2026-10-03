@@ -11,7 +11,7 @@ import { getOrderByNumber, getOrderItems } from "@/features/orders/repo";
 import { paymentProgress } from "@/features/orders/status";
 import { getProofSummaries } from "@/features/payments/repo";
 import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
-import { getContactInfo } from "@/features/settings/service";
+import { getContactInfo, getStoreIdentity } from "@/features/settings/service";
 import { db } from "@/server/db/client";
 import { env } from "@/server/env";
 import { sendMail } from "@/server/mail/transport";
@@ -41,8 +41,8 @@ async function logMailFailure(orderNumber: string, message: string): Promise<voi
 
 /** Also used by `features/notify/service.ts` for the owner-alert email channel. */
 export async function loadStore(): Promise<StoreInfo> {
-  const contact = await getContactInfo();
-  return { name: siteConfig.storeName, phone: contact.phone, whatsapp: contact.whatsapp, address: contact.address };
+  const [contact, identity] = await Promise.all([getContactInfo(), getStoreIdentity()]);
+  return { name: identity.storeName, phone: contact.phone, whatsapp: contact.whatsapp, address: contact.address };
 }
 
 function orderUrl(orderNumber: string): string {

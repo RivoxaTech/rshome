@@ -184,3 +184,18 @@ export function buildOwnerAlertEmail(input: OwnerAlertInput): MailContent {
 
   return { subject, html, text };
 }
+
+// ── Test email (S14) ────────────────────────────────────────────────────────────────────────────
+
+export type TestEmailInput = { listLabel: string; sentBy: string; store: StoreInfo };
+
+/** "Send test email" on `/panel/settings`: proves the mailbox and the recipient list work, nothing more. */
+export function buildTestEmail(input: TestEmailInput): MailContent {
+  const subject = `Test email — ${input.store.name} ${input.listLabel}`;
+  const bodyLine = `This is a test of the ${input.listLabel} recipient list, sent by ${input.sentBy} from the ${input.store.name} panel. If you can read this, email alerts to this list are working.`;
+
+  const html = wrap(input.store, "Test email", paragraph(bodyLine));
+  const text = `Test email\n${bodyLine}${footerText(input.store)}`;
+
+  return { subject, html, text };
+}

@@ -60,7 +60,7 @@ export function CheckoutForm({
   bankAccounts: BankAccount[];
 }) {
   const router = useRouter();
-  const { quote, status, pending, setCustomerPhone, refresh, clearCart } = useCart();
+  const { quote, status, pending, setCustomerPhone, setDestination, refresh, clearCart } = useCart();
   const [form, setForm] = useState<FormState>({
     name: "",
     phone: "",
@@ -92,6 +92,12 @@ export function CheckoutForm({
   useEffect(() => {
     if (status === "ready" && !placedRef.current && (!quote || quote.lines.length === 0)) router.replace("/cart");
   }, [status, quote, router]);
+
+  // The quote follows the destination, so the summary shows the zone's charge (or "to be
+  // confirmed") exactly as the order will be priced; the cart page sends no destination.
+  useEffect(() => {
+    setDestination({ country: form.country, city: cityValue });
+  }, [form.country, cityValue, setDestination]);
 
   const update = (patch: Partial<FormState>) => setForm((current) => ({ ...current, ...patch }));
 

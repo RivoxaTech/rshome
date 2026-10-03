@@ -4,10 +4,11 @@ import { PageContainer } from "@/components/store/PageContainer";
 import { WholesaleForm } from "@/components/store/wholesale/WholesaleForm";
 import { features } from "@/config/features";
 import { siteConfig } from "@/config/site.config";
-import { getContactInfo } from "@/features/settings/service";
+import { getContactInfo, getStoreIdentity } from "@/features/settings/service";
 
 export const metadata: Metadata = {
-  title: `Wholesale & Bulk Orders | ${siteConfig.storeName}`,
+  // The store layout's title template appends the store name from settings (S14).
+  title: "Wholesale & Bulk Orders",
   description:
     "Request wholesale pricing for tableware, tea sets, trays and decor for your business, event or venue.",
 };
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 /** The wholesale inquiry page (REQUIREMENTS SF-08). Off when `features.wholesale` is off. */
 export default async function WholesalePage() {
   if (!features.wholesale) notFound();
-  const contact = await getContactInfo();
+  const [contact, identity] = await Promise.all([getContactInfo(), getStoreIdentity()]);
 
   return (
     <PageContainer>
@@ -27,7 +28,7 @@ export default async function WholesalePage() {
       <WholesaleForm
         businessTypes={siteConfig.wholesaleBusinessTypes}
         whatsappNumber={contact.whatsapp}
-        whatsappMessage={siteConfig.wholesaleWhatsAppMessage}
+        whatsappMessage={siteConfig.wholesaleWhatsAppMessage.replace("{store}", identity.storeName)}
       />
     </PageContainer>
   );

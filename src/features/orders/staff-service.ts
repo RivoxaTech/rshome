@@ -11,6 +11,7 @@ import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 import { getPrimaryImagesByProductId } from "@/features/catalog/repo";
 import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
 import { goodsTotalOf } from "@/features/pricing/pricing";
+import { getStoreIdentity } from "@/features/settings/service";
 import { formatPhone } from "@/lib/phone";
 import { env } from "@/server/env";
 import { getOrderByNumber, getOrderItems } from "./repo";
@@ -253,7 +254,7 @@ function historyLabel(kind: "order" | "payment" | "note", status: string | null)
 type StaffOrderRow = NonNullable<Awaited<ReturnType<typeof getOrderByNumber>>>;
 
 /** The shop-to-customer WhatsApp message for the order's stage (C13), from each payment's latest screenshot. */
-function whatsAppMessage(order: StaffOrderRow, latest: LatestProofs, deliveryCharge: string | null): string {
+function whatsAppMessage(order: StaffOrderRow, latest: LatestProofs, deliveryCharge: string | null, storeName: string): string {
   const messages = siteConfig.staffWhatsAppMessages;
   const bank = order.paymentMethod === "bank_transfer";
   let message: string = messages.general;
@@ -276,7 +277,7 @@ function whatsAppMessage(order: StaffOrderRow, latest: LatestProofs, deliveryCha
   }
   return fill(message, {
     name: order.customerName,
-    store: siteConfig.storeName,
+    store: storeName,
     reason: order.rejectionReason ?? "",
     orderNumber: order.orderNumber,
     deliveryCharge: deliveryCharge ?? "",
@@ -332,7 +333,7 @@ export async function getStaffOrder(orderNumber: string, permissions: ReadonlySe
     delivery: { charge: control.deliveryCharge, note: order.shippingNote, courier: order.courier, trackingNote: order.trackingNote },
     proofs: proofs.map(proofView),
     customerWait: customerWait({ ...order, latest }, control.deliveryCharge),
-    whatsApp: { phone: order.phone, message: whatsAppMessage(order, latest, control.deliveryCharge) },
+    whatsApp: { phone: order.phone, message: whatsAppMessage(order, latest, control.deliveryCharge, (await getStoreIdentity()).storeName) },
     customer: { name: order.customerName, phone: formatPhone(order.phone), phoneDigits: order.phone, email: order.email },
     address: [order.addressLine, [order.city, order.state, order.postalCode].filter(Boolean).join(" "), countryName].filter(Boolean),
     customerNote: order.customerNote,

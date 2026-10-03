@@ -1,9 +1,11 @@
+import { COUNTRY_CODES } from "@/config/countries";
 import { features } from "@/config/features";
 import { getPrimaryImagesByProductId } from "@/features/catalog/repo";
 import { parseVariantAttributes } from "@/features/catalog/variants";
 import { decimalToPaisa } from "@/features/pricing/money";
 import { normalizeCouponCode } from "@/features/pricing/pricing";
 import { loadCoupon, priceCart } from "@/features/pricing/service";
+import { resolveShippingZone } from "@/features/shipping/service";
 import { normalizePhone } from "@/lib/phone";
 import { consumeRateLimit, resetRateLimit } from "@/server/rate-limit";
 import { formatCartQuote, reconcileCart, toCartLineInputs, type CartQuote, type CartVariant } from "./quote";
@@ -72,12 +74,16 @@ export async function quoteCart(rawInput: unknown, ctx: { ip: string }): Promise
 
   const activeCode = couponAllowed ? couponCode : null;
   const customerKey = input.phone ? normalizePhone(input.phone) : null;
+  // The same resolution `createOrder` runs (ARCHITECTURE.md §4.2 step 3), so a flat zone's charge
+  // is in `expectedTotal` and the order it leads to isn't refused as "prices changed".
+  const destination = input.destination && COUNTRY_CODES.has(input.destination.country.toUpperCase()) ? input.destination : null;
+  const zone = destination ? await resolveShippingZone(destination.country, destination.city) : null;
   const calculation = await priceCart({
     lines: toCartLineInputs(reconciled.lines),
     couponCode: activeCode,
     coupon: await loadCoupon(activeCode, customerKey),
-    zone: null,
-    country: null,
+    zone: zone?.pricing ?? null,
+    country: destination ? destination.country.toUpperCase() : null,
   });
   if (couponCode && calculation.coupon.status === "applied") await resetRateLimit(couponBucket);
 

@@ -23,6 +23,11 @@ function getTransporter(): ReturnType<typeof nodemailer.createTransport> {
   return transporter;
 }
 
+/** True once SMTP is configured; without it `sendMail` only logs the rendered email (development). */
+export function isMailConfigured(): boolean {
+  return env.SMTP_HOST !== undefined;
+}
+
 /** Sends one email, or logs it when there's no SMTP configured. Throws on a real send failure. */
 export async function sendMail(message: MailMessage): Promise<void> {
   const from = env.MAIL_FROM ?? "no-reply@localhost";

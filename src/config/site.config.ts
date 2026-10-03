@@ -1,8 +1,9 @@
 /**
  * Build-time defaults (ARCHITECTURE.md §4.6). The `settings` table holds the runtime-editable
- * versions of `contact`, `socialLinks` and `bankAccounts` (features/settings) and wins when a
- * row exists; these are the fallback when a settings row is missing, and the source for values
- * that aren't in `settings` yet (store name, logo text, nav copy, timezone, order numbers).
+ * versions of `storeName`/`logoText` (`store_identity`), `announcementText`, `contact`,
+ * `socialLinks` and `bankAccounts` (features/settings, edited in the panel since S14) and wins
+ * when a row exists; these are the fallback when a settings row is missing, and the source for
+ * values that aren't in `settings` (nav copy, timezone, order numbers, message templates).
  */
 export const siteConfig = {
   storeName: "RS Home",
@@ -18,10 +19,10 @@ export const siteConfig = {
   timezone: "Asia/Karachi",
   /** Order numbers are `PREFIX-YYMMDD-XXXX` (ARCHITECTURE.md D14). */
   orderNumberPrefix: "RSH",
-  /** The customer-to-shop WhatsApp message on the order page; `{orderNumber}` is filled in. */
-  orderWhatsAppMessage: "Hello RS Home, I have a question about my order {orderNumber}.",
-  /** The customer-to-shop WhatsApp button on the wholesale thank-you state (S17). */
-  wholesaleWhatsAppMessage: "Hello RS Home, I just submitted a wholesale inquiry and wanted to follow up.",
+  /** The customer-to-shop WhatsApp message on the order page; `{store}` and `{orderNumber}` are filled in. */
+  orderWhatsAppMessage: "Hello {store}, I have a question about my order {orderNumber}.",
+  /** The customer-to-shop WhatsApp button on the wholesale thank-you state (S17); `{store}` is filled in. */
+  wholesaleWhatsAppMessage: "Hello {store}, I just submitted a wholesale inquiry and wanted to follow up.",
   /**
    * The shop-to-customer WhatsApp messages on the panel order page, one per stage (C13, C20).
    * `{name}`, `{store}`, `{orderNumber}`, `{deliveryCharge}`, `{total}`, `{reason}` and `{orderUrl}`

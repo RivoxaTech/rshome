@@ -20,9 +20,20 @@ describe("firstAllowedPath", () => {
     expect(firstAllowedPath(permissions)).toBe("/panel/orders/bank");
   });
 
-  it("lands a partial role with only settings.manage on settings", () => {
-    const permissions = new Set<PermissionKey>([PERMISSIONS.SETTINGS_MANAGE]);
-    expect(firstAllowedPath(permissions)).toBe("/panel/settings");
+  it("lands a partial role with only settings.manage on settings, and only settings.bank on the bank page (S14)", () => {
+    expect(firstAllowedPath(new Set<PermissionKey>([PERMISSIONS.SETTINGS_MANAGE]))).toBe("/panel/settings");
+    expect(firstAllowedPath(new Set<PermissionKey>([PERMISSIONS.SETTINGS_BANK]))).toBe("/panel/settings/bank");
+  });
+
+  it("lands a partial role with only shipping.manage on shipping (S14)", () => {
+    expect(firstAllowedPath(new Set<PermissionKey>([PERMISSIONS.SHIPPING_MANAGE]))).toBe("/panel/shipping");
+    // Shipping comes before settings, matching the sidebar's order.
+    expect(firstAllowedPath(new Set<PermissionKey>([PERMISSIONS.SETTINGS_MANAGE, PERMISSIONS.SHIPPING_MANAGE]))).toBe("/panel/shipping");
+  });
+
+  it("keeps the full Admin set on the dashboard and the full Developer set on products despite the new entries", () => {
+    expect(firstAllowedPath(new Set(ADMIN_DEFAULT_PERMISSIONS))).toBe("/panel");
+    expect(firstAllowedPath(new Set(DEVELOPER_DEFAULT_PERMISSIONS))).toBe("/panel/products");
   });
 
   it("lands a partial role with only category.manage on categories", () => {

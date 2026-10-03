@@ -37,10 +37,13 @@ export function Header({
 
   return (
     <header className="fixed inset-x-0 top-0 z-50">
-      {/* One line on phones: smaller type and tracking below sm, the demo's 10px / 0.3em above. */}
-      <div className="bg-espresso text-background overflow-hidden px-3 py-2 text-center text-[8px] tracking-[0.12em] whitespace-nowrap uppercase sm:text-[10px] sm:tracking-[0.3em]">
-        {announcementText}
-      </div>
+      {/* One line on phones: smaller type and tracking below sm, the demo's 10px / 0.3em above.
+          Blank text (settings, S14) hides the bar entirely; the text is rendered as text, never HTML. */}
+      {announcementText && (
+        <div className="bg-espresso text-background overflow-hidden px-3 py-2 text-center text-[8px] tracking-[0.12em] whitespace-nowrap uppercase sm:text-[10px] sm:tracking-[0.3em]">
+          {announcementText}
+        </div>
+      )}
       <div
         className={`transition-all duration-500 ${
           separated ? "bg-background/70 border-border border-b backdrop-blur-xl" : "bg-transparent"

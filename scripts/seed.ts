@@ -162,23 +162,15 @@ async function seedShippingZones() {
     },
   ];
 
-  // This seed is for setup and dev only: it force-sets mode/flat_rate/free_over_amount/cod_enabled on
-  // every run, even for rows already edited elsewhere. Once the S14 zone editor exists, stop overwriting
-  // these fields here (upsert name/areas only) so a Developer's panel changes survive a reseed.
+  // Since S14 the panel's zone editor (`/panel/shipping`) owns these rows: a zone that already
+  // exists is left exactly as staff last saved it (mode, rate, COD, active, areas), and only a
+  // missing zone or a missing seed area is created. Before S14 this force-reset every field on
+  // each run, which would now undo a Developer's panel changes.
   for (const zone of zones) {
     const [existingZone] = await db.select().from(shippingZones).where(eq(shippingZones.name, zone.name));
     let zoneId: number;
     if (existingZone) {
       zoneId = existingZone.id;
-      await db
-        .update(shippingZones)
-        .set({
-          mode: zone.mode,
-          flatRate: zone.flatRate,
-          freeOverAmount: null,
-          codEnabled: zone.codEnabled,
-        })
-        .where(eq(shippingZones.id, zoneId));
     } else {
       const [result] = await db.insert(shippingZones).values({
         name: zone.name,
@@ -189,8 +181,11 @@ async function seedShippingZones() {
         sortOrder: zone.sortOrder,
       });
       zoneId = result.insertId;
+      console.log(`Created shipping zone ${zone.name}.`);
     }
 
+    // An area belongs to exactly one zone (unique index); one already owned — by this zone or,
+    // after a panel edit, another — is never moved.
     for (const area of zone.areas) {
       const existing = await db
         .select()
@@ -201,7 +196,7 @@ async function seedShippingZones() {
       }
     }
   }
-  console.log("Upserted shipping zones: Karachi, Pakistan, International.");
+  console.log("Shipping zones present: Karachi, Pakistan, International (existing rows left as saved in the panel).");
 }
 
 export type VariantSeed = {
@@ -522,35 +517,17 @@ async function seedSampleCoupon() {
   console.log(`Created sample coupon "${SAMPLE_COUPON_CODE}" (10% off, min order PKR 3,000).`);
 }
 
-// Contact and social values from the client (S2b #8); logo text "RS Home" is a build-time
-// default in config/site.config.ts (added in S3), not a runtime setting.
+// Every settings row is created once and never overwritten (S14): the panel's two settings pages
+// are now the way to change them, and a reseed must not undo what staff saved. The values match
+// config/site.config.ts (the storefront's fallback), so a fresh database renders identically to
+// one with no rows at all. Contact and social values are from the client (S2b #8).
 async function seedSettings() {
-  const values: Record<string, unknown> = {
-    contact: {
-      phone: "03218581969",
-      whatsapp: "923218581969",
-      address: "Shop #2 & #3, Plot 3C, Lane 9, Bukhari Commercial, DHA Phase 6, Karachi, Pakistan",
-    },
-    social_links: {
-      facebook: "https://www.facebook.com/share/1BzHaKucmx/",
-      instagram: "https://www.instagram.com/reema_shamsi",
-      instagramHandle: "@reema_shamsi",
-    },
-  };
-
-  for (const [key, value] of Object.entries(values)) {
-    await db
-      .insert(settings)
-      .values({ key, value: JSON.stringify(value) })
-      .onDuplicateKeyUpdate({ set: { value: JSON.stringify(value) } });
-  }
-  console.log(`Upserted ${Object.keys(values).length} settings keys: ${Object.keys(values).join(", ")}.`);
-
-  // Created once and never overwritten, so values entered later (the S14 settings editor, or by
-  // hand for the two notify_owner_* keys below) survive a reseed.
+  await createSettingOnceIfMissing("store_identity", { storeName: siteConfig.storeName, logoText: siteConfig.logoText }, "the config store name and logo text");
+  await createSettingOnceIfMissing("announcement_text", siteConfig.announcementText, "the config announcement text");
+  await createSettingOnceIfMissing("contact", siteConfig.contact, "the client's phone, WhatsApp number and address");
+  await createSettingOnceIfMissing("social_links", siteConfig.socialLinks, "the client's Facebook and Instagram links");
   await createSettingOnceIfMissing("bank_accounts", siteConfig.bankAccounts, "PLACEHOLDER values");
-  // S21 Phase 2: empty = off (push is the primary new-order alert); the owner fills these in by
-  // hand until S14's settings editor exists.
+  // S21 Phase 2: empty = off (push is the primary new-order alert); filled in on /panel/settings.
   await createSettingOnceIfMissing("notify_owner_order_emails", [], "an empty recipient list");
   await createSettingOnceIfMissing("notify_owner_wholesale_emails", [], "an empty recipient list");
 }

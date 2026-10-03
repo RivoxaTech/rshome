@@ -35,6 +35,8 @@ type CartContextValue = {
   removeCoupon: () => void;
   /** Checkout: the phone goes with every quote so a coupon's per-customer limit is checked early. */
   setCustomerPhone: (phone: string | null) => void;
+  /** Checkout: the destination goes with every quote so the shipping zone (and a flat charge) resolves as it will at order time. */
+  setDestination: (destination: { country: string; city: string } | null) => void;
   /** Re-quotes the stored cart, e.g. after the server refused an order because stock changed. */
   refresh: () => void;
   /** After a successful order. */
@@ -74,12 +76,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [pending, startTransition] = useTransition();
   const requestRef = useRef(0);
   const phoneRef = useRef<string | null>(null);
+  const destinationRef = useRef<{ country: string; city: string } | null>(null);
 
   /** Sends a non-empty cart to the server; the reply replaces storage and the view. */
   const quoteRemote = useCallback((cart: CartInput) => {
     const requestId = ++requestRef.current;
     startTransition(async () => {
-      const result = await quoteCartAction({ ...cart, phone: phoneRef.current });
+      const result = await quoteCartAction({ ...cart, phone: phoneRef.current, destination: destinationRef.current });
       if (requestId !== requestRef.current) return; // a newer change is already in flight
       if (result.ok) {
         cartStore.set({ lines: result.quote.storedLines, couponCode: result.quote.storedCouponCode });
@@ -148,6 +151,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       // Only a stored coupon can be affected by the phone, so nothing else triggers a round trip.
       const cart = cartStore.get();
       if (cart.couponCode && cart.lines.length > 0) quoteRemote(cart);
+    },
+    setDestination: (destination) => {
+      const current = destinationRef.current;
+      if (current?.country === destination?.country && current?.city === destination?.city) return;
+      destinationRef.current = destination;
+      // Shipping depends on the destination, so a change always re-quotes a non-empty cart.
+      const cart = cartStore.get();
+      if (cart.lines.length > 0) quoteRemote(cart);
     },
     refresh: () => {
       const cart = cartStore.get();

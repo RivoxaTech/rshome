@@ -5,21 +5,25 @@ import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
  * DB18: dashboard, orders (bank, then COD — one permission covers both pages, bank is just the
  * preferred landing), wholesale, products, categories, settings, users, audit. Used for the post-login
  * redirect, the `/panel` dashboard page when the viewer lacks `dashboard.view`, the login page
- * when already signed in, and the 403 page's back link. `settings` checks either settings
- * permission, since Admin and Developer each hold a different half of it. Categories, discounts and
- * coupons sit after products (S10 phase 1, S12/S13): the Developer holds all of them by default and
- * keeps landing on products unchanged; the entries exist so a role holding only one of those keys
- * still lands on its own page instead of falling back to `/panel/account`.
+ * when already signed in, and the 403 page's back link. The two settings permissions land on two
+ * different pages (S14): `settings.bank` on the Admin's bank/contact page, `settings.manage` on the
+ * Developer's store settings — each is the last Admin-side / Developer-side entry, so a full role
+ * never lands there, but a role holding only that one key does. Categories, discounts, coupons and
+ * shipping sit after products (S10 phase 1, S12/S13, S14): the Developer holds all of them by
+ * default and keeps landing on products unchanged; the entries exist so a role holding only one of
+ * those keys still lands on its own page instead of falling back to `/panel/account`.
  */
 const PRIORITY: { permissions: PermissionKey[]; href: string }[] = [
   { permissions: [PERMISSIONS.DASHBOARD_VIEW], href: "/panel" },
   { permissions: [PERMISSIONS.ORDER_VIEW], href: "/panel/orders/bank" },
   { permissions: [PERMISSIONS.WHOLESALE_VIEW], href: "/panel/wholesale" },
+  { permissions: [PERMISSIONS.SETTINGS_BANK], href: "/panel/settings/bank" },
   { permissions: [PERMISSIONS.PRODUCT_VIEW], href: "/panel/products" },
   { permissions: [PERMISSIONS.CATEGORY_MANAGE], href: "/panel/categories" },
   { permissions: [PERMISSIONS.DISCOUNT_MANAGE], href: "/panel/discounts" },
   { permissions: [PERMISSIONS.COUPON_MANAGE], href: "/panel/coupons" },
-  { permissions: [PERMISSIONS.SETTINGS_BANK, PERMISSIONS.SETTINGS_MANAGE], href: "/panel/settings" },
+  { permissions: [PERMISSIONS.SHIPPING_MANAGE], href: "/panel/shipping" },
+  { permissions: [PERMISSIONS.SETTINGS_MANAGE], href: "/panel/settings" },
   { permissions: [PERMISSIONS.USER_MANAGE], href: "/panel/users" },
   { permissions: [PERMISSIONS.AUDIT_VIEW], href: "/panel/audit-log" },
 ];

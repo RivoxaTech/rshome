@@ -9,7 +9,7 @@ import { siteConfig } from "@/config/site.config";
 import { hasOrderAccess } from "@/features/checkout/order-access-cookie";
 import { orderNumberSchema } from "@/features/checkout/schemas";
 import { getCustomerOrder } from "@/features/orders/service";
-import { getBankAccounts, getContactInfo } from "@/features/settings/service";
+import { getBankAccounts, getContactInfo, getStoreIdentity } from "@/features/settings/service";
 
 const ROW = "flex items-center justify-between gap-4 text-xs tracking-[0.2em] uppercase";
 const SECTION = "border-border border-t pt-8";
@@ -27,9 +27,12 @@ export default async function OrderPage({ params }: PageProps<"/order/[orderNumb
 
   const order = await getCustomerOrder(orderNumber);
   if (!order) notFound();
-  const [contact, bankAccounts] = await Promise.all([getContactInfo(), getBankAccounts()]);
+  const [contact, bankAccounts, identity] = await Promise.all([getContactInfo(), getBankAccounts(), getStoreIdentity()]);
 
-  const whatsapp = whatsAppHref(contact.whatsapp, siteConfig.orderWhatsAppMessage.replace("{orderNumber}", order.orderNumber));
+  const whatsapp = whatsAppHref(
+    contact.whatsapp,
+    siteConfig.orderWhatsAppMessage.replace("{store}", identity.storeName).replace("{orderNumber}", order.orderNumber),
+  );
   const { totals } = order;
 
   return (

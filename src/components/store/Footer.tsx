@@ -1,6 +1,12 @@
+import { whatsAppHref } from "@/components/store/WhatsAppButton";
 import type { Contact, SocialLinks } from "@/features/settings/schemas";
 
-/** Ported from design-reference/src/routes/index.tsx (footer), extended with WhatsApp/Facebook (S2b #8). */
+const LINK = "hover:text-champagne transition-colors";
+
+/**
+ * Ported from design-reference/src/routes/index.tsx (footer), extended with WhatsApp/Facebook (S2b #8).
+ * Every value comes from `settings` (S14): a blank social link simply isn't rendered.
+ */
 export function Footer({
   storeName,
   logoText,
@@ -23,30 +29,19 @@ export function Footer({
         </div>
         <p className="text-muted-foreground text-xs leading-relaxed">{contact.address}</p>
         <div className="flex flex-col gap-2 text-xs tracking-[0.2em] uppercase">
-          <a
-            href={`https://wa.me/${contact.whatsapp}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-champagne transition-colors"
-          >
+          <a href={whatsAppHref(contact.whatsapp)} target="_blank" rel="noopener noreferrer" className={LINK}>
             WhatsApp {contact.phone}
           </a>
-          <a
-            href={socialLinks.facebook}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-champagne transition-colors"
-          >
-            Facebook
-          </a>
-          <a
-            href={socialLinks.instagram}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-champagne transition-colors"
-          >
-            {socialLinks.instagramHandle}
-          </a>
+          {socialLinks.facebook && (
+            <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className={LINK}>
+              Facebook
+            </a>
+          )}
+          {socialLinks.instagram && (
+            <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className={LINK}>
+              {socialLinks.instagramHandle || "Instagram"}
+            </a>
+          )}
         </div>
       </div>
       <p className="text-muted-foreground mx-auto mt-12 max-w-[1400px] text-[10px] tracking-[0.2em] uppercase">
