@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { CouponsPageBody } from "@/components/panel/coupons/CouponsPageBody";
+
+export const metadata: Metadata = { title: "Coupons" };
 
 export default async function CouponsPage({
   searchParams,

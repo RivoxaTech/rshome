@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { ProductsPageBody } from "@/components/panel/products/ProductsPageBody";
+
+export const metadata: Metadata = { title: "Products" };
 
 export default async function ProductsPage({
   searchParams,

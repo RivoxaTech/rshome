@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { BankSettingsForm } from "@/components/panel/settings/BankSettingsForm";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { getBankSettingsForEdit } from "@/features/settings/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { saveBankSettingsAction } from "@/app/panel/(protected)/settings/actions";
+
+export const metadata: Metadata = { title: "Bank & contact" };
 
 /** The Admin's bank, contact and WhatsApp details (REQUIREMENTS DV-07, `settings.bank` only). */
 export default async function BankSettingsPage() {

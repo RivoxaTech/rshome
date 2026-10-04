@@ -32,7 +32,7 @@ export function FloatingActions({ whatsappHref }: { whatsappHref: string }) {
         aria-label="Back to top"
         aria-hidden={!showTop}
         tabIndex={showTop ? 0 : -1}
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        onClick={() => window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" })}
         className={`bg-background border-espresso/20 hover:border-espresso flex h-11 w-11 items-center justify-center rounded-full border shadow-[var(--shadow-soft)] transition-all duration-500 ${
           showTop ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-2 opacity-0"
         }`}

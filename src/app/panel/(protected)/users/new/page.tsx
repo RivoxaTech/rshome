@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { PanelFormHeader } from "@/components/panel/PanelFormHeader";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { UserForm } from "@/components/panel/users/UserForm";
@@ -6,6 +7,8 @@ import { userBackHrefSchema } from "@/features/users/schemas";
 import { getRoleOptions } from "@/features/users/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { createUserAction } from "@/app/panel/(protected)/users/actions";
+
+export const metadata: Metadata = { title: "New user" };
 
 export default async function NewUserPage({ searchParams }: { searchParams: Promise<{ back?: string }> }) {
   await requirePermission(PERMISSIONS.USER_MANAGE);

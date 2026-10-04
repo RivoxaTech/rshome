@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { firstAllowedPath } from "@/features/auth/landing";
 import { requireSession } from "@/server/auth/permissions";
+
+export const metadata: Metadata = { title: "Access denied" };
 
 export default async function ForbiddenPage() {
   const session = await requireSession();

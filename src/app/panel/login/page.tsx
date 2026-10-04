@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/server/auth/session";
 import { firstAllowedPath } from "@/features/auth/landing";
 import { getStoreIdentity } from "@/features/settings/service";
 import { LoginForm } from "@/app/panel/login/LoginForm";
+
+export const metadata: Metadata = { title: "Sign in" };
 
 export default async function LoginPage() {
   const session = await getSession();

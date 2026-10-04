@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { ArchiveRestoreButton } from "@/components/panel/products/ProductRowActions";
@@ -11,6 +12,8 @@ import { productBackHrefSchema } from "@/features/catalog/schemas";
 import { checkProductDeletable, getActiveCategoryGroups, getProductForEdit } from "@/features/catalog/products-staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { updateProductAction } from "@/app/panel/(protected)/products/actions";
+
+export const metadata: Metadata = { title: "Edit product" };
 
 export default async function EditProductPage({
   params,

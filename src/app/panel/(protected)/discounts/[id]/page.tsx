@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PanelFormHeader } from "@/components/panel/PanelFormHeader";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
@@ -12,6 +13,8 @@ import { DISCOUNT_STATUS_COLORS, DISCOUNT_STATUS_LABELS } from "@/features/disco
 import { utcToKarachiLocal } from "@/lib/karachi-datetime";
 import { requirePermission } from "@/server/auth/permissions";
 import { updateDiscountAction } from "@/app/panel/(protected)/discounts/actions";
+
+export const metadata: Metadata = { title: "Edit discount" };
 
 export default async function EditDiscountPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ back?: string }> }) {
   await requirePermission(PERMISSIONS.DISCOUNT_MANAGE);

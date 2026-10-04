@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { PanelFormHeader } from "@/components/panel/PanelFormHeader";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { DiscountForm } from "@/components/panel/discounts/DiscountForm";
@@ -7,6 +8,8 @@ import { getDiscountFormOptions } from "@/features/discounts/staff-service";
 import { utcToKarachiLocal } from "@/lib/karachi-datetime";
 import { requirePermission } from "@/server/auth/permissions";
 import { createDiscountAction } from "@/app/panel/(protected)/discounts/actions";
+
+export const metadata: Metadata = { title: "New discount" };
 
 export default async function NewDiscountPage({ searchParams }: { searchParams: Promise<{ back?: string }> }) {
   await requirePermission(PERMISSIONS.DISCOUNT_MANAGE);

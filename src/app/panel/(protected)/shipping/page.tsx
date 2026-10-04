@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { TestDestinationBox } from "@/components/panel/shipping/TestDestinationBox";
@@ -6,6 +7,8 @@ import { DEFAULT_COUNTRY, getCountryOptions } from "@/config/countries";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { listStaffZones } from "@/features/shipping/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
+
+export const metadata: Metadata = { title: "Shipping" };
 
 const BASE_PATH = "/panel/shipping";
 

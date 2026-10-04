@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PanelFormHeader } from "@/components/panel/PanelFormHeader";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
@@ -13,6 +14,8 @@ import { COUPON_STATUS_COLORS, COUPON_STATUS_LABELS } from "@/features/coupons/s
 import { utcToKarachiLocal } from "@/lib/karachi-datetime";
 import { requirePermission } from "@/server/auth/permissions";
 import { updateCouponAction } from "@/app/panel/(protected)/coupons/actions";
+
+export const metadata: Metadata = { title: "Edit coupon" };
 
 export default async function EditCouponPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ back?: string }> }) {
   const session = await requirePermission(PERMISSIONS.COUPON_MANAGE);

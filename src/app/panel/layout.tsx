@@ -2,11 +2,19 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { getPanelTheme } from "@/app/panel/panel-prefs";
 import { noindexRobots } from "@/features/seo/metadata";
+import { getStoreIdentity } from "@/features/settings/service";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
-/** Defense-in-depth alongside robots.txt's `/panel` disallow (REQUIREMENTS SF-10) — the panel is auth-gated regardless. */
-export const metadata: Metadata = { robots: noindexRobots };
+/**
+ * Defense-in-depth alongside robots.txt's `/panel` disallow (REQUIREMENTS SF-10) — the panel is
+ * auth-gated regardless. The tab title is "<page> | <store name>" (D56; S22 QA-08): every panel
+ * page exports its own `metadata.title`, and the store name comes from `settings`.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const identity = await getStoreIdentity();
+  return { robots: noindexRobots, title: { default: identity.storeName, template: `%s | ${identity.storeName}` } };
+}
 
 /**
  * Wraps every `/panel` route (login, 403, the protected app). `data-panel` scopes the panel's

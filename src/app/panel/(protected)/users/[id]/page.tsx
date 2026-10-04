@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PanelFormHeader } from "@/components/panel/PanelFormHeader";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
@@ -12,6 +13,8 @@ import { userBackHrefSchema } from "@/features/users/schemas";
 import { getRoleOptions, getUserForEdit } from "@/features/users/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { updateUserAction } from "@/app/panel/(protected)/users/actions";
+
+export const metadata: Metadata = { title: "Edit user" };
 
 export default async function EditUserPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ back?: string }> }) {
   const session = await requirePermission(PERMISSIONS.USER_MANAGE);

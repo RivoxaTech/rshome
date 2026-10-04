@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { ChangePasswordForm } from "@/components/panel/account/ChangePasswordForm";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { requireSession } from "@/server/auth/permissions";
+
+export const metadata: Metadata = { title: "Account" };
 
 /** Open to any signed-in user (BUILD_PLAN.md C25) — no `requirePermission` call. */
 export default async function AccountPage() {

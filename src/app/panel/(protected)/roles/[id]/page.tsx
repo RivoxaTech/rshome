@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PanelFormHeader } from "@/components/panel/PanelFormHeader";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
@@ -10,6 +11,8 @@ import { PERMISSIONS } from "@/features/auth/permissions";
 import { PERMISSION_LABELS, checkRoleDeletable, getRoleForEdit } from "@/features/roles/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { updateRoleAction } from "@/app/panel/(protected)/roles/actions";
+
+export const metadata: Metadata = { title: "Edit role" };
 
 export default async function EditRolePage({ params }: { params: Promise<{ id: string }> }) {
   await requirePermission(PERMISSIONS.ROLE_MANAGE);

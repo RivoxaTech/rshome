@@ -22,7 +22,8 @@ export function PanelHeader({ showNotifications, vapidPublicKey }: { showNotific
         >
           <Icon d={ICON_PATHS.menu} className="h-5 w-5" />
         </button>
-        <h1 className="truncate text-[15px] font-semibold sm:text-lg">{title}</h1>
+        {/* Not a heading: each page has its own <h1>, and two per page confused the outline (S22 QA-07). */}
+        <p className="truncate text-[15px] font-semibold sm:text-lg">{title}</p>
       </div>
 
       <div className="flex shrink-0 items-center gap-1">

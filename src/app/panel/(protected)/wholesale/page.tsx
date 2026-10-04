@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { WholesalePageBody } from "@/components/panel/wholesale/WholesalePageBody";
+
+export const metadata: Metadata = { title: "Wholesale inquiries" };
 
 export default async function WholesalePage({
   searchParams,

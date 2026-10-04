@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { PanelFormHeader } from "@/components/panel/PanelFormHeader";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { RoleForm } from "@/components/panel/roles/RoleForm";
@@ -5,6 +6,8 @@ import { PERMISSIONS } from "@/features/auth/permissions";
 import { PERMISSION_LABELS } from "@/features/roles/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { createRoleAction } from "@/app/panel/(protected)/roles/actions";
+
+export const metadata: Metadata = { title: "New role" };
 
 export default async function NewRolePage() {
   await requirePermission(PERMISSIONS.ROLE_MANAGE);

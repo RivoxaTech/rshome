@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import { OrderDetailPage } from "@/components/panel/orders/detail/OrderDetailPage";
+
+/** From the URL only (no query): a missing order still 404s in the page itself. */
+export async function generateMetadata({ params }: { params: Promise<{ orderNumber: string }> }): Promise<Metadata> {
+  const { orderNumber } = await params;
+  return { title: `Order ${orderNumber}` };
+}
 
 export default async function CodOrderDetailPage({
   params,

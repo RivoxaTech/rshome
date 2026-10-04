@@ -42,6 +42,8 @@ export function HeroSection({
     const section = sectionRef.current;
     const picture = imageRef.current;
     if (!section || !picture) return;
+    // Reduced motion (S22 QA-06): the photo stays at its resting position, no scroll listener.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     let frame = 0;
     const apply = () => {
       frame = 0;

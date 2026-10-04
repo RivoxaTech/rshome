@@ -224,3 +224,25 @@
 @utility float-soft {
   animation: float-soft 9s ease-in-out infinite;
 }
+
+/*
+ * Reduced motion (S22 QA-06): the entrance and floating animations, the card tilt and smooth
+ * scrolling are decorative, so they are switched off for anyone who asked their OS for less
+ * motion. The hero parallax and the back-to-top scroll check the same media query in code.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .rise {
+    animation: none;
+  }
+  .float-soft {
+    animation: none;
+  }
+  .tilt-card,
+  .tilt-card:hover {
+    transition: none;
+    transform: none;
+  }
+}

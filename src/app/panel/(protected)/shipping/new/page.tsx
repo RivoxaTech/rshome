@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { PanelFormHeader } from "@/components/panel/PanelFormHeader";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { ZoneForm } from "@/components/panel/shipping/ZoneForm";
@@ -7,6 +8,8 @@ import { zoneBackHrefSchema } from "@/features/shipping/schemas";
 import { fallbackExists } from "@/features/shipping/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { createZoneAction } from "@/app/panel/(protected)/shipping/actions";
+
+export const metadata: Metadata = { title: "New zone" };
 
 export default async function NewZonePage({ searchParams }: { searchParams: Promise<{ back?: string }> }) {
   await requirePermission(PERMISSIONS.SHIPPING_MANAGE);

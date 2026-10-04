@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PanelFormHeader } from "@/components/panel/PanelFormHeader";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
@@ -11,6 +12,8 @@ import { zoneBackHrefSchema } from "@/features/shipping/schemas";
 import { checkZoneDeletable, getZoneForEdit } from "@/features/shipping/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { updateZoneAction } from "@/app/panel/(protected)/shipping/actions";
+
+export const metadata: Metadata = { title: "Edit zone" };
 
 const ACTIVE_COLORS = { dot: "bg-emerald-500", bg: "bg-emerald-500/15", text: "text-emerald-700 dark:text-emerald-400" };
 const INACTIVE_COLORS = { dot: "bg-muted-foreground/60", bg: "bg-muted", text: "text-muted-foreground" };

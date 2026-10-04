@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { StoreSettingsForm } from "@/components/panel/settings/StoreSettingsForm";
 import { TestEmailButton } from "@/components/panel/settings/TestEmailButton";
@@ -5,6 +6,8 @@ import { PERMISSIONS } from "@/features/auth/permissions";
 import { getStoreSettingsForEdit } from "@/features/settings/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { saveStoreSettingsAction } from "@/app/panel/(protected)/settings/actions";
+
+export const metadata: Metadata = { title: "Settings" };
 
 /** The Developer's store settings (REQUIREMENTS DV-07, `settings.manage`): identity, announcement, social links, alert recipients. */
 export default async function SettingsPage() {

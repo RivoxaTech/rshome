@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { PanelFormHeader } from "@/components/panel/PanelFormHeader";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { CouponForm } from "@/components/panel/coupons/CouponForm";
@@ -6,6 +7,8 @@ import { couponBackHrefSchema } from "@/features/coupons/schemas";
 import { utcToKarachiLocal } from "@/lib/karachi-datetime";
 import { requirePermission } from "@/server/auth/permissions";
 import { createCouponAction } from "@/app/panel/(protected)/coupons/actions";
+
+export const metadata: Metadata = { title: "New coupon" };
 
 export default async function NewCouponPage({ searchParams }: { searchParams: Promise<{ back?: string }> }) {
   await requirePermission(PERMISSIONS.COUPON_MANAGE);

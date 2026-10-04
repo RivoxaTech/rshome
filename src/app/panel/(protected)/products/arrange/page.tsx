@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { z } from "zod";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { ProductFormHeader } from "@/components/panel/products/ProductFormHeader";
@@ -8,6 +9,8 @@ import { PERMISSIONS } from "@/features/auth/permissions";
 import { getFeaturedArrangeList, getShopArrangeList } from "@/features/catalog/arrange-service";
 import { listAllCategoriesForStaff } from "@/features/catalog/staff-repo";
 import { requirePermission } from "@/server/auth/permissions";
+
+export const metadata: Metadata = { title: "Arrange products" };
 
 const ARRANGE_TABS = ["shop", "featured"] as const;
 

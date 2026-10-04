@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { CategoryForm } from "@/components/panel/categories/CategoryForm";
@@ -8,6 +9,8 @@ import { categoryBackHrefSchema } from "@/features/catalog/schemas";
 import { checkCategoryDeletable, getCategoryForEdit } from "@/features/catalog/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { updateCategoryAction } from "@/app/panel/(protected)/categories/actions";
+
+export const metadata: Metadata = { title: "Edit category" };
 
 export default async function EditCategoryPage({
   params,

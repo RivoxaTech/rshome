@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { DashboardPeriodSelector } from "@/components/panel/dashboard/DashboardPeriodSelector";
@@ -13,6 +14,8 @@ import type { RangeKey } from "@/features/dashboard/ranges";
 import { dashboardQuerySchema } from "@/features/dashboard/schemas";
 import { getDashboardCards, getDashboardChart, getMostSellingProductsView, getRecentOrdersView } from "@/features/dashboard/service";
 import { requireSession } from "@/server/auth/permissions";
+
+export const metadata: Metadata = { title: "Dashboard" };
 
 async function ChartSection({ range }: { range: RangeKey }) {
   const chart = await getDashboardChart(range);

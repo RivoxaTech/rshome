@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
 import { ProductForm } from "@/components/panel/products/ProductForm";
 import { ProductFormHeader } from "@/components/panel/products/ProductFormHeader";
@@ -6,6 +7,8 @@ import { productBackHrefSchema } from "@/features/catalog/schemas";
 import { getActiveCategoryGroups, getPlacementTotals } from "@/features/catalog/products-staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { createProductAction } from "@/app/panel/(protected)/products/actions";
+
+export const metadata: Metadata = { title: "New product" };
 
 export default async function NewProductPage({ searchParams }: { searchParams: Promise<{ back?: string }> }) {
   await requirePermission(PERMISSIONS.PRODUCT_CREATE);
