@@ -31,6 +31,16 @@ export function Header({
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Esc closes the open phone menu (it is a disclosure, not a modal: the page stays reachable).
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   // The open mobile menu gets the scrolled look too, so it reads the same over the hero and plain pages.
   const elevated = scrolled || open;
   const separated = elevated || !isHome;
@@ -81,7 +91,14 @@ export function Header({
                 </span>
               )}
             </button>
-            <button aria-label="Menu" onClick={() => setOpen((v) => !v)} className="lg:hidden">
+            <button
+              type="button"
+              aria-label="Menu"
+              aria-expanded={open}
+              aria-controls="store-mobile-nav"
+              onClick={() => setOpen((v) => !v)}
+              className="lg:hidden"
+            >
               <Icon d={ICON_PATHS.menu} />
             </button>
           </div>
@@ -89,7 +106,7 @@ export function Header({
 
         {open && (
           // No background of its own: the wrapper's translucent blur covers the header row and this panel.
-          <nav className="border-border/60 grid gap-4 border-t px-6 py-6 lg:hidden">
+          <nav id="store-mobile-nav" className="border-border/60 grid gap-4 border-t px-6 py-6 lg:hidden">
             {navItems.map((item) => (
               <Link
                 key={item.label}

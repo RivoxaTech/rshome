@@ -102,7 +102,7 @@ export function WholesaleStatusActions({ id, control, onChanged }: { id: number;
           )}
         </div>
       )}
-      {state?.ok === false && <span className="text-destructive text-xs">{state.error}</span>}
+      {state?.ok === false && <span role="alert" className="text-destructive text-xs">{state.error}</span>}
     </div>
   );
 }

@@ -58,7 +58,7 @@ export function CloseOrderDialog({
           Reason (the customer sees this)
           <textarea name="reason" rows={3} required className="border-input bg-background rounded-lg border px-3 py-2 text-sm" />
         </label>
-        {state?.ok === false && <p className="text-destructive text-sm">{state.error}</p>}
+        {state?.ok === false && <p role="alert" className="text-destructive text-sm">{state.error}</p>}
         <div className="mt-1 flex justify-between gap-2">
           {!initialAction ? (
             <button type="button" onClick={() => setAction(null)} className="hover:bg-secondary rounded-lg px-3 py-2 text-sm">

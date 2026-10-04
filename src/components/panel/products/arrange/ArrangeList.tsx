@@ -117,7 +117,7 @@ export function ArrangeList({ scope, items }: { scope: ArrangeScope; items: Arra
     <div className="flex flex-col gap-2">
       <div className="h-4 text-xs">
         {saving && <span className="text-muted-foreground">Saving…</span>}
-        {error && <span className="text-destructive">{error}</span>}
+        {error && <span role="alert" className="text-destructive">{error}</span>}
       </div>
       <DndContext id={`arrange-${scope.kind}`} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={order.map((item) => item.id)} strategy={verticalListSortingStrategy}>

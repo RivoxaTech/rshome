@@ -31,7 +31,7 @@ export function DeleteUserDialog({ id, name, isActive, guard }: { id: number; na
         {guard.allowed ? (
           <div className="flex flex-col gap-4">
             <p className="text-sm">This user has never signed in and has no history, so the record can be removed. This can&apos;t be undone.</p>
-            {deleteState && !deleteState.ok && <p className="text-destructive text-sm">{deleteState.error}</p>}
+            {deleteState && !deleteState.ok && <p role="alert" className="text-destructive text-sm">{deleteState.error}</p>}
             <form action={deleteFormAction} className="flex justify-end gap-2">
               <input type="hidden" name="id" value={id} />
               <button type="button" onClick={() => setOpen(false)} className="border-input hover:bg-secondary rounded-md border px-3 py-1.5 text-sm">
@@ -45,7 +45,7 @@ export function DeleteUserDialog({ id, name, isActive, guard }: { id: number; na
         ) : (
           <div className="flex flex-col gap-4">
             <p className="text-sm">{guard.reason}</p>
-            {deactivate.state && !deactivate.state.ok && <p className="text-destructive text-sm">{deactivate.state.error}</p>}
+            {deactivate.state && !deactivate.state.ok && <p role="alert" className="text-destructive text-sm">{deactivate.state.error}</p>}
             <form action={deactivate.formAction} className="flex justify-end gap-2">
               <input type="hidden" name="id" value={id} />
               <input type="hidden" name="isActive" value="false" />

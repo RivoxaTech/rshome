@@ -113,7 +113,7 @@ export function MediaImageField({
           if (file) void handleFile(file);
         }}
       />
-      {(uploadError || error) && <p className="text-destructive text-xs">{uploadError ?? error}</p>}
+      {(uploadError || error) && <p role="alert" className="text-destructive text-xs">{uploadError ?? error}</p>}
     </div>
   );
 }

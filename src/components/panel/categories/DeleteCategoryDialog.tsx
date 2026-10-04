@@ -30,7 +30,7 @@ export function DeleteCategoryDialog({ id, guard }: { id: number; guard: DeleteG
         {guard.allowed ? (
           <div className="flex flex-col gap-4">
             <p className="text-sm">This can&apos;t be undone. Its image files will be removed too.</p>
-            {deleteState && !deleteState.ok && <p className="text-destructive text-sm">{deleteState.error}</p>}
+            {deleteState && !deleteState.ok && <p role="alert" className="text-destructive text-sm">{deleteState.error}</p>}
             <form action={deleteFormAction} className="flex justify-end gap-2">
               <input type="hidden" name="id" value={id} />
               <button type="button" onClick={() => setOpen(false)} className="border-input hover:bg-secondary rounded-md border px-3 py-1.5 text-sm">
@@ -62,7 +62,7 @@ export function DeleteCategoryDialog({ id, guard }: { id: number; guard: DeleteG
               {guard.count} {guard.count === 1 ? "product uses" : "products use"} this category, so it can&apos;t be deleted. Hide it instead to keep it
               out of the storefront.
             </p>
-            {hideState && !hideState.ok && <p className="text-destructive text-sm">{hideState.error}</p>}
+            {hideState && !hideState.ok && <p role="alert" className="text-destructive text-sm">{hideState.error}</p>}
             <form action={hideFormAction} className="flex justify-end gap-2">
               <input type="hidden" name="id" value={id} />
               <button type="button" onClick={() => setOpen(false)} className="border-input hover:bg-secondary rounded-md border px-3 py-1.5 text-sm">

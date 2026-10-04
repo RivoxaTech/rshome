@@ -18,7 +18,7 @@ export function DeleteImageDialog({ image, onClose }: { image: PanelImage; onClo
     <Dialog open onClose={onClose} title="Delete image">
       <div className="flex flex-col gap-4">
         <p className="text-sm">This image will be removed from the product and its files deleted. This can&apos;t be undone.</p>
-        {state && !state.ok && <p className="text-destructive text-sm">{state.error}</p>}
+        {state && !state.ok && <p role="alert" className="text-destructive text-sm">{state.error}</p>}
         <form action={formAction} className="flex justify-end gap-2">
           <input type="hidden" name="imageId" value={image.id} />
           <button type="button" onClick={onClose} className="border-input hover:bg-secondary rounded-md border px-3 py-1.5 text-sm">

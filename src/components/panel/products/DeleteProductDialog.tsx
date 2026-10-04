@@ -41,7 +41,7 @@ export function DeleteProductDialog({ id, guard }: { id: number; guard: ProductD
         {guard.allowed ? (
           <div className="flex flex-col gap-4">
             <p className="text-sm">This can&apos;t be undone. Its image file will be removed too.</p>
-            {deleteState && !deleteState.ok && <p className="text-destructive text-sm">{deleteState.error}</p>}
+            {deleteState && !deleteState.ok && <p role="alert" className="text-destructive text-sm">{deleteState.error}</p>}
             <form action={deleteFormAction} className="flex justify-end gap-2">
               <input type="hidden" name="id" value={id} />
               <button type="button" onClick={() => setOpen(false)} className="border-input hover:bg-secondary rounded-md border px-3 py-1.5 text-sm">
@@ -62,7 +62,7 @@ export function DeleteProductDialog({ id, guard }: { id: number; guard: ProductD
               {guard.count} {guard.count === 1 ? "order uses" : "orders use"} this product, so it can&apos;t be deleted. Archive it instead to keep it out
               of the storefront.
             </p>
-            {archiveState && !archiveState.ok && <p className="text-destructive text-sm">{archiveState.error}</p>}
+            {archiveState && !archiveState.ok && <p role="alert" className="text-destructive text-sm">{archiveState.error}</p>}
             <form action={archiveFormAction} className="flex justify-end gap-2">
               <input type="hidden" name="id" value={id} />
               <button type="button" onClick={() => setOpen(false)} className="border-input hover:bg-secondary rounded-md border px-3 py-1.5 text-sm">

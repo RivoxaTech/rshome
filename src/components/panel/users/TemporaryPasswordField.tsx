@@ -55,7 +55,7 @@ export function TemporaryPasswordField({ id, name, value, onChange, error }: { i
           Generate
         </button>
       </div>
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }

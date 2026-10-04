@@ -115,7 +115,7 @@ function UserFormBody({ mode, initial, roles, version, isSelf, action, backHref,
           <div>
             <span className="text-sm font-medium">Active</span>
             <p className="text-muted-foreground text-xs">{isSelf ? "You can't deactivate your own account." : "Off blocks sign-in and ends every open session at once."}</p>
-            {fieldErrors?.isActive && <p className="text-destructive text-xs">{fieldErrors.isActive}</p>}
+            {fieldErrors?.isActive && <p role="alert" className="text-destructive text-xs">{fieldErrors.isActive}</p>}
           </div>
           {isSelf ? <input type="hidden" name="isActive" value={isActive ? "true" : "false"} /> : <Switch name="isActive" checked={isActive} onChange={setIsActive} />}
         </div>

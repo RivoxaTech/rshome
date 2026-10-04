@@ -32,10 +32,11 @@ export function ScreenshotReview({ item, onDone }: { item: OrderControl["toCheck
             name="reason"
             rows={2}
             required
+            aria-label="Reason (the customer sees this)"
             placeholder="Reason (the customer sees this)"
             className="border-input bg-background rounded-lg border px-3 py-2 text-sm"
           />
-          {reject.state?.ok === false && <p className="text-destructive text-sm">{reject.state.error}</p>}
+          {reject.state?.ok === false && <p role="alert" className="text-destructive text-sm">{reject.state.error}</p>}
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setRejecting(false)} className="hover:bg-secondary rounded-lg px-3 py-1.5 text-sm">
               Back
@@ -57,7 +58,7 @@ export function ScreenshotReview({ item, onDone }: { item: OrderControl["toCheck
           <form action={approve.formAction}>
             <input type="hidden" name="proofId" value={item.id} />
             <input type="hidden" name="decision" value="approve" />
-            {approve.state?.ok === false && <p className="text-destructive text-sm">{approve.state.error}</p>}
+            {approve.state?.ok === false && <p role="alert" className="text-destructive text-sm">{approve.state.error}</p>}
             <button
               type="submit"
               disabled={approve.pending}

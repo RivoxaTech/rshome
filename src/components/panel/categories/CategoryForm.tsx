@@ -36,7 +36,7 @@ function Field({
         {label}
       </label>
       {children}
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
@@ -153,7 +153,7 @@ export function CategoryForm({
         </div>
         <p className="text-muted-foreground -mt-2 text-xs">Hidden categories (and any sub-categories under a hidden parent) disappear from the storefront.</p>
 
-        {formError && <p className="text-destructive text-sm">{formError}</p>}
+        {formError && <p role="alert" className="text-destructive text-sm">{formError}</p>}
 
         <div className="flex items-center gap-2 pt-2">
           <button

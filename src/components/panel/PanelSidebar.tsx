@@ -118,6 +118,7 @@ export function PanelSidebar({
             <button type="button" aria-label="Close menu" onClick={closeMobile} className="absolute inset-0 bg-black/40" />
             <aside
               ref={drawerRef}
+              id="panel-mobile-nav"
               role="dialog"
               aria-modal="true"
               aria-label="Menu"

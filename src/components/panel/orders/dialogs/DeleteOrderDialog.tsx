@@ -16,7 +16,7 @@ export function DeleteOrderDialog({ orderNumber, onClose }: { orderNumber: strin
           This permanently deletes order <span className="font-medium">{orderNumber}</span> and everything in its history — items,
           screenshots, activity. This cannot be undone.
         </p>
-        {state?.ok === false && <p className="text-destructive text-sm">{state.error}</p>}
+        {state?.ok === false && <p role="alert" className="text-destructive text-sm">{state.error}</p>}
         <div className="mt-1 flex justify-end gap-2">
           <button type="button" onClick={onClose} className="hover:bg-secondary rounded-lg px-3 py-2 text-sm">
             Back

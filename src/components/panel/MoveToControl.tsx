@@ -61,7 +61,7 @@ export function MoveToControl({
       <button type="submit" disabled={pending} className="border-input hover:bg-secondary rounded-md border px-2 py-1 text-xs font-medium disabled:opacity-50">
         {pending ? "…" : "Move"}
       </button>
-      {state && !state.ok && <span className="text-destructive basis-full text-xs">{state.error}</span>}
+      {state && !state.ok && <span role="alert" className="text-destructive basis-full text-xs">{state.error}</span>}
     </form>
   );
 }

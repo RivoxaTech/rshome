@@ -140,8 +140,8 @@ export function RoleForm({
             This role can manage users or roles, so anyone holding it can change who has access to the panel. Give it only to people you trust with that.
           </div>
         )}
-        {fieldErrors?.permissions && <p className="text-destructive text-sm">{fieldErrors.permissions}</p>}
-        {fieldErrors?.confirmSensitive && <p className="text-destructive text-sm">{fieldErrors.confirmSensitive}</p>}
+        {fieldErrors?.permissions && <p role="alert" className="text-destructive text-sm">{fieldErrors.permissions}</p>}
+        {fieldErrors?.confirmSensitive && <p role="alert" className="text-destructive text-sm">{fieldErrors.confirmSensitive}</p>}
 
         {/* Plain sections with visible headings, never an `sr-only` legend: an absolutely-positioned sr-only element
             inside the panel's scrolling <main> grows the document (ARCHITECTURE.md D47, re-found by the scroll probe). */}

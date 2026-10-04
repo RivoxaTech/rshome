@@ -42,7 +42,7 @@ export function ApproveDialog({
             Reason (the customer sees this)
             <textarea name="reason" rows={3} required className="border-input bg-background rounded-lg border px-3 py-2 text-sm" />
           </label>
-          {reject.state?.ok === false && <p className="text-destructive text-sm">{reject.state.error}</p>}
+          {reject.state?.ok === false && <p role="alert" className="text-destructive text-sm">{reject.state.error}</p>}
           <div className="mt-1 flex justify-end gap-2">
             <button type="button" onClick={() => setRejecting(false)} className="hover:bg-secondary rounded-lg px-3 py-2 text-sm">
               Back
@@ -84,7 +84,7 @@ export function ApproveDialog({
           Note (optional — courier, parcel count…)
           <input name="note" maxLength={255} className="border-input bg-background rounded-lg border px-3 py-2 text-sm" />
         </label>
-        {approve.state?.ok === false && <p className="text-destructive text-sm">{approve.state.error}</p>}
+        {approve.state?.ok === false && <p role="alert" className="text-destructive text-sm">{approve.state.error}</p>}
         <div className="mt-1 flex items-center justify-between gap-2">
           {!isCod && goodsProof ? (
             <button type="button" onClick={() => setRejecting(true)} className="text-destructive text-sm hover:underline">

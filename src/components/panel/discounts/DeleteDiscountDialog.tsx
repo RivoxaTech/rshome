@@ -25,7 +25,7 @@ export function DeleteDiscountDialog({ id, name }: { id: number; name: string })
             This can&apos;t be undone. Past orders are unaffected: every order item keeps the price and discount it was bought at, so nothing is
             recalculated.
           </p>
-          {state && !state.ok && <p className="text-destructive text-sm">{state.error}</p>}
+          {state && !state.ok && <p role="alert" className="text-destructive text-sm">{state.error}</p>}
           <form action={formAction} className="flex justify-end gap-2">
             <input type="hidden" name="id" value={id} />
             <button type="button" onClick={() => setOpen(false)} className="border-input hover:bg-secondary rounded-md border px-3 py-1.5 text-sm">

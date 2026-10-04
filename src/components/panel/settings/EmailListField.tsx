@@ -96,7 +96,7 @@ export function EmailListField({
       <p className="text-muted-foreground text-xs">
         {value.length} of {max}. Press Enter or Add after each address.
       </p>
-      {(draftError || error) && <p className="text-destructive text-xs">{draftError ?? error}</p>}
+      {(draftError || error) && <p role="alert" className="text-destructive text-xs">{draftError ?? error}</p>}
     </div>
   );
 }

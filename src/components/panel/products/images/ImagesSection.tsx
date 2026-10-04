@@ -73,7 +73,7 @@ export function ImagesSection({ productId, images }: { productId: number; images
 
         <div className="h-4 text-xs">
           {saving && <span className="text-muted-foreground">Saving…</span>}
-          {error && <span className="text-destructive">{error}</span>}
+          {error && <span role="alert" className="text-destructive">{error}</span>}
         </div>
 
         {order.length > 0 && (

@@ -76,7 +76,7 @@ export function ResetRoleDefaultsDialog({
               )}
             </>
           )}
-          {state && !state.ok && <p className="text-destructive text-sm">{state.error}</p>}
+          {state && !state.ok && <p role="alert" className="text-destructive text-sm">{state.error}</p>}
           <form action={formAction} className="flex justify-end gap-2">
             <input type="hidden" name="id" value={id} />
             <input type="hidden" name="version" value={version} />

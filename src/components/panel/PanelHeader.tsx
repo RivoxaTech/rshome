@@ -6,7 +6,7 @@ import { LogoutButton } from "@/components/panel/LogoutButton";
 import { NotificationBell } from "@/components/panel/notifications/NotificationBell";
 
 export function PanelHeader({ showNotifications, vapidPublicKey }: { showNotifications: boolean; vapidPublicKey: string | null }) {
-  const { title, theme, toggleTheme, setMobileOpen } = usePanelUi();
+  const { title, theme, toggleTheme, mobileOpen, setMobileOpen } = usePanelUi();
 
   return (
     <header className="border-border bg-background flex h-[52px] shrink-0 items-center justify-between border-b px-4 sm:px-6">
@@ -15,6 +15,8 @@ export function PanelHeader({ showNotifications, vapidPublicKey }: { showNotific
           type="button"
           onClick={() => setMobileOpen(true)}
           aria-label="Open menu"
+          aria-expanded={mobileOpen}
+          aria-controls="panel-mobile-nav"
           title="Open menu"
           className="text-muted-foreground hover:bg-secondary -ml-1.5 rounded-md p-1.5 md:hidden"
         >

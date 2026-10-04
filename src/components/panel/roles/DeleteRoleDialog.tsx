@@ -20,7 +20,7 @@ export function DeleteRoleDialog({ id, name, guard }: { id: number; name: string
         {guard.allowed ? (
           <div className="flex flex-col gap-4">
             <p className="text-sm">No user holds this role, so it can be removed. This can&apos;t be undone.</p>
-            {state && !state.ok && <p className="text-destructive text-sm">{state.error}</p>}
+            {state && !state.ok && <p role="alert" className="text-destructive text-sm">{state.error}</p>}
             <form action={formAction} className="flex justify-end gap-2">
               <input type="hidden" name="id" value={id} />
               <button type="button" onClick={() => setOpen(false)} className="border-input hover:bg-secondary rounded-md border px-3 py-1.5 text-sm">

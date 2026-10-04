@@ -17,7 +17,7 @@ export function CompleteDialog({ orderNumber, isCod, onClose }: { orderNumber: s
           Mark this order as delivered to the customer.
           {isCod && " This records the cash as collected."}
         </p>
-        {state?.ok === false && <p className="text-destructive text-sm">{state.error}</p>}
+        {state?.ok === false && <p role="alert" className="text-destructive text-sm">{state.error}</p>}
         <div className="mt-1 flex justify-end">
           <button
             type="submit"

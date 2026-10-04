@@ -66,7 +66,7 @@ export function BankSettingsForm({
               {accounts.length} of {MAX_BANK_ACCOUNTS}
             </span>
           </div>
-          {fieldErrors?.accounts && <p className="text-destructive text-xs">{fieldErrors.accounts}</p>}
+          {fieldErrors?.accounts && <p role="alert" className="text-destructive text-xs">{fieldErrors.accounts}</p>}
 
           {accounts.map((account, index) => (
             <fieldset key={index} className="border-border flex flex-col gap-3 rounded-md border p-3">

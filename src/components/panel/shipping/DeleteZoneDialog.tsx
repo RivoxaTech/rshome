@@ -37,7 +37,7 @@ export function DeleteZoneDialog({ id, name, isActive, guard }: { id: number; na
         {guard.allowed ? (
           <div className="flex flex-col gap-4">
             <p className="text-sm">No order has used this zone, so it can be removed along with its areas. Addresses it covered fall back to the rest-of-world zone. This can&apos;t be undone.</p>
-            {deleteState && !deleteState.ok && <p className="text-destructive text-sm">{deleteState.error}</p>}
+            {deleteState && !deleteState.ok && <p role="alert" className="text-destructive text-sm">{deleteState.error}</p>}
             <form action={deleteFormAction} className="flex justify-end gap-2">
               <input type="hidden" name="id" value={id} />
               {cancelButton}
@@ -57,7 +57,7 @@ export function DeleteZoneDialog({ id, name, isActive, guard }: { id: number; na
               {guard.orderCount} {guard.orderCount === 1 ? "order was" : "orders were"} delivered through this zone, so it can&apos;t be deleted — those orders keep their record of it. Deactivate it
               instead: new addresses then resolve to another zone, and nothing already placed changes.
             </p>
-            {deactivate.state && !deactivate.state.ok && <p className="text-destructive text-sm">{deactivate.state.error}</p>}
+            {deactivate.state && !deactivate.state.ok && <p role="alert" className="text-destructive text-sm">{deactivate.state.error}</p>}
             <form action={deactivate.formAction} className="flex justify-end gap-2">
               <input type="hidden" name="id" value={id} />
               <input type="hidden" name="isActive" value="false" />

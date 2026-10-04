@@ -28,7 +28,7 @@ export function LoginForm() {
         </label>
         <PasswordInput id="password" name="password" autoComplete="current-password" required />
       </div>
-      {state?.error && <p className="text-destructive text-sm">{state.error}</p>}
+      {state?.error && <p role="alert" className="text-destructive text-sm">{state.error}</p>}
       <button
         type="submit"
         disabled={pending}

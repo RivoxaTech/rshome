@@ -113,7 +113,7 @@ export function ZoneForm({
               any.
             </p>
           )}
-          {fieldErrors?.codEnabled && <p className="text-destructive text-xs">{fieldErrors.codEnabled}</p>}
+          {fieldErrors?.codEnabled && <p role="alert" className="text-destructive text-xs">{fieldErrors.codEnabled}</p>}
         </div>
 
         <div className="border-border flex flex-col gap-3 rounded-md border p-3">
@@ -126,7 +126,7 @@ export function ZoneForm({
             </div>
             {isFallback ? <input type="hidden" name="isActive" value="true" /> : <Switch name="isActive" checked={isActive} onChange={setIsActive} />}
           </div>
-          {fieldErrors?.isActive && <p className="text-destructive text-xs">{fieldErrors.isActive}</p>}
+          {fieldErrors?.isActive && <p role="alert" className="text-destructive text-xs">{fieldErrors.isActive}</p>}
           {mode === "create" && offerFallback && (
             <div className="border-border flex items-center justify-between gap-3 border-t pt-3">
               <div>
@@ -136,7 +136,7 @@ export function ZoneForm({
               <Switch name="isFallback" checked={isFallback} onChange={setIsFallback} />
             </div>
           )}
-          {fieldErrors?.isFallback && <p className="text-destructive text-xs">{fieldErrors.isFallback}</p>}
+          {fieldErrors?.isFallback && <p role="alert" className="text-destructive text-xs">{fieldErrors.isFallback}</p>}
         </div>
 
         <div className="flex flex-col gap-1">

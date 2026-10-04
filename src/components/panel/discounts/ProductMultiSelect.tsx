@@ -106,7 +106,7 @@ export function ProductMultiSelect({
       <p className="text-muted-foreground text-xs">
         {value.length} of {max} chosen. The discount applies to every variant of each chosen product.
       </p>
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }

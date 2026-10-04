@@ -31,7 +31,7 @@ export function DeleteCouponDialog({ id, code, isActive, guard }: { id: number; 
         {guard.allowed ? (
           <div className="flex flex-col gap-4">
             <p className="text-sm">No order has used this coupon yet, so it can be removed. This can&apos;t be undone.</p>
-            {deleteState && !deleteState.ok && <p className="text-destructive text-sm">{deleteState.error}</p>}
+            {deleteState && !deleteState.ok && <p role="alert" className="text-destructive text-sm">{deleteState.error}</p>}
             <form action={deleteFormAction} className="flex justify-end gap-2">
               <input type="hidden" name="id" value={id} />
               <button type="button" onClick={() => setOpen(false)} className="border-input hover:bg-secondary rounded-md border px-3 py-1.5 text-sm">
@@ -48,7 +48,7 @@ export function DeleteCouponDialog({ id, code, isActive, guard }: { id: number; 
               {Math.max(guard.usageCount, guard.orderCount)} {Math.max(guard.usageCount, guard.orderCount) === 1 ? "order has" : "orders have"} used this coupon, so it
               can&apos;t be deleted — those orders keep their record of it. Deactivate it instead to stop any further use.
             </p>
-            {deactivate.state && !deactivate.state.ok && <p className="text-destructive text-sm">{deactivate.state.error}</p>}
+            {deactivate.state && !deactivate.state.ok && <p role="alert" className="text-destructive text-sm">{deactivate.state.error}</p>}
             <form action={deactivate.formAction} className="flex justify-end gap-2">
               <input type="hidden" name="id" value={id} />
               <input type="hidden" name="isActive" value="false" />

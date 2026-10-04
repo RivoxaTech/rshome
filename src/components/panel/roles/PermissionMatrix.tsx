@@ -72,7 +72,7 @@ function RoleColumnHeader({ role, chosen, labels }: { role: StaffRoleColumn; cho
         >
           {pending ? "Saving…" : dirty ? "Save" : "Saved"}
         </button>
-        {state && !state.ok && <span className="text-destructive text-xs font-normal whitespace-normal">{state.error}</span>}
+        {state && !state.ok && <span role="alert" className="text-destructive text-xs font-normal whitespace-normal">{state.error}</span>}
       </form>
       <SensitiveGrantDialog roleName={role.name} roleKey={role.key} keys={pendingKeys} labels={labels} onConfirm={confirm} onClose={() => setPendingKeys([])} />
     </div>

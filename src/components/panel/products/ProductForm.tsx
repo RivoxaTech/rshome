@@ -39,7 +39,7 @@ function Field({ id, label, error, children }: { id: string; label: string; erro
         {label}
       </label>
       {children}
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
@@ -110,7 +110,7 @@ function PlacementField({
           </label>
         ))}
       </div>
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
     </fieldset>
   );
 }
@@ -333,7 +333,7 @@ export function ProductForm({
           </div>
         )}
 
-        {formError && <p className="text-destructive text-sm">{formError}</p>}
+        {formError && <p role="alert" className="text-destructive text-sm">{formError}</p>}
 
         <div className="flex items-center gap-2 pt-2">
           <button

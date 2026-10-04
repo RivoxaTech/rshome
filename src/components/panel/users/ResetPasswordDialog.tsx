@@ -59,7 +59,7 @@ export function ResetPasswordDialog({ id, name }: { id: number; name: string }) 
               <TemporaryPasswordField id="resetPassword" name="password" value={password} onChange={setPassword} error={fieldErrors?.password} />
               {!fieldErrors?.password && <p className="text-muted-foreground text-xs">At least {MIN_PASSWORD_LENGTH} characters.</p>}
             </div>
-            {state && !state.ok && !fieldErrors && <p className="text-destructive text-sm">{state.error}</p>}
+            {state && !state.ok && !fieldErrors && <p role="alert" className="text-destructive text-sm">{state.error}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" onClick={close} className="border-input hover:bg-secondary rounded-md border px-3 py-1.5 text-sm">
                 Cancel

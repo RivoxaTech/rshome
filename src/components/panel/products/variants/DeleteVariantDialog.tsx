@@ -25,7 +25,7 @@ export function DeleteVariantDialog({ variant, onClose }: { variant: PanelVarian
       {variant.ordered ? (
         <div className="flex flex-col gap-4">
           <p className="text-sm">This variant appears on past orders, so it can&apos;t be deleted. Deactivate it instead to take it off the storefront while keeping those orders intact.</p>
-          {deactivate.state && !deactivate.state.ok && <p className="text-destructive text-sm">{deactivate.state.error}</p>}
+          {deactivate.state && !deactivate.state.ok && <p role="alert" className="text-destructive text-sm">{deactivate.state.error}</p>}
           <form action={deactivate.formAction} className="flex justify-end gap-2">
             <input type="hidden" name="variantId" value={variant.id} />
             <input type="hidden" name="isActive" value="false" />
@@ -44,7 +44,7 @@ export function DeleteVariantDialog({ variant, onClose }: { variant: PanelVarian
           <p className="text-sm">
             SKU <span className="font-mono">{variant.sku}</span> and its stock of {variant.stock} will be removed. This can&apos;t be undone.
           </p>
-          {remove.state && !remove.state.ok && <p className="text-destructive text-sm">{remove.state.error}</p>}
+          {remove.state && !remove.state.ok && <p role="alert" className="text-destructive text-sm">{remove.state.error}</p>}
           <form action={remove.formAction} className="flex justify-end gap-2">
             <input type="hidden" name="variantId" value={variant.id} />
             <button type="button" onClick={onClose} className="border-input hover:bg-secondary rounded-md border px-3 py-1.5 text-sm">

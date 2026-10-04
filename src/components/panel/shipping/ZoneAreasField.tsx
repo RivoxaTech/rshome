@@ -99,7 +99,7 @@ export function ZoneAreasField({ countries, value, onChange, error }: { countrie
       <p className="text-muted-foreground text-xs">
         {value.length} of {MAX_ZONE_AREAS}. An area can belong to only one zone.
       </p>
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }

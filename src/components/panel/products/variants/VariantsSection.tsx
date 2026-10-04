@@ -82,7 +82,7 @@ export function VariantsSection({ product, variants }: { product: VariantsProduc
         </p>
         <div className="h-4 text-xs">
           {saving && <span className="text-muted-foreground">Saving…</span>}
-          {error && <span className="text-destructive">{error}</span>}
+          {error && <span role="alert" className="text-destructive">{error}</span>}
         </div>
         <DndContext id={`variants-${product.id}`} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={order.map((variant) => variant.id)} strategy={verticalListSortingStrategy}>

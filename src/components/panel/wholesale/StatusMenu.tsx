@@ -117,7 +117,7 @@ export function StatusMenu({ id, control, onChanged }: { id: number; control: In
           <Icon d={ICON_PATHS.chevronDown} className="h-3 w-3" />
         </button>
       )}
-      {state?.ok === false && <span className="text-destructive text-[11px]">{state.error}</span>}
+      {state?.ok === false && <span role="alert" className="text-destructive text-[11px]">{state.error}</span>}
 
       {open &&
         position &&

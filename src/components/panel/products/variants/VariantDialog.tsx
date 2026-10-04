@@ -26,7 +26,7 @@ function Field({ id, label, error, hint, children }: { id: string; label: string
       </label>
       {children}
       {hint && !error && <p className="text-muted-foreground text-xs">{hint}</p>}
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
@@ -165,7 +165,7 @@ export function VariantDialog({
                     ))}
                   </span>
                 )}
-                {(keyError || valueError) && <p className="text-destructive text-xs">{keyError ?? valueError}</p>}
+                {(keyError || valueError) && <p role="alert" className="text-destructive text-xs">{keyError ?? valueError}</p>}
               </div>
             );
           })}
@@ -221,7 +221,7 @@ export function VariantDialog({
           <Switch name="isActive" checked={isActive} onChange={setIsActive} />
         </div>
 
-        {formError && <p className="text-destructive text-sm">{formError}</p>}
+        {formError && <p role="alert" className="text-destructive text-sm">{formError}</p>}
 
         <div className="border-border -mx-5 -mb-4 flex justify-end gap-2 border-t px-5 pt-3">
           <button type="button" onClick={onClose} className="border-input hover:bg-secondary rounded-md border px-3 py-1.5 text-sm">

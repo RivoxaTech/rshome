@@ -36,7 +36,7 @@ function Field({ id, label, error, hint, children }: { id: string; label: string
       </label>
       {children}
       {hint && !error && <p className="text-muted-foreground text-xs">{hint}</p>}
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
@@ -160,7 +160,7 @@ export function CouponForm({
           moment a discounted item is added.
         </p>
 
-        {formError && <p className="text-destructive text-sm">{formError}</p>}
+        {formError && <p role="alert" className="text-destructive text-sm">{formError}</p>}
 
         <div className="flex items-center gap-2 pt-2">
           <button type="submit" disabled={pending} className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50">

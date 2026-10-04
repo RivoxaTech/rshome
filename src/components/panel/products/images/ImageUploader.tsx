@@ -159,7 +159,7 @@ export function ImageUploader({
               <span className="min-w-0 flex-1 truncate">{file.name}</span>
               {!file.done && <span className="text-muted-foreground tabular-nums">{file.progress}%</span>}
               {file.done && !file.error && <span className="text-emerald-600 dark:text-emerald-400">Added</span>}
-              {file.error && <span className="text-destructive">{file.error}</span>}
+              {file.error && <span role="alert" className="text-destructive">{file.error}</span>}
             </li>
           ))}
         </ul>

@@ -39,7 +39,7 @@ function Field({ id, label, error, hint, children }: { id: string; label: string
       </label>
       {children}
       {hint && !error && <p className="text-muted-foreground text-xs">{hint}</p>}
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
@@ -199,7 +199,7 @@ export function DiscountForm({
           <Switch name="isActive" checked={isActive} onChange={setIsActive} />
         </div>
 
-        {formError && <p className="text-destructive text-sm">{formError}</p>}
+        {formError && <p role="alert" className="text-destructive text-sm">{formError}</p>}
 
         <div className="flex items-center gap-2 pt-2">
           <button

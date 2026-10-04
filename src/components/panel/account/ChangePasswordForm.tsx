@@ -25,7 +25,7 @@ function Field({
         {label}
       </label>
       <PasswordInput id={id} name={name} autoComplete={autoComplete} required aria-invalid={!!error} />
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
@@ -45,7 +45,7 @@ export function ChangePasswordForm() {
         error={state?.fieldErrors?.confirmPassword}
       />
 
-      {state && !state.ok && !state.fieldErrors && <p className="text-destructive text-sm">{state.error}</p>}
+      {state && !state.ok && !state.fieldErrors && <p role="alert" className="text-destructive text-sm">{state.error}</p>}
       {state?.ok && <p className="text-sm text-emerald-600 dark:text-emerald-400">Password changed. Your other sessions were signed out.</p>}
 
       <button

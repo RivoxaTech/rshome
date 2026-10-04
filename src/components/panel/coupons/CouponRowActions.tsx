@@ -27,7 +27,7 @@ export function CouponActiveToggle({ id, isActive, variant = "icon" }: { id: num
           <Icon d={ICON_PATHS.power} className={`h-4 w-4 ${isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`} />
         </button>
       )}
-      {state && !state.ok && <span className="text-destructive text-xs">{state.error}</span>}
+      {state && !state.ok && <span role="alert" className="text-destructive text-xs">{state.error}</span>}
     </form>
   );
 }

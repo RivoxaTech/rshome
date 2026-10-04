@@ -41,10 +41,11 @@ export function ActivityCard({
           <textarea
             name="note"
             rows={2}
+            aria-label="Internal note"
             placeholder="Add an internal note (staff only)"
             className="border-input bg-background rounded-lg border px-3 py-2 text-sm"
           />
-          {state?.ok === false && <p className="text-destructive text-sm">{state.error}</p>}
+          {state?.ok === false && <p role="alert" className="text-destructive text-sm">{state.error}</p>}
           <div className="flex justify-end">
             <button
               type="submit"

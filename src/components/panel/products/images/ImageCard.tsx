@@ -116,7 +116,7 @@ export function ImageCard({ image, total, onDelete }: { image: PanelImage; total
 
       <MoveToControl action={moveImageAction} hiddenFields={{ imageId: image.id }} total={total} itemName={`image ${image.position}`} />
 
-      {(cardError || primaryError) && <p className="text-destructive text-[11px]">{cardError ?? primaryError}</p>}
+      {(cardError || primaryError) && <p role="alert" className="text-destructive text-[11px]">{cardError ?? primaryError}</p>}
     </li>
   );
 }

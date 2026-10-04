@@ -207,7 +207,7 @@ export function VariantRow({
         </div>
       </div>
 
-      {rowError && <p className="text-destructive text-xs md:col-span-8">{rowError}</p>}
+      {rowError && <p role="alert" className="text-destructive text-xs md:col-span-8">{rowError}</p>}
     </li>
   );
 }
