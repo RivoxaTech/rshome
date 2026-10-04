@@ -9,7 +9,6 @@ import { BankDetails } from "@/components/store/orders/BankDetails";
 import { ProofUpload } from "@/components/store/orders/ProofUpload";
 import { CopyButton } from "@/components/ui/CopyButton";
 import type { CountryOption } from "@/config/countries";
-import { siteConfig } from "@/config/site.config";
 import { checkoutInputSchema, fieldErrorsOf } from "@/features/checkout/schemas";
 import type { BankAccount } from "@/features/settings/schemas";
 import { CheckoutSummary } from "./CheckoutSummary";
@@ -50,6 +49,7 @@ export function CheckoutForm({
   codEnabled,
   couponsEnabled,
   deliveryNote,
+  emailHint,
   bankAccounts,
 }: {
   countries: CountryOption[];
@@ -57,6 +57,8 @@ export function CheckoutForm({
   codEnabled: boolean;
   couponsEnabled: boolean;
   deliveryNote: string;
+  /** Under the email field; a prop so this client bundle doesn't carry all of site.config.ts (S22 SPD-05). */
+  emailHint: string;
   bankAccounts: BankAccount[];
 }) {
   const router = useRouter();
@@ -211,7 +213,7 @@ export function CheckoutForm({
               label="Email"
               type="email"
               autoComplete="email"
-              hint={siteConfig.checkoutEmailHint}
+              hint={emailHint}
               value={form.email}
               onChange={(event) => update({ email: event.target.value })}
               error={fieldErrors.email}

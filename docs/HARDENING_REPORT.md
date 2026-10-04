@@ -2,7 +2,7 @@
 
 ## Progress (resume from here)
 
-**Stage 1 (Group A security, Group B bugs) is done, 4 October 2026, uncommitted on `main`.** Stage 2 (Groups C speed + hero, D dead code, E quality, F docs, then Phase 4 verification) has not started. Owner answers to the section 7 questions are recorded at the end of this section. Tests: 1015 passing in 99 files (959 in 84 files before Stage 1), typecheck and lint clean. Two standalone builds were made: the first to check the headers with curl and a headless pass (home, product, login, dashboard poll, upload fetch, service worker), which surfaced zod's `new Function` probe as a CSP violation; the second, after the `jitless` fix, ran the same pass with no violations and confirmed `.shadow-soft` is generated in the built CSS and no `.env*` file is inside `.next/standalone`.
+**Stage 1 (Group A security, Group B bugs) is done, 4 October 2026, committed and pushed on `production` (`569c61a`, `eb756b0`). Stage 2A (Group C speed + hero, Group D dead code) is done, 5 October 2026, as two local commits on `production`, not pushed; see "Stage 2A" below.** Stage 2B (Groups E quality, F docs, then Phase 4 verification) has not started. Owner answers to the section 7 questions are recorded at the end of this section. Tests: 1015 passing in 99 files (959 in 84 files before Stage 1), typecheck and lint clean. Two standalone builds were made: the first to check the headers with curl and a headless pass (home, product, login, dashboard poll, upload fetch, service worker), which surfaced zod's `new Function` probe as a CSP violation; the second, after the `jitless` fix, ran the same pass with no violations and confirmed `.shadow-soft` is generated in the built CSS and no `.env*` file is inside `.next/standalone`.
 
 | Item | Status | Notes |
 |---|---|---|
@@ -36,6 +36,46 @@
 **Test-suite note:** `checkout/service.integration.test.ts`'s COD-off test must stay the last test in its file — outside a Next request React's `cache()` never resets (D45), so a zone row read with COD off would leak into every later test.
 
 **Stage 2 order:** (1) Group C (SPD-01 counts query, SPD-03 `sizes` + `deviceSizes`, SPD-02, SPD-04/05, HERO-01 from the two JPGs in `public/hero/`, re-measure); (4) Group D (20 dead items, 10 theme tokens, favicon = generated "RS" placeholder, README, stale comments, drop 168 redundant `export`s); (5) Group E (a11y `useModal`, alerts, labels, reduced motion, headings, panel titles, layering, shared helpers, three file splits; contrast **panel only**, storefront contrast reported in the final summary, not changed); (6) Group F (`docs/DEPLOY.md`, BUILD_PLAN S22 done/S23 next, ARCHITECTURE D61, CLAUDE.md rules, `db:seed -- --no-samples` that never deletes); (7) Phase 4. Owner answers: Q1 skip B17; Q2 static CSP, no proxy; Q3 HSTS 180 days, no includeSubDomains; Q4 drop redundant exports; Q5 use the two JPGs in `public/hero/`; Q6 generate an "RS" placeholder icon with sharp; Q7 panel-only contrast fixes; Q8 add `--no-samples`; Q9 price 0 stays allowed; Q10 keep this report.
+
+### Stage 2A (5 October 2026)
+
+**Group C, speed and hero: done.** Tests 1024 passing in 101 files (1018 before), typecheck and lint clean. Measured against production standalone builds of `eb756b0` ("before") and of the Group C commit ("after") on this laptop, each started on its own port next to the owner's dev server; query counts come from MySQL's general log in TABLE mode filtered to the standalone server's own connections (the dev server's threads were excluded and confirmed idle), timings are the warm median of 15 requests from Node `fetch`, browser transfer is headless Chrome with cache disabled.
+
+| Item | Status | Notes |
+|---|---|---|
+| C1 SPD-01 counts query | done | `countOrdersByState` is a `UNION ALL` of two grouped selects: the two correlated screenshot subqueries now run only for bank orders that are not cancelled or rejected (the only orders whose flags read screenshots); COD orders and closed bank orders are counted with a plain `GROUP BY` and NULL screenshot states. **Narrower than the report's plan:** a *delivered* bank order stays on the subquery path, because `screenshotToCheck` still returns true for it when a latest screenshot is `submitted` (`canReviewProof` treats Completed as open) and the every-enum-combination test checks exactly that. Test change: COD orders in that test now also get screenshot histories, so the plain path is exercised; an identical-counts test cannot fail before a behaviour-preserving refactor, so this is the protecting test, not a failing-first one. |
+| C2 SPD-03 `sizes` + `deviceSizes` | done | `next.config.ts` `images.deviceSizes: [400, 800, 1200]`, `imageSizes: []`, pinned to the loader's `AVAILABLE_WIDTHS` by a new (failing-first) test in `image-loader.test.ts`; `sizes` on the Featured cards (`330px`/`280px`), each Collections mosaic slot (`58vw`/`42vw`/`100vw`), Story (`50vw`) and Wholesale (`25vw`/`50vw`) images. Also found by the "after" build: the footer's credit `<img>` had no `loading="lazy"`, so React's streaming renderer emitted a `<link rel=preload>` for a below-the-fold 48 KB PNG on every storefront page; now lazy, so the hero preload is again the only image preload. |
+| C3 SPD-02 settings batch read | done | `loadSettings()` (`cache()`d) reads every key with one `WHERE key IN (...)`; each reader still falls back per key. `getSettingValue` deleted (unused). New `settings/service.test.ts` (mocked repo; confirmed failing before the change). |
+| C4 SPD-04/05 | done | `CartProvider` value is `useMemo`d over `useCallback`ed actions; `HeroSection` parallax writes `transform` straight to the element once per animation frame and stops once the hero has scrolled past, no React state; `CheckoutForm` takes `emailHint` as a prop (the checkout page passes `siteConfig.checkoutEmailHint`), so `site.config.ts` is no longer in that client bundle. |
+| C5 HERO-01 | done | `public/hero/hero-{main,accent}-{400,800,1200}.webp` (9/27/48 KB and 17/46/76 KB), generated by the new `scripts/hero-images.mjs` from the owner's two JPGs; `HERO_IMAGES` in `config/home-content.ts` (alt text describes the photos); `HeroSection` renders them with `next/image`, `preload`, `sizes="100vw"`/`"288px"` and `lib/image-loader.ts#staticImagePath` as the per-image loader; the home `generateMetadata` uses the 1200 px main file as the Open Graph image; the hero no longer depends on any category. **Deviation from the plan's 640/960/1200 and 288/576/864:** Next asks the loader for the `deviceSizes` widths, so a set at other widths produced `srcset` descriptors that lied (`hero-main-640.webp 800w`) and never served the middle size; every static set now uses the same three widths as `/media`, so each candidate is a real file. `metadata.test.ts` checks the OG URL and that every file the loader can name exists. Verified in the browser at 375 and 1440 (screenshots; hero fills, accent card bottom-right on desktop, no console errors). The source JPGs were moved out of `public/` after the commit. |
+| C6 re-measure | done | Tables below. |
+
+Server, warm median and queries per request (before → after):
+
+| Page | Before | After | Queries before | Queries after |
+|---|---|---|---|---|
+| `/` | 45 ms | 40 ms | 10 | 7 |
+| `/shop` | 40 ms | 32 ms | 10 | 7 |
+| `/category/tableware` | 33 ms | 37 ms | 10 | 7 |
+| `/product/[slug]` | 31 ms | 28 ms | 10 | 7 |
+| `/cart`, `/track`, `/wholesale`, `/contact` | 21–30 ms | 16–27 ms | 4 | 1 |
+| `/checkout` | 32 ms | 27 ms | 5 | 1 |
+| `/panel` (dashboard) | 40 ms | 34 ms | 13 | 13 |
+| `/panel/orders/bank` | 48 ms | 45 ms | 8 | 8 |
+| `/panel/orders/cod/[n]` | 33 ms | 37 ms | 10 | 10 |
+| `/panel/products` | 31 ms | 31 ms | 5 | 5 |
+
+The three fewer storefront queries are the per-key settings reads (C3). The panel's query count is unchanged because the `UNION ALL` is one statement; at 134 orders (mostly COD) its cost is within noise, and the gain is that completed COD orders and closed bank orders no longer pay the two subqueries as the table grows. Timing differences of a few ms are within run-to-run noise on this laptop.
+
+Home page transfer, cache disabled (before → after): "initial" is the first paint's requests, "full" is after scrolling to the footer so every lazy image loads.
+
+| Viewport | Initial | Full | Images (full) | Hero file |
+|---|---|---|---|---|
+| 375 px, DPR 2 | 719 → 512 KB | 1120 → 996 KB | 807 → 683 KB | category 1200 px → `hero-main-800` |
+| 375 px, DPR 3 | 697 → 642 KB | 1099 → 1176 KB | 807 → 886 KB | category 1200 px → `hero-main-1200` |
+| 1440 px, DPR 1 | 696 → 629 KB | 1094 → 804 KB | 807 → 519 KB | category 1200 px → `hero-main-1200` |
+
+The report's "~350 KB" estimate was optimistic: with only three generated widths, a 327 px wide card at DPR 3 still needs the 1200 px file, so `sizes` helps DPR 2 phones and desktops, not DPR 3 phones. The DPR 3 "full" figure grew by 77 KB because the hero is now its own file (before, the Decor category photo served as hero, Collections card, Story image and Wholesale cell and was fetched once) and because one Wholesale cell now fetches an 800 px file where Chrome previously reused the 1200 px copy already in memory. Console errors: none in any run.
 
 **Dev database:** every test suite runs against `rs_home_test`, so the fixes themselves touched nothing. The headless passes logged into the dev panel: the `sessions` rows they created (4 in total) were deleted afterwards (the table had 0 rows before), `users.last_login_at` of the two seeded users now shows today, and the new rate-limit sweep (B15) ran on that login and removed 224 long-expired `rate_limits` rows (227 → 3; all were stale buckets from earlier demo seeds and manual tests, which the seed never creates and the `db:reset:*` scripts clear anyway). No catalogue, order, settings or user data changed.
 

@@ -1,5 +1,5 @@
-import { and, asc, count, desc, eq, gt, gte, inArray, isNull, like, lt, or, sql, type SQL } from "drizzle-orm";
-import { alias } from "drizzle-orm/mysql-core";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNull, like, lt, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { alias, unionAll } from "drizzle-orm/mysql-core";
 import { normalizePhone } from "@/lib/phone";
 import { db, type DbClient } from "@/server/db/client";
 import { users } from "@/server/db/schema/access-control";
@@ -113,12 +113,22 @@ export async function listOrders(
 
 
 /**
+ * The orders whose flags (`screenshotToCheck`, `needsAction` in transitions.ts) read the latest
+ * screenshots: bank orders that are not closed. A COD order's flags never look at screenshots,
+ * and a cancelled or rejected order can't have one checked (`canReviewProof`).
+ */
+const FLAGS_READ_PROOFS = and(eq(orders.paymentMethod, "bank_transfer"), notInArray(orders.orderStatus, ["cancelled", "rejected"]));
+const FLAGS_IGNORE_PROOFS = or(eq(orders.paymentMethod, "cod"), inArray(orders.orderStatus, ["cancelled", "rejected"]));
+
+/**
  * How many orders there are per method, order status, payment status and each payment's latest
- * screenshot status: a few dozen rows at most. Grouped by the aliases, which MySQL and MariaDB
- * both accept.
+ * screenshot status: a few dozen rows at most. The two correlated screenshot subqueries run only
+ * for the orders whose flags depend on them (S22 SPD-01); every other order is counted with a
+ * plain GROUP BY and NULL screenshot states, which the service reads as "missing", exactly what
+ * the flags ignore for those orders. Grouped by the aliases, which MySQL and MariaDB both accept.
  */
 export function countOrdersByState() {
-  return db
+  const withProofs = db
     .select({
       paymentMethod: orders.paymentMethod,
       orderStatus: orders.orderStatus,
@@ -128,7 +138,21 @@ export function countOrdersByState() {
       count: count(),
     })
     .from(orders)
+    .where(FLAGS_READ_PROOFS)
     .groupBy(orders.paymentMethod, orders.orderStatus, orders.paymentStatus, sql`goods_status`, sql`delivery_status`);
+  const withoutProofs = db
+    .select({
+      paymentMethod: orders.paymentMethod,
+      orderStatus: orders.orderStatus,
+      paymentStatus: orders.paymentStatus,
+      goods: sql<ProofRow["status"] | null>`null`.as("goods_status"),
+      delivery: sql<ProofRow["status"] | null>`null`.as("delivery_status"),
+      count: count(),
+    })
+    .from(orders)
+    .where(FLAGS_IGNORE_PROOFS)
+    .groupBy(orders.paymentMethod, orders.orderStatus, orders.paymentStatus);
+  return unionAll(withProofs, withoutProofs);
 }
 
 /** Every screenshot of these orders (one order, or one list page), newest first, with who reviewed it. */

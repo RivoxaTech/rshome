@@ -1,16 +1,20 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/store/Button";
+import { staticImagePath, type StaticImageSet } from "@/lib/image-loader";
 
 type Cta = { label: string; href: string };
-type HeroImage = { path: string; alt: string; width: number; height: number };
+
+const PARALLAX_FACTOR = 0.25;
+const restingTransform = (offset: number) => `translateY(${offset * PARALLAX_FACTOR}px) scale(1.05)`;
 
 /**
  * The only client component on the home page: the demo's scroll-linked parallax on the hero
  * background (ported from design-reference/src/routes/index.tsx). Everything else on the page
- * is static enough to stay a Server Component (ARCHITECTURE.md §5).
+ * is static enough to stay a Server Component (ARCHITECTURE.md §5). The photos are the static
+ * sets in `config/home-content.ts` (S22 HERO-01), rendered through the `public/` loader.
  */
 export function HeroSection({
   eyebrow,
@@ -26,28 +30,49 @@ export function HeroSection({
   copy: string;
   primaryCta: Cta;
   secondaryCta: Cta;
-  image: HeroImage;
-  accentImage: HeroImage | null;
+  image: StaticImageSet;
+  accentImage: StaticImageSet;
 }) {
-  const [offset, setOffset] = useState(0);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
 
+  // One style write per animation frame, straight to the element, and none once the hero has
+  // scrolled out of view (S22 SPD-04): no React state, so nothing re-renders on scroll.
   useEffect(() => {
-    const onScroll = () => setOffset(window.scrollY);
-    onScroll();
+    const section = sectionRef.current;
+    const picture = imageRef.current;
+    if (!section || !picture) return;
+    let frame = 0;
+    const apply = () => {
+      frame = 0;
+      const offset = window.scrollY;
+      if (offset > section.offsetHeight) return;
+      picture.style.transform = restingTransform(offset);
+    };
+    const onScroll = () => {
+      if (frame === 0) frame = requestAnimationFrame(apply);
+    };
+    apply();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame !== 0) cancelAnimationFrame(frame);
+    };
   }, []);
 
   return (
-    <div className="relative h-[100svh] min-h-[620px] overflow-hidden">
+    <div ref={sectionRef} className="relative h-[100svh] min-h-[620px] overflow-hidden">
       <Image
-        src={image.path}
+        ref={imageRef}
+        src={image.basePath}
+        loader={({ width }) => staticImagePath(image, width)}
         alt={image.alt}
         width={image.width}
         height={image.height}
+        sizes="100vw"
         preload
         className="absolute inset-0 h-[120%] w-full object-cover"
-        style={{ transform: `translateY(${offset * 0.25}px) scale(1.05)` }}
+        style={{ transform: restingTransform(0) }}
       />
       <div className="from-background/90 via-background/40 absolute inset-0 bg-gradient-to-r to-transparent" />
       <div className="absolute inset-0 flex items-center px-6 lg:px-16">
@@ -71,18 +96,18 @@ export function HeroSection({
         </div>
       </div>
 
-      {accentImage && (
-        <div className="float-soft absolute right-6 bottom-16 hidden lg:block">
-          <Image
-            src={accentImage.path}
-            alt={accentImage.alt}
-            width={accentImage.width}
-            height={accentImage.height}
-            loading="lazy"
-            className="shadow-lift h-52 w-72 object-cover"
-          />
-        </div>
-      )}
+      <div className="float-soft absolute right-6 bottom-16 hidden lg:block">
+        <Image
+          src={accentImage.basePath}
+          loader={({ width }) => staticImagePath(accentImage, width)}
+          alt={accentImage.alt}
+          width={accentImage.width}
+          height={accentImage.height}
+          sizes="288px"
+          loading="lazy"
+          className="shadow-lift h-52 w-72 object-cover"
+        />
+      </div>
     </div>
   );
 }

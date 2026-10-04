@@ -57,6 +57,7 @@ export function WholesaleSection({
               alt={image.alt}
               width={GRID_IMAGE_SIZE.width}
               height={GRID_IMAGE_SIZE.height}
+              sizes="(min-width: 1024px) 25vw, 50vw"
               loading="lazy"
               className={`h-44 w-full object-cover lg:h-56 ${index % 3 === 0 ? "mt-8" : ""}`}
             />

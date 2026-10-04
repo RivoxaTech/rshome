@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -129,29 +130,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", onStorage);
   }, [quoteRemote]);
 
-  // Stable, so the drawer's effects (focus, scroll lock, Escape) don't re-run on every quote.
+  // Every function below is stable (S22 SPD-04): the drawer's effects (focus, scroll lock, Escape)
+  // don't re-run on every quote, and a consumer that only calls one of them doesn't re-render
+  // unless the data it reads changed.
   const openDrawer = useCallback(() => setDrawerOpen(true), []);
   const closeDrawer = useCallback(() => setDrawerOpen(false), []);
-
-  const value: CartContextValue = {
-    itemCount: stored.lines.reduce((sum, line) => sum + line.quantity, 0),
-    quote,
-    status: !hydrated || (stored.lines.length > 0 && quote === null) ? "loading" : "ready",
-    pending,
-    drawerOpen,
-    openDrawer,
-    closeDrawer,
-    addItem: (variantId, quantity) => {
+  const addItem = useCallback(
+    (variantId: number, quantity: number) => {
       const cart = cartStore.get();
       const current = cart.lines.find((line) => line.variantId === variantId)?.quantity ?? 0;
       runQuote(withLine(cart, variantId, current + quantity));
       setDrawerOpen(true);
     },
-    setQuantity: (variantId, quantity) => runQuote(withLine(cartStore.get(), variantId, quantity)),
-    removeItem: (variantId) => runQuote(withLine(cartStore.get(), variantId, 0)),
-    applyCoupon: (code) => runQuote({ ...cartStore.get(), couponCode: code.trim() || null }),
-    removeCoupon: () => runQuote({ ...cartStore.get(), couponCode: null }),
-    setCustomerPhone: (phone) => {
+    [runQuote],
+  );
+  const setQuantity = useCallback((variantId: number, quantity: number) => runQuote(withLine(cartStore.get(), variantId, quantity)), [runQuote]);
+  const removeItem = useCallback((variantId: number) => runQuote(withLine(cartStore.get(), variantId, 0)), [runQuote]);
+  const applyCoupon = useCallback((code: string) => runQuote({ ...cartStore.get(), couponCode: code.trim() || null }), [runQuote]);
+  const removeCoupon = useCallback(() => runQuote({ ...cartStore.get(), couponCode: null }), [runQuote]);
+  const setCustomerPhone = useCallback(
+    (phone: string | null) => {
       const next = phone?.trim() || null;
       if (next === phoneRef.current) return;
       phoneRef.current = next;
@@ -159,7 +157,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const cart = cartStore.get();
       if (cart.couponCode && cart.lines.length > 0) quoteRemote(cart);
     },
-    setDestination: (destination) => {
+    [quoteRemote],
+  );
+  const setDestination = useCallback(
+    (destination: { country: string; city: string } | null) => {
       const current = destinationRef.current;
       if (current?.country === destination?.country && current?.city === destination?.city) return;
       destinationRef.current = destination;
@@ -167,12 +168,37 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const cart = cartStore.get();
       if (cart.lines.length > 0) quoteRemote(cart);
     },
-    refresh: () => {
-      const cart = cartStore.get();
-      if (cart.lines.length > 0) quoteRemote(cart);
-    },
-    clearCart: () => runQuote(EMPTY_CART),
-  };
+    [quoteRemote],
+  );
+  const refresh = useCallback(() => {
+    const cart = cartStore.get();
+    if (cart.lines.length > 0) quoteRemote(cart);
+  }, [quoteRemote]);
+  const clearCart = useCallback(() => runQuote(EMPTY_CART), [runQuote]);
+
+  const itemCount = stored.lines.reduce((sum, line) => sum + line.quantity, 0);
+  const status = !hydrated || (stored.lines.length > 0 && quote === null) ? "loading" : "ready";
+  const value = useMemo<CartContextValue>(
+    () => ({
+      itemCount,
+      quote,
+      status,
+      pending,
+      drawerOpen,
+      openDrawer,
+      closeDrawer,
+      addItem,
+      setQuantity,
+      removeItem,
+      applyCoupon,
+      removeCoupon,
+      setCustomerPhone,
+      setDestination,
+      refresh,
+      clearCart,
+    }),
+    [itemCount, quote, status, pending, drawerOpen, openDrawer, closeDrawer, addItem, setQuantity, removeItem, applyCoupon, removeCoupon, setCustomerPhone, setDestination, refresh, clearCart],
+  );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

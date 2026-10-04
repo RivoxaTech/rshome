@@ -79,6 +79,8 @@ export function Footer({
                 width={POWERED_BY.logoWidth}
                 height={POWERED_BY.logoHeight}
                 alt={POWERED_BY.name}
+                // Below the fold: without this React's streaming renderer preloads it (S22 SPD-03).
+                loading="lazy"
                 className="h-[18px] w-auto"
               />
             ) : (

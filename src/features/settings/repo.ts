@@ -1,15 +1,10 @@
-import { eq, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { db, type DbClient } from "@/server/db/client";
 import { settings } from "@/server/db/schema/settings";
 
 export type SettingRow = { key: string; value: string; updatedAt: Date };
 
-export async function getSettingValue(key: string): Promise<string | null> {
-  const [row] = await db.select({ value: settings.value }).from(settings).where(eq(settings.key, key)).limit(1);
-  return row?.value ?? null;
-}
-
-/** The rows for `keys` that exist (a missing key simply isn't returned), with `updated_at` for the version check. */
+/** The rows for `keys` that exist (a missing key simply isn't returned), with `updated_at` for the panel's version check. */
 export function getSettingRows(keys: readonly string[], client: DbClient = db): Promise<SettingRow[]> {
   if (keys.length === 0) return Promise.resolve([]);
   return client.select({ key: settings.key, value: settings.value, updatedAt: settings.updatedAt }).from(settings).where(inArray(settings.key, [...keys]));

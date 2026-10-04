@@ -9,14 +9,15 @@ import type { StoreCategory } from "@/features/catalog/service";
 const CATEGORY_IMAGE_SIZE = { width: 1600, height: 1200 };
 
 // A bespoke 4-item mosaic (ported from the demo); a 5th+ category falls back to a plain
-// half-width card rather than crashing or squeezing into the layout meant for four.
+// half-width card rather than crashing or squeezing into the layout meant for four. `sizes` is
+// each card's share of the 12-column grid above `lg`, full width below it (S22 SPD-03).
 const CARD_LAYOUTS = [
-  { span: "lg:col-span-7 lg:row-span-2", height: "h-[360px] lg:h-[680px]" },
-  { span: "lg:col-span-5", height: "h-[320px]" },
-  { span: "lg:col-span-5", height: "h-[320px]" },
-  { span: "lg:col-span-12", height: "h-[320px] lg:h-[420px]" },
+  { span: "lg:col-span-7 lg:row-span-2", height: "h-[360px] lg:h-[680px]", sizes: "(min-width: 1024px) 58vw, 100vw" },
+  { span: "lg:col-span-5", height: "h-[320px]", sizes: "(min-width: 1024px) 42vw, 100vw" },
+  { span: "lg:col-span-5", height: "h-[320px]", sizes: "(min-width: 1024px) 42vw, 100vw" },
+  { span: "lg:col-span-12", height: "h-[320px] lg:h-[420px]", sizes: "100vw" },
 ] as const;
-const DEFAULT_CARD_LAYOUT = { span: "lg:col-span-6", height: "h-[320px]" } as const;
+const DEFAULT_CARD_LAYOUT = { span: "lg:col-span-6", height: "h-[320px]", sizes: "(min-width: 1024px) 50vw, 100vw" } as const;
 
 export function CollectionsSection({
   eyebrow,
@@ -49,6 +50,7 @@ export function CollectionsSection({
                   alt={category.name}
                   width={CATEGORY_IMAGE_SIZE.width}
                   height={CATEGORY_IMAGE_SIZE.height}
+                  sizes={layout.sizes}
                   loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-[1200ms] group-hover:scale-[1.06]"
                 />

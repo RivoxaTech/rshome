@@ -42,6 +42,7 @@ export function FeaturedSection({
                   alt={product.image.alt ?? product.name}
                   width={product.image.width}
                   height={product.image.height}
+                  sizes="(min-width: 1024px) 330px, 280px"
                   loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-[900ms] group-hover:scale-105"
                 />

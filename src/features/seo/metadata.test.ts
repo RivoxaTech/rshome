@@ -1,8 +1,28 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { HERO_IMAGES } from "@/config/home-content";
 import type { PageContent } from "@/features/pages/schema";
+import { AVAILABLE_WIDTHS, staticImagePath } from "@/lib/image-loader";
 import { buildPageMetadata, buildStorefrontMetadata, canonicalUrl, mediaImageUrl } from "./metadata";
 
 const APP_URL = "https://rshome.example";
+
+describe("home page Open Graph image (S22 HERO-01)", () => {
+  it("is the hero's largest static file, as an absolute URL", () => {
+    expect(canonicalUrl(APP_URL, staticImagePath(HERO_IMAGES.main, HERO_IMAGES.main.width))).toBe("https://rshome.example/hero/hero-main-1200.webp");
+  });
+
+  it("every hero file the loader can name exists in public/", () => {
+    for (const image of Object.values(HERO_IMAGES)) {
+      for (const width of AVAILABLE_WIDTHS) {
+        const file = path.join(process.cwd(), "public", staticImagePath(image, width));
+        expect(existsSync(file), file).toBe(true);
+      }
+      expect(image.width).toBe(AVAILABLE_WIDTHS.at(-1));
+    }
+  });
+});
 
 describe("canonicalUrl", () => {
   it("builds the root path with no trailing slash", () => {

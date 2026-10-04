@@ -1,3 +1,27 @@
+import type { StaticImageSet } from "@/lib/image-loader";
+
+/**
+ * The hero's two photos (S22 HERO-01): static files in `public/hero`, never a category's image,
+ * so the hero can't disappear when the catalogue changes. To change them, run
+ * `node scripts/hero-images.mjs <main photo> <accent photo>` (sharp writes these exact files),
+ * then update `width`/`height` to the largest file's and the alt text; nothing else reads them.
+ * The main photo also serves as the home page's Open Graph image.
+ */
+export const HERO_IMAGES = {
+  main: {
+    basePath: "/hero/hero-main",
+    width: 1200,
+    height: 896,
+    alt: "A walnut console table with a black horse-head sculpture, art books and an orchid beneath an abstract gold and grey painting",
+  },
+  accent: {
+    basePath: "/hero/hero-accent",
+    width: 1200,
+    height: 896,
+    alt: "A ribbed glass cake dome on a silver tray at a table set with gold-rimmed plates and cut-crystal glasses",
+  },
+} as const satisfies Record<string, StaticImageSet>;
+
 /**
  * Marketing copy for the home page that isn't product/category data (CLAUDE.md #9: no
  * client-specific text in components). Ported from design-reference/src/routes/index.tsx.

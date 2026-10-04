@@ -22,6 +22,7 @@ export default async function CheckoutPage() {
         codEnabled={features.cod}
         couponsEnabled={features.coupons}
         deliveryNote={siteConfig.deliveryPendingNote}
+        emailHint={siteConfig.checkoutEmailHint}
         bankAccounts={bankAccounts}
       />
     </PageContainer>

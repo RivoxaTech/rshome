@@ -21,9 +21,14 @@ const nextConfig: NextConfig = {
     position: "bottom-right",
   },
   // ARCHITECTURE.md §5, D8: pre-generated WebP sizes served from /media, no runtime optimizer.
+  // The srcset widths are exactly the generated sizes (S22 SPD-03): Next's defaults would list
+  // sixteen widths that the loader snaps to the same three files. `image-loader.test.ts` keeps
+  // this list and the loader's in step.
   images: {
     loader: "custom",
     loaderFile: "./src/lib/image-loader.ts",
+    deviceSizes: [400, 800, 1200],
+    imageSizes: [],
   },
   experimental: {
     serverActions:

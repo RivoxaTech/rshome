@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { siteConfig } from "@/config/site.config";
-import { getSettingValue } from "@/features/settings/repo";
+import { getSettingRows } from "@/features/settings/repo";
 import {
   type BankAccount,
   type Contact,
@@ -29,12 +29,20 @@ export const SETTING_KEYS = {
   notifyOwnerWholesaleEmails: "notify_owner_wholesale_emails",
 } as const;
 
+/**
+ * Every settings row in one query, memoised per request with React `cache()` (S22 SPD-02): a
+ * storefront page reads four keys and the panel layout one more, and pages render per request
+ * (D7), so a saved change is visible on the very next request with no cache to clear.
+ */
+const loadSettings = cache(async (): Promise<Map<string, string>> => {
+  const rows = await getSettingRows(Object.values(SETTING_KEYS));
+  return new Map(rows.map((row) => [row.key, row.value]));
+});
+
 // Falls back to config/site.config.ts when the settings row is missing or fails validation
-// (ARCHITECTURE.md §4.6), so a bad or absent row never breaks the storefront shell. Each reader is
-// memoised per request with React `cache()` — pages render per request (D7), so a saved change is
-// visible on the very next request with no cache to clear.
+// (ARCHITECTURE.md §4.6), so a bad or absent row never breaks the storefront shell.
 async function readSetting<T>(key: string, schema: { parse: (v: unknown) => T }, fallback: T): Promise<T> {
-  const raw = await getSettingValue(key);
+  const raw = (await loadSettings()).get(key);
   if (!raw) return fallback;
   try {
     return schema.parse(JSON.parse(raw));

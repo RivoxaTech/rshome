@@ -498,8 +498,9 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
   }
 
   it("lists every combination of method, order status and payment status in exactly one tab of its method's page, and counts them", async () => {
-    // Each bank order also gets one of these screenshot histories (oldest first), so the flags
-    // are checked against the latest screenshot per payment, stale ones included.
+    // Each order also gets one of these screenshot histories (oldest first), so the flags are
+    // checked against the latest screenshot per payment, stale ones included. COD orders get them
+    // too: their flags must ignore screenshots, which the counts query relies on (S22 SPD-01).
     const histories: [purpose: "goods" | "delivery", status: "submitted" | "verified" | "rejected"][][] = [
       [],
       [["goods", "submitted"]],
@@ -516,7 +517,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
       for (const orderStatus of orders.orderStatus.enumValues) {
         for (const paymentStatus of orders.paymentStatus.enumValues) {
           const orderNumber = `QQQ-000000-${String(++n).padStart(4, "0")}`;
-          const history = paymentMethod === "bank_transfer" ? histories[n % histories.length] : [];
+          const history = histories[n % histories.length];
           const newestFirst = history.map(([purpose, status]) => ({ purpose, status })).reverse();
           const state = { paymentMethod, orderStatus, paymentStatus, latest: latestProofStates(newestFirst) };
           expected.set(orderNumber, { method: paymentMethod, tab: orderTab(state), toCheck: screenshotToCheck(state), needsAction: needsAction(state) });
