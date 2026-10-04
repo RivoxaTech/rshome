@@ -131,7 +131,7 @@ export type CartLineInput = {
   priceOverride: Paisa | null;
 };
 
-export type CartLine = {
+type CartLine = {
   variantId: number;
   quantity: number;
   price: VariantPrice;
@@ -169,7 +169,7 @@ export type CouponRejectReason =
   | "COUPON_BLOCKED_BY_DISCOUNT"
   | "COUPON_MIN_ORDER";
 
-export type CouponResult =
+type CouponResult =
   | { status: "none" }
   | { status: "applied"; couponId: number; code: string; discount: Paisa }
   | { status: "rejected"; code: string; reason: CouponRejectReason; message: string };
@@ -252,7 +252,7 @@ export type PricingZone = {
   codEnabled: boolean;
 };
 
-export type ShippingResult =
+type ShippingResult =
   /** A `quote` zone, or no zone known yet: staff confirm the charge after the order (§4.1). */
   | { status: "pending" }
   | { status: "priced"; amount: Paisa };

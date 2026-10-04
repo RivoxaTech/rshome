@@ -22,14 +22,14 @@ export const LoginInputSchema = z.object({
 const UNKNOWN_USER_HASH =
   "scrypt:16384:8:1:0352f9c0f443eb085588abcae0b2226c:2076339d6a67d9ae45f8e54edf1acded9b9cfea07e0f72b1a8c127e56b681e8c8b3074bf87ae0ae19acde2bd4624bdb34ed9f0342d67dc174f807879b7d2fbce";
 
-export type LoginInput = z.infer<typeof LoginInputSchema>;
+type LoginInput = z.infer<typeof LoginInputSchema>;
 
 const LOGIN_RATE_LIMIT = { max: 5, windowMs: 15 * 60 * 1000 };
 const LOGIN_IP_RATE_LIMIT = { max: 20, windowMs: 15 * 60 * 1000 };
 
 const GENERIC_LOGIN_ERROR = "Incorrect email or password.";
 
-export type LoginResult = { ok: true } | { ok: false; error: string };
+type LoginResult = { ok: true } | { ok: false; error: string };
 
 export async function login(input: LoginInput, ctx: { ip: string; userAgent: string }): Promise<LoginResult> {
   const [byEmail, byIp] = await Promise.all([
@@ -73,12 +73,12 @@ export const ChangePasswordInputSchema = z
     path: ["newPassword"],
   });
 
-export type ChangePasswordInput = z.infer<typeof ChangePasswordInputSchema>;
+type ChangePasswordInput = z.infer<typeof ChangePasswordInputSchema>;
 
 const PASSWORD_CHANGE_RATE_LIMIT = { max: 5, windowMs: 15 * 60 * 1000 };
 const GENERIC_PASSWORD_ERROR = "Your current password is incorrect.";
 
-export type ChangePasswordResult =
+type ChangePasswordResult =
   | { ok: true }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 

@@ -37,7 +37,7 @@ function rowsFrom(attributes: Record<string, string>): AttributeRow[] {
 }
 
 /**
- * Add/Edit a variant (S10 phase 3a): its own `<form>` inside a `Dialog`, rendered by the variants
+ * Add/Edit a variant (S10): its own `<form>` inside a `Dialog`, rendered by the variants
  * card outside the product save form. Attribute rows post as `attributeKey{i}`/`attributeValue{i}`;
  * the label follows the attribute values ("Red / Large") until the Developer edits it. The shared
  * `variantInputSchema` runs here first (field errors without a round trip) and again in the

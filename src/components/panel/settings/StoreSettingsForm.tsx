@@ -8,7 +8,7 @@ import { useStaffAction } from "@/components/panel/use-staff-action";
 import { MAX_NOTIFY_RECIPIENTS } from "@/features/settings/schemas";
 import type { StaffActionResult } from "@/features/settings/staff-service";
 
-export type StoreSettingsFormValues = {
+type StoreSettingsFormValues = {
   storeName: string;
   logoText: string;
   announcementText: string;

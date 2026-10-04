@@ -1,5 +1,5 @@
 /**
- * The panel's variant CRUD (S10 phase 3a, REQUIREMENTS DV-02, ARCHITECTURE.md D53). Every write
+ * The panel's variant CRUD (S10, REQUIREMENTS DV-02, ARCHITECTURE.md D53). Every write
  * runs in one transaction that locks the product row and then the product's whole variant set
  * (`SELECT … FOR UPDATE`, in that order — the same order the product form takes), re-checks the
  * rules under that lock, and writes `audit_logs` rows (CLAUDE.md #10). Refusals come back as
@@ -57,9 +57,9 @@ function refusal(error: unknown): StaffActionResult {
   throw error;
 }
 
-export const ORDERED_VARIANT_MESSAGE = "This variant appears on past orders, so it can't be deleted. Deactivate it instead to take it off the storefront.";
-export const LAST_VARIANT_MESSAGE = "A product always keeps at least one variant, so the last one can't be deleted.";
-export const LAST_ACTIVE_VARIANT_MESSAGE = "This is the only active variant of an active product. Archive the product instead if it shouldn't be sold.";
+const ORDERED_VARIANT_MESSAGE = "This variant appears on past orders, so it can't be deleted. Deactivate it instead to take it off the storefront.";
+const LAST_VARIANT_MESSAGE = "A product always keeps at least one variant, so the last one can't be deleted.";
+const LAST_ACTIVE_VARIANT_MESSAGE = "This is the only active variant of an active product. Archive the product instead if it shouldn't be sold.";
 
 // ── The read model ──────────────────────────────────────────────────────────────────────────
 

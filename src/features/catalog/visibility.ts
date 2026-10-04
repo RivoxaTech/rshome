@@ -1,5 +1,5 @@
 /**
- * Whether a category shows up on the storefront (S10 phase 1): one level of nesting only, and
+ * Whether a category shows up on the storefront (S10): one level of nesting only, and
  * hiding a parent hides its children too, without changing the children's own `is_active` flag.
  * Pure (no DB), so the rule is unit-tested directly; `features/catalog/service.ts` applies it to
  * the full category table (fetched once, a handful of rows) rather than filtering per component.

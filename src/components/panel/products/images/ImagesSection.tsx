@@ -13,7 +13,7 @@ import { ImageCard } from "./ImageCard";
 import { ImageUploader } from "./ImageUploader";
 
 /**
- * The edit page's images card (S10 phase 3b, ARCHITECTURE.md D54): its own section *below and
+ * The edit page's images card (S10, ARCHITECTURE.md D54): its own section *below and
  * outside* the product save form, exactly like the Variants card — every control here (the
  * uploader, the alt field, the move form, the delete dialog) is a `<form>` of its own, which must
  * never sit inside another form (CLAUDE.md UI rules, D49). Drops and per-row moves save

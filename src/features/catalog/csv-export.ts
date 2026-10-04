@@ -9,7 +9,7 @@ import { listProductsForExport, type ProductExportRow } from "./products-staff-r
 import type { ProductTab } from "./schemas";
 import { parseVariantAttributes } from "./variants";
 
-export const PRODUCT_EXPORT_ROW_CAP = 5000;
+const PRODUCT_EXPORT_ROW_CAP = 5000;
 
 function attributesCell(attributes: Record<string, string>): string {
   return Object.entries(attributes)

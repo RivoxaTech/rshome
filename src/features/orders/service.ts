@@ -22,7 +22,7 @@ import {
 const TRACK_RATE_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 };
 const TRACK_NOT_FOUND = "We couldn't find an order with that order number and phone number.";
 
-export type TrackOrderResult = { ok: true; orderNumber: string } | { ok: false; error: string };
+type TrackOrderResult = { ok: true; orderNumber: string } | { ok: false; error: string };
 
 /**
  * `/track` (ARCHITECTURE.md §4.5, D23): order number plus the checkout phone, rate-limited per

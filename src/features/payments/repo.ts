@@ -3,7 +3,7 @@ import { db, type DbClient } from "@/server/db/client";
 import { orders, paymentProofs } from "@/server/db/schema/orders";
 import type { PaymentStatus, ProofSummary } from "@/features/orders/status";
 
-export type PaymentProofInsert = typeof paymentProofs.$inferInsert;
+type PaymentProofInsert = typeof paymentProofs.$inferInsert;
 
 /** Newest first, which is what the payment rules in `orders/status.ts` expect. */
 export function getProofSummaries(orderId: number, client: DbClient = db): Promise<ProofSummary[]> {

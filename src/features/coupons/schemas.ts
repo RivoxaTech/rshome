@@ -8,7 +8,7 @@ export const COUPON_TYPES = ["percent", "fixed"] as const;
 export type CouponType = (typeof COUPON_TYPES)[number];
 
 /** A-Z, 0-9, dash and underscore only, 3–32 characters, after trimming and uppercasing. */
-export const COUPON_CODE_PATTERN = /^[A-Z0-9_-]+$/;
+const COUPON_CODE_PATTERN = /^[A-Z0-9_-]+$/;
 
 const activeField = z.preprocess((value) => value === "true" || value === true, z.boolean());
 

@@ -23,7 +23,7 @@ import {
 import { requirePermission } from "@/server/auth/permissions";
 
 /**
- * The edit page's variants card (S10 phase 3a). Every action is a `product.update` write — a
+ * The edit page's variants card (S10). Every action is a `product.update` write — a
  * variant is part of its product, so there's no separate permission key — and none redirects: the
  * card refreshes in place (`router.refresh()`), the panel's quick-action convention.
  */
@@ -89,7 +89,7 @@ export async function saveVariantOrderAction(input: unknown): Promise<StaffActio
   return saveVariantOrder(parsed.data, { id: session.id });
 }
 
-// ── Images card (S10 phase 3b) ──────────────────────────────────────────────────────────────
+// ── Images card (S10) ──────────────────────────────────────────────────────────────
 
 /** Adds one already-uploaded file (the uploader calls this once per file, right after `/api/panel/uploads` returns) — called directly from the client, not a `<form>`. */
 export async function addProductImageAction(productId: number, input: unknown): Promise<StaffActionResult> {

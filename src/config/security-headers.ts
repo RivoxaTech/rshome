@@ -34,7 +34,7 @@ export const CONTENT_SECURITY_POLICY = [
 /** 180 days; no `includeSubDomains`, no `preload` (owner decision, S22). */
 export const STRICT_TRANSPORT_SECURITY = "max-age=15552000";
 
-export type HeaderEntry = { key: string; value: string };
+type HeaderEntry = { key: string; value: string };
 
 export const SECURITY_HEADERS: readonly HeaderEntry[] = [
   { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },

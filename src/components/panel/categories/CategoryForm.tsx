@@ -8,7 +8,7 @@ import { Listbox } from "@/components/panel/Listbox";
 import { MediaImageField } from "@/components/panel/MediaImageField";
 import { Switch } from "@/components/panel/Switch";
 
-export type CategoryFormValues = {
+type CategoryFormValues = {
   id: number | null;
   name: string;
   slug: string;

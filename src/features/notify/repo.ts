@@ -20,7 +20,7 @@ const SELECT_SUBSCRIPTION = {
 };
 
 /** A staff member has a handful of devices; anything beyond this is a stuck re-subscribe loop or a crafted request (S22 SEC-04). */
-export const MAX_SUBSCRIPTIONS_PER_USER = 10;
+const MAX_SUBSCRIPTIONS_PER_USER = 10;
 
 /** Subscribing again from the same browser (the same endpoint) updates the row instead of duplicating it; the oldest rows go once a user has more than `MAX_SUBSCRIPTIONS_PER_USER`. */
 export async function upsertSubscription(input: {

@@ -27,7 +27,7 @@ export function productAvailability(stockState: StockState): JsonLdAvailability 
   }
 }
 
-export type ProductJsonLdInput = {
+type ProductJsonLdInput = {
   name: string;
   description: string | null;
   url: string;
@@ -57,7 +57,7 @@ export function buildProductJsonLd(input: ProductJsonLdInput): Record<string, un
   };
 }
 
-export type BreadcrumbItem = { name: string; url: string };
+type BreadcrumbItem = { name: string; url: string };
 
 export function buildBreadcrumbJsonLd(items: BreadcrumbItem[]): Record<string, unknown> {
   return {
@@ -72,7 +72,7 @@ export function buildBreadcrumbJsonLd(items: BreadcrumbItem[]): Record<string, u
   };
 }
 
-export type OrganizationJsonLdInput = {
+type OrganizationJsonLdInput = {
   name: string;
   url: string;
   telephone: string | null;

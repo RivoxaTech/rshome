@@ -5,9 +5,9 @@ import { orderItems, orderStatusHistory, orders } from "@/server/db/schema/order
 import { couponUsages, coupons } from "@/server/db/schema/promotions";
 
 export type LockedVariantRow = typeof productVariants.$inferSelect;
-export type OrderInsert = typeof orders.$inferInsert;
-export type OrderItemInsert = typeof orderItems.$inferInsert;
-export type StatusHistoryInsert = typeof orderStatusHistory.$inferInsert;
+type OrderInsert = typeof orders.$inferInsert;
+type OrderItemInsert = typeof orderItems.$inferInsert;
+type StatusHistoryInsert = typeof orderStatusHistory.$inferInsert;
 
 export async function findOrderNumberByCheckoutToken(checkoutToken: string): Promise<string | null> {
   const [row] = await db

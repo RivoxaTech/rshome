@@ -10,7 +10,7 @@ import { discounts, discountTargets } from "@/server/db/schema/promotions";
 import { likeContains } from "@/lib/sql-like";
 
 export type DiscountRow = typeof discounts.$inferSelect;
-export type DiscountUpdate = Partial<typeof discounts.$inferInsert>;
+type DiscountUpdate = Partial<typeof discounts.$inferInsert>;
 export type DiscountWithTargets = { discount: DiscountRow; targetIds: number[] };
 
 const contains = likeContains;
@@ -112,7 +112,7 @@ export async function getProductNamesByIds(ids: number[]): Promise<Map<number, s
 }
 
 /** What `features/pricing`'s `discountMatchesProduct` needs for every product, for the overlap hint. */
-export type OverlapProductRow = { id: number; price: string; categoryId: number; parentCategoryId: number | null };
+type OverlapProductRow = { id: number; price: string; categoryId: number; parentCategoryId: number | null };
 
 export function listProductsForOverlap(): Promise<OverlapProductRow[]> {
   return db

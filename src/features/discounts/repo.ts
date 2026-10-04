@@ -2,7 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { discounts, discountTargets } from "@/server/db/schema/promotions";
 
-export type DiscountRow = typeof discounts.$inferSelect;
+type DiscountRow = typeof discounts.$inferSelect;
 
 /**
  * Switched-on discounts with their target ids. The date window is left to

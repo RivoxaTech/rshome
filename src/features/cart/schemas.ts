@@ -1,7 +1,7 @@
 import "@/lib/zod-config";
 import { z } from "zod";
 
-export const MAX_CART_LINES = 50;
+const MAX_CART_LINES = 50;
 export const MAX_LINE_QUANTITY = 99;
 
 /**
@@ -52,4 +52,3 @@ export const cartQuoteRequestSchema = cartInputSchema.extend({
     .catch(null),
 });
 
-export type CartQuoteRequest = z.infer<typeof cartQuoteRequestSchema>;

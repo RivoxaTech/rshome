@@ -1,5 +1,5 @@
 /**
- * `/panel/products/arrange` (S10 phase 2b): the two tabs' read models plus their Server Action
+ * `/panel/products/arrange` (S10): the two tabs' read models plus their Server Action
  * targets — a full drag-drop save and a single-row "move to top/end/position N". Both write paths
  * mirror `products-staff-service.ts`'s lock/transaction/audit shape; see `ordering.ts` for the
  * pure reorder math and `ARCHITECTURE.md` D51 for the slot-preserving category-scoped design.

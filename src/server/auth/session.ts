@@ -7,7 +7,7 @@ import { getPermissionKeysForRole } from "@/features/auth/repo";
 import { db } from "@/server/db/client";
 import { sessions, users, roles } from "@/server/db/schema/access-control";
 
-export const SESSION_COOKIE = "panel_session";
+const SESSION_COOKIE = "panel_session";
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 /** last_seen_at is updated at most this often, so a busy admin isn't writing to `sessions` on every click. */
 const LAST_SEEN_UPDATE_INTERVAL_MS = 60 * 60 * 1000;

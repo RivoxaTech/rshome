@@ -10,7 +10,7 @@ import { couponUsages, coupons } from "@/server/db/schema/promotions";
 import { likeContains } from "@/lib/sql-like";
 
 export type CouponRow = typeof coupons.$inferSelect;
-export type CouponUpdate = Partial<typeof coupons.$inferInsert>;
+type CouponUpdate = Partial<typeof coupons.$inferInsert>;
 
 const contains = likeContains;
 
@@ -80,7 +80,7 @@ export async function countOrdersByCouponId(id: number, client: DbClient = db): 
   return row.count;
 }
 
-export type UsageRow = { createdAt: Date; orderNumber: string; paymentMethod: typeof orders.$inferSelect.paymentMethod };
+type UsageRow = { createdAt: Date; orderNumber: string; paymentMethod: typeof orders.$inferSelect.paymentMethod };
 
 /** The most recent usages with their order's number and method — the service decides whether the viewer may see the order numbers. */
 export function listRecentUsages(couponId: number, limit: number): Promise<UsageRow[]> {

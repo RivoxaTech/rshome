@@ -13,14 +13,14 @@ import { grantRolePermissions } from "@/features/auth/repo";
 import { db } from "@/server/db/client";
 import { permissions as permissionsTable, roles } from "@/server/db/schema/access-control";
 
-export type SeedRolesInput = {
+type SeedRolesInput = {
   keys: readonly string[];
   descriptions: Record<string, string>;
   /** By role key: the display name used on creation and the first-run permission set. */
   defaults: Record<string, { name: string; permissions: readonly string[] }>;
 };
 
-export type SeedRolesResult = {
+type SeedRolesResult = {
   newKeys: string[];
   createdRoles: string[];
   /** What each system role was actually granted this run (empty on a plain re-run). */

@@ -11,7 +11,7 @@ import type { OrderTab } from "./transitions";
 import { likeContains } from "@/lib/sql-like";
 
 export type OrderUpdate = Partial<typeof orders.$inferInsert>;
-export type ProofRow = typeof paymentProofs.$inferSelect;
+type ProofRow = typeof paymentProofs.$inferSelect;
 
 const contains = likeContains;
 
@@ -19,7 +19,7 @@ const contains = likeContains;
  * Each tab in SQL, within one payment method's page: the same rules as `orderTab` in
  * transitions.ts (checked over every enum combination by the integration tests).
  */
-export const TAB_CONDITIONS: Record<OrderTab, SQL | undefined> = {
+const TAB_CONDITIONS: Record<OrderTab, SQL | undefined> = {
   need_review: or(
     eq(orders.orderStatus, "awaiting_shipping_quote"),
     and(eq(orders.paymentMethod, "cod"), eq(orders.orderStatus, "pending")),

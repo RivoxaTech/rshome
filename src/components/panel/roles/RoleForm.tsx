@@ -11,7 +11,7 @@ import { sensitiveGrants, type PermissionKey } from "@/features/auth/permissions
 import { suggestRoleKey } from "@/features/roles/schemas";
 import type { StaffActionResult } from "@/features/roles/staff-service";
 
-export type RoleFormValues = {
+type RoleFormValues = {
   id: number | null;
   key: string;
   name: string;

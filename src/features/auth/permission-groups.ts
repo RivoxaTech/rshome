@@ -4,7 +4,7 @@ import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
  * How the roles page groups permission keys (S20): one group per area of the panel, in the
  * sidebar's own order. Pure data; a unit test asserts every `PERMISSIONS` key appears exactly once.
  */
-export type PermissionGroup = { key: string; label: string; permissions: PermissionKey[] };
+type PermissionGroup = { key: string; label: string; permissions: PermissionKey[] };
 
 export const PERMISSION_GROUPS: PermissionGroup[] = [
   {

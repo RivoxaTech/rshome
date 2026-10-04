@@ -114,7 +114,7 @@ export function chooseBucket(spanDays: number): Bucket {
   return "month";
 }
 
-export type ChangeKind = "up" | "down" | "equal" | "zero" | "new" | "none";
+type ChangeKind = "up" | "down" | "equal" | "zero" | "new" | "none";
 export type ChangeBadge = { kind: ChangeKind; percent: number | null };
 
 /**

@@ -5,7 +5,7 @@
  */
 
 export type StoreInfo = { name: string; phone: string; whatsapp: string; address: string };
-export type MailContent = { subject: string; html: string; text: string };
+type MailContent = { subject: string; html: string; text: string };
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -43,8 +43,8 @@ function footerText(store: StoreInfo): string {
 
 // ── Order received ──────────────────────────────────────────────────────────────────────────
 
-export type OrderReceivedItem = { name: string; quantity: number; lineTotal: string };
-export type OrderReceivedInput = {
+type OrderReceivedItem = { name: string; quantity: number; lineTotal: string };
+type OrderReceivedInput = {
   orderNumber: string;
   paymentMethod: "cod" | "bank_transfer";
   items: OrderReceivedItem[];
@@ -96,7 +96,7 @@ ${footerText(input.store)}`;
 
 // ── Order approved ──────────────────────────────────────────────────────────────────────────
 
-export type OrderApprovedInput = {
+type OrderApprovedInput = {
   orderNumber: string;
   paymentMethod: "cod" | "bank_transfer";
   deliveryCharge: string;
@@ -125,7 +125,7 @@ export function buildOrderApprovedEmail(input: OrderApprovedInput): MailContent 
 
 // ── Order shipped ───────────────────────────────────────────────────────────────────────────
 
-export type OrderShippedInput = {
+type OrderShippedInput = {
   orderNumber: string;
   courier: string | null;
   trackingNote: string | null;
@@ -146,7 +146,7 @@ export function buildOrderShippedEmail(input: OrderShippedInput): MailContent {
 
 // ── Order rejected / cancelled ──────────────────────────────────────────────────────────────
 
-export type OrderClosedInput = {
+type OrderClosedInput = {
   orderNumber: string;
   action: "rejected" | "cancelled";
   reason: string;
@@ -166,7 +166,7 @@ export function buildOrderClosedEmail(input: OrderClosedInput): MailContent {
 
 // ── Owner alert (new order / screenshot / wholesale inquiry) ──────────────────────────────────
 
-export type OwnerAlertInput = {
+type OwnerAlertInput = {
   title: string;
   /** The order number, or null for a wholesale inquiry (no order number). */
   orderNumber: string | null;
@@ -187,7 +187,7 @@ export function buildOwnerAlertEmail(input: OwnerAlertInput): MailContent {
 
 // ── Test email (S14) ────────────────────────────────────────────────────────────────────────────
 
-export type TestEmailInput = { listLabel: string; sentBy: string; store: StoreInfo };
+type TestEmailInput = { listLabel: string; sentBy: string; store: StoreInfo };
 
 /** "Send test email" on `/panel/settings`: proves the mailbox and the recipient list work, nothing more. */
 export function buildTestEmail(input: TestEmailInput): MailContent {

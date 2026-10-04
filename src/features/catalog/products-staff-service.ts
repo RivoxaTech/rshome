@@ -1,7 +1,7 @@
 /**
- * The panel's products CRUD (S10 phase 2, BUILD_PLAN.md S10): every write locks the row(s) it
+ * The panel's products CRUD (S10, BUILD_PLAN.md S10): every write locks the row(s) it
  * touches (`SELECT … FOR UPDATE`) and records `audit_logs` rows (CLAUDE.md #10), mirroring
- * `staff-service.ts` (categories, S10 phase 1). A new product gets one "Default" variant (SKU +
+ * `staff-service.ts` (categories, S10). A new product gets one "Default" variant (SKU +
  * stock) in the same transaction; everything else about variants is `variants-staff-service.ts`
  * (phase 3a), surfaced on the edit page as its own card outside the product form.
  */
@@ -104,7 +104,7 @@ async function assertCategoryValid(categoryId: number, currentCategoryId?: numbe
   if (!category.isActive && categoryId !== currentCategoryId) throw new ProductActionError("That category is hidden. Choose an active category.");
 }
 
-// ── Manual ordering (S10 phase 2b) ──────────────────────────────────────────────────────────────
+// ── Manual ordering (S10) ──────────────────────────────────────────────────────────────
 
 /** `"keep"` (edit only) means "don't touch this order" — the caller skips applying anything. */
 function toPlacement(placement: "top" | "end" | "position" | "keep", position?: number): Placement | null {
@@ -236,11 +236,11 @@ export async function listStaffProducts(
 
 // ── The create/edit form ────────────────────────────────────────────────────────────────────
 
-export type ProductEditFormData = {
+type ProductEditFormData = {
   product: ProductRow;
-  /** Every variant in display order, for the edit page's variants card (S10 phase 3a). */
+  /** Every variant in display order, for the edit page's variants card (S10). */
   variants: PanelVariant[];
-  /** Every image in display order, for the edit page's images card (S10 phase 3b). The product
+  /** Every image in display order, for the edit page's images card (S10). The product
    *  form itself no longer reads or writes images on edit — only the create form's one field does. */
   images: PanelImage[];
   salePrice: SaleInfo;

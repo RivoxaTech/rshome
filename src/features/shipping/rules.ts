@@ -17,7 +17,7 @@ export function checkoutDestinations(): { country: string; city: string }[] {
   return [{ country: DEFAULT_COUNTRY, city: KARACHI }, ...[...COUNTRY_CODES].map((country) => ({ country, city: "" }))];
 }
 
-export type Destination = { country: string; city: string };
+type Destination = { country: string; city: string };
 
 /** The checkout destinations that would resolve to no zone at all with this zone set — empty when every address is covered. */
 export function coverageGaps(zones: ZoneRow[], areas: ZoneAreaRow[]): Destination[] {
@@ -34,7 +34,7 @@ export function newCoverageGaps(before: { zones: ZoneRow[]; areas: ZoneAreaRow[]
   return coverageGaps(after.zones, after.areas).filter((gap) => !already.has(`${gap.country}:${gap.city}`));
 }
 
-export type AreaConflict = { area: ZoneAreaInput; zoneId: number };
+type AreaConflict = { area: ZoneAreaInput; zoneId: number };
 
 /** The wanted areas already owned by *another* zone (an area belongs to exactly one zone). */
 export function findAreaConflicts(existing: ZoneAreaRow[], ownZoneId: number | null, wanted: ZoneAreaInput[]): AreaConflict[] {
@@ -51,7 +51,7 @@ export function countFallbacks(zones: readonly Pick<ZoneRow, "isFallback">[]): n
   return zones.filter((zone) => zone.isFallback).length;
 }
 
-export type DeliveryOutcome = { kind: "quote" } | { kind: "flat"; amount: Paisa } | { kind: "free" };
+type DeliveryOutcome = { kind: "quote" } | { kind: "flat"; amount: Paisa } | { kind: "free" };
 
 export type DestinationOutcome = {
   zone: { id: number; name: string } | null;

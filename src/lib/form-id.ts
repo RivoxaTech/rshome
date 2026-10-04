@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** A row id as a hidden form field posts it: a positive integer, nothing else. */
-export const formIdSchema = z.coerce.number().int().positive();
+const formIdSchema = z.coerce.number().int().positive();
 
 /**
  * The id behind a panel quick action (S22 SEC-07): `null` for anything but a positive integer, so

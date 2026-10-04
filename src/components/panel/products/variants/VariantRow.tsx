@@ -29,7 +29,7 @@ const iconButtonBase = "inline-flex h-8 w-8 shrink-0 items-center justify-center
 const iconButtonMuted = `${iconButtonBase} text-muted-foreground hover:bg-secondary hover:text-foreground`;
 const iconButtonDestructive = `${iconButtonBase} text-destructive hover:bg-destructive/10`;
 
-export function AttributeChips({ attributes }: { attributes: Record<string, string> }) {
+function AttributeChips({ attributes }: { attributes: Record<string, string> }) {
   const entries = Object.entries(attributes);
   if (entries.length === 0) return null;
   return (

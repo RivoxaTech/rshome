@@ -2,15 +2,15 @@ import { eq, lt } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { rateLimits } from "@/server/db/schema/access-control";
 
-export type RateLimitRow = { count: number; windowEndsAt: Date };
+type RateLimitRow = { count: number; windowEndsAt: Date };
 
-export type RateLimitOptions = {
+type RateLimitOptions = {
   /** Attempts allowed inside one window. The (max + 1)th attempt is blocked. */
   max: number;
   windowMs: number;
 };
 
-export type RateLimitDecision =
+type RateLimitDecision =
   | { action: "start"; windowEndsAt: Date }
   | { action: "increment"; count: number }
   | { action: "block"; retryAfterSeconds: number };
@@ -31,7 +31,7 @@ export function decideRateLimit(
   return { action: "increment", count: row.count + 1 };
 }
 
-export type RateLimitResult = { allowed: true } | { allowed: false; retryAfterSeconds: number };
+type RateLimitResult = { allowed: true } | { allowed: false; retryAfterSeconds: number };
 
 /** Expired rows are swept once their window has been over for this long. */
 const SWEEP_AFTER_MS = 24 * 60 * 60 * 1000;

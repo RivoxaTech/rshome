@@ -1,5 +1,5 @@
 /**
- * The panel's categories CRUD against the test database (S10 phase 1): slug clashes, the
+ * The panel's categories CRUD against the test database (S10): slug clashes, the
  * one-level parent/child rules, delete refusals (children, then products), hide/show reflected in
  * the storefront's category query, audit rows, and the Developer-vs-Admin RBAC wall. Mirrors the
  * `next/headers` mock every other panel integration suite uses, since there is no real Next
@@ -171,7 +171,7 @@ describe.skipIf(!TEST_DATABASE_URL)("categories CRUD (integration)", () => {
     });
   });
 
-  describe("image path hardening (S10 phase 3b, D54)", () => {
+  describe("image path hardening (S10, D54)", () => {
     const hex32 = "a".repeat(32);
 
     it("accepts a real categories/<hex> imagePath and the dev seed's enumerated placeholders", async () => {

@@ -1,12 +1,12 @@
 /**
- * Pure helpers for product variants (S10 phase 3a): attribute pairs, the auto-generated label and
+ * Pure helpers for product variants (S10): attribute pairs, the auto-generated label and
  * "same attribute set" detection. No DB access — `variants-staff-service.ts` loads the rows and
  * applies these; `schemas.ts#variantInputSchema` uses `validateAttributePairs` for the form.
  */
 import { z } from "zod";
 
 /** product_variants.attributes, e.g. {"Colour":"Red","Size":"Large"} (DATABASE.md DB2). */
-export const variantAttributesSchema = z.record(z.string(), z.string());
+const variantAttributesSchema = z.record(z.string(), z.string());
 
 /** Key/value pairs a variant can carry (Colour, Size, …); the dialog offers this many rows. */
 export const MAX_VARIANT_ATTRIBUTES = 5;
@@ -17,7 +17,7 @@ export const SUGGESTED_ATTRIBUTE_NAMES = ["Colour", "Size"] as const;
 export const ATTRIBUTE_SLOTS = Array.from({ length: MAX_VARIANT_ATTRIBUTES }, (_, index) => index);
 
 export type AttributePair = { key: string; value: string };
-export type AttributePairError = { index: number; field: "key" | "value"; message: string };
+type AttributePairError = { index: number; field: "key" | "value"; message: string };
 
 /**
  * Trims every pair, skips a fully empty row, and refuses a half-filled row, a duplicate name

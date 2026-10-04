@@ -21,7 +21,7 @@ export type AuditFilter = {
   to?: Date;
 };
 
-export type AuditRow = {
+type AuditRow = {
   id: number;
   userId: number | null;
   /** Null for a system row; a user with audit rows can't be deleted (S20), so an id always resolves. */

@@ -12,8 +12,8 @@ function ensureConfigured(): boolean {
   return true;
 }
 
-export type PushSubscriptionKeys = { endpoint: string; p256dh: string; auth: string };
-export type PushSendResult = { ok: true } | { ok: false; statusCode?: number; message: string };
+type PushSubscriptionKeys = { endpoint: string; p256dh: string; auth: string };
+type PushSendResult = { ok: true } | { ok: false; statusCode?: number; message: string };
 
 /**
  * Every send is urgent (a staff member needs to see it now) and short-lived: a push the push

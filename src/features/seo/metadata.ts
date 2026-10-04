@@ -20,7 +20,7 @@ export function mediaImageUrl(appUrl: string, path: string, width: 400 | 800 | 1
   return `${appUrl.replace(/\/+$/, "")}/media/${path}-${width}.webp`;
 }
 
-export type StorefrontMetadataInput = {
+type StorefrontMetadataInput = {
   appUrl: string;
   path: string;
   title: string;

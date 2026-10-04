@@ -12,7 +12,7 @@ export type NotifyEvent =
   | { type: "delivery_screenshot_uploaded"; orderNumber: string }
   | { type: "new_wholesale_inquiry"; inquiryId: number };
 
-export type PushPayload = { title: string; body: string; url: string; tag: string };
+type PushPayload = { title: string; body: string; url: string; tag: string };
 
 const NEW_ORDER_TITLES: Record<PaymentMethod, string> = {
   bank_transfer: "New bank transfer order",

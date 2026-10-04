@@ -2,10 +2,10 @@ import { cookies } from "next/headers";
 import { env } from "@/server/env";
 import { ORDER_ACCESS_TTL_MS, decodeOrderAccess, encodeOrderAccess, withOrderAccess } from "./order-access";
 
-export const ORDER_ACCESS_COOKIE = "order_access";
+const ORDER_ACCESS_COOKIE = "order_access";
 
 /** Order numbers this browser may open (empty when there is no valid cookie). */
-export async function getAccessibleOrderNumbers(): Promise<string[]> {
+async function getAccessibleOrderNumbers(): Promise<string[]> {
   const cookieStore = await cookies();
   return decodeOrderAccess(cookieStore.get(ORDER_ACCESS_COOKIE)?.value, env.SESSION_SECRET, new Date());
 }

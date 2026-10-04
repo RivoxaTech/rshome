@@ -5,7 +5,7 @@ import { grantOrderAccess } from "@/features/checkout/order-access-cookie";
 import { trackOrder } from "@/features/orders/service";
 import { getClientIp } from "@/server/request";
 
-export type TrackActionState = { error: string } | undefined;
+type TrackActionState = { error: string } | undefined;
 
 export async function trackOrderAction(_prevState: TrackActionState, formData: FormData): Promise<TrackActionState> {
   const ip = await getClientIp();

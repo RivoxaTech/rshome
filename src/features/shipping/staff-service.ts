@@ -65,14 +65,14 @@ function refused(error: ZoneActionError): StaffActionResult {
 
 /** `Intl.DisplayNames` through the checkout's own country list (D31), so panel and storefront name countries identically. */
 const countryNames = new Map(getCountryOptions().map((option) => [option.code, option.name]));
-export const countryName = (code: string): string => countryNames.get(code) ?? code;
+const countryName = (code: string): string => countryNames.get(code) ?? code;
 
 /**
  * The optimistic-concurrency token, posted back as `version`: the row's `updated_at` plus a
  * fingerprint of what the form edits (the row's fields and its areas), since `updated_at` is
  * whole-second and two saves inside one second would otherwise look the same.
  */
-export function zoneVersion(row: ZoneAuditFields & Pick<ZoneStaffRow, "updatedAt">, areas: ZoneAreaInput[]): string {
+function zoneVersion(row: ZoneAuditFields & Pick<ZoneStaffRow, "updatedAt">, areas: ZoneAreaInput[]): string {
   return `${row.updatedAt.getTime()}@${fingerprint(auditValues(row, areas))}`;
 }
 
@@ -127,7 +127,7 @@ export async function listStaffZones(): Promise<StaffZoneListItem[]> {
 
 export type ZoneAreaView = ZoneAreaInput & { token: string; label: string };
 
-export type ZoneEditFormData = {
+type ZoneEditFormData = {
   zone: ZoneStaffRow;
   areas: ZoneAreaView[];
   version: string;
@@ -136,7 +136,7 @@ export type ZoneEditFormData = {
   coversOutsidePakistan: boolean;
 };
 
-export function toAreaView(area: ZoneAreaInput): ZoneAreaView {
+function toAreaView(area: ZoneAreaInput): ZoneAreaView {
   return { ...area, token: areaToken(area), label: areaLabel(area, countryName) };
 }
 

@@ -11,7 +11,7 @@ import type { ZoneAreaInput } from "./schemas";
 import type { ZoneAreaRow } from "./zones";
 
 export type ZoneStaffRow = typeof shippingZones.$inferSelect;
-export type ZoneUpdate = Partial<typeof shippingZones.$inferInsert>;
+type ZoneUpdate = Partial<typeof shippingZones.$inferInsert>;
 
 /** Every zone in display order (a handful of rows). */
 export function listZoneRows(client: DbClient = db): Promise<ZoneStaffRow[]> {

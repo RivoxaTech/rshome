@@ -41,7 +41,7 @@ import {
   getWholesaleLeadsCount,
 } from "./repo";
 
-export function currentRange(rangeKey: RangeKey): ResolvedRange {
+function currentRange(rangeKey: RangeKey): ResolvedRange {
   return resolveRange(rangeKey, new Date());
 }
 
@@ -116,7 +116,7 @@ export const getDashboardCards = cache(async (rangeKey: RangeKey): Promise<StatC
 
 // ── Chart ───────────────────────────────────────────────────────────────────────────────────
 
-export type ChartPointView = { label: string; dateKarachi: string; revenuePaisa: number; revenueLabel: string; orderCount: number };
+type ChartPointView = { label: string; dateKarachi: string; revenuePaisa: number; revenueLabel: string; orderCount: number };
 export type ChartView = { kind: "empty" } | { kind: "data"; bucket: Bucket; points: ChartPointView[] };
 
 const dailySeriesCached = cache((fromMs: number, toMs: number) => getDailyRevenueSeries(new Date(fromMs), new Date(toMs)));

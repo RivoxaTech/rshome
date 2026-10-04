@@ -10,4 +10,3 @@ export const dashboardQuerySchema = z.object({
   range: z.preprocess(firstValue, z.enum(RANGE_KEYS)).catch(DEFAULT_RANGE),
 });
 
-export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;

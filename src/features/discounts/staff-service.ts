@@ -72,7 +72,7 @@ export function dateWindowRefusal(input: DateWindow, previous: DateWindow | null
 }
 
 /** The pricing module's shape for a stored row, so its rules can run on panel data unchanged. */
-export function toPricingDiscount({ discount, targetIds }: DiscountWithTargets): PricingDiscount {
+function toPricingDiscount({ discount, targetIds }: DiscountWithTargets): PricingDiscount {
   return {
     id: discount.id,
     type: discount.type,
@@ -147,14 +147,14 @@ export async function listStaffDiscounts(query: {
 
 // ── The create/edit form ────────────────────────────────────────────────────────────────────────
 
-export type DiscountFormOptions = { categories: CategoryOption[]; products: ProductOption[] };
+type DiscountFormOptions = { categories: CategoryOption[]; products: ProductOption[] };
 
 export async function getDiscountFormOptions(): Promise<DiscountFormOptions> {
   const [categories, products] = await Promise.all([listCategoryOptions(), listProductOptions()]);
   return { categories, products };
 }
 
-export type DiscountEditFormData = { discount: DiscountRow; targetIds: number[]; status: DiscountStatus };
+type DiscountEditFormData = { discount: DiscountRow; targetIds: number[]; status: DiscountStatus };
 
 export async function getDiscountForEdit(id: number): Promise<DiscountEditFormData | null> {
   const entry = await getDiscountWithTargets(id);
@@ -351,7 +351,7 @@ export async function deleteDiscountById(id: number, actor: Actor): Promise<Staf
 
 // ── The overlap hint ────────────────────────────────────────────────────────────────────────────
 
-export type DiscountOverlap = { id: number; name: string; productCount: number };
+type DiscountOverlap = { id: number; name: string; productCount: number };
 export type DiscountOverlapResult = { ok: true; matchedProducts: number; overlaps: DiscountOverlap[] } | { ok: false; error: string };
 
 /**

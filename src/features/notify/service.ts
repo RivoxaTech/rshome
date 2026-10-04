@@ -125,7 +125,7 @@ export async function unsubscribe(userId: number, endpoint: string): Promise<voi
   await deleteSubscription(userId, endpoint);
 }
 
-export type TestNotificationResult = { ok: true; sent: number } | { ok: false; error: string };
+type TestNotificationResult = { ok: true; sent: number } | { ok: false; error: string };
 
 /** "Send test notification" in the bell's menu: only to this user's own devices. */
 export async function sendTestNotification(userId: number): Promise<TestNotificationResult> {

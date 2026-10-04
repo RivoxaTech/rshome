@@ -46,12 +46,11 @@ export const contactInputSchema = z.object({
   whatsapp: whatsappField,
   address: z.string().trim().min(1, "Enter the shop's address.").max(300, "Keep the address under 300 characters."),
 });
-export type ContactInput = z.infer<typeof contactInputSchema>;
 
 // ── Bank accounts (Admin, settings.bank) ────────────────────────────────────────────────────────
 
 /** Shown to bank-transfer customers at checkout and on the order page. `iban` matters for international payers. */
-export const bankAccountSchema = z.object({
+const bankAccountSchema = z.object({
   bankName: z.string().min(1),
   accountTitle: z.string().min(1),
   accountNumber: z.string().min(1),
@@ -82,7 +81,7 @@ const optionalTrimmed = (max: number, pattern?: RegExp) =>
     (pattern ? z.string().trim().max(max, `Keep this under ${max} characters.`).regex(pattern, ACCOUNT_SHAPE_MESSAGE) : z.string().trim().max(max, `Keep this under ${max} characters.`)).nullable(),
   );
 
-export const bankAccountInputSchema = z.object({
+const bankAccountInputSchema = z.object({
   bankName: z.string().trim().min(1, "Enter the bank's name.").max(80, "Keep this under 80 characters."),
   accountTitle: z.string().trim().min(1, "Enter the account title.").max(120, "Keep this under 120 characters."),
   accountNumber: accountNumberField,
@@ -115,7 +114,7 @@ export function bankAccountsFromForm(entries: Record<string, unknown>): unknown[
   }));
 }
 
-export const bankAccountsInputSchema = z
+const bankAccountsInputSchema = z
   .array(bankAccountInputSchema)
   .min(1, "Add at least one bank account.")
   .max(MAX_BANK_ACCOUNTS, `Keep to ${MAX_BANK_ACCOUNTS} bank accounts or fewer.`);
@@ -125,7 +124,6 @@ export const bankSettingsInputSchema = contactInputSchema.extend({
   accounts: bankAccountsInputSchema,
   version: z.string().max(1000).default(""),
 });
-export type BankSettingsInput = z.infer<typeof bankSettingsInputSchema>;
 
 // ── Store identity, announcement, social links (Developer, settings.manage) ─────────────────────
 
@@ -169,7 +167,6 @@ export const storeSettingsInputSchema = z.object({
   wholesaleEmails: z.string().max(2000).default(""),
   version: z.string().max(1000).default(""),
 });
-export type StoreSettingsInput = z.infer<typeof storeSettingsInputSchema>;
 
 // ── Owner alert recipients (Developer, settings.manage) ─────────────────────────────────────────
 
@@ -209,6 +206,6 @@ export const recipientListSchema = z.string().transform((raw, ctx) => {
   return emails;
 });
 
-export const NOTIFY_LISTS = ["order", "wholesale"] as const;
+const NOTIFY_LISTS = ["order", "wholesale"] as const;
 export type NotifyList = (typeof NOTIFY_LISTS)[number];
 export const notifyListSchema = z.enum(NOTIFY_LISTS);

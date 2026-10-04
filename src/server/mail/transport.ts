@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import { env } from "@/server/env";
 
-export type MailMessage = { to: string; subject: string; html: string; text: string };
+type MailMessage = { to: string; subject: string; html: string; text: string };
 
 let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
 

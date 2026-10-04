@@ -1,5 +1,5 @@
 /**
- * The panel's product-images CRUD (S10 phase 3b, REQUIREMENTS DV-02, ARCHITECTURE.md D54). Every
+ * The panel's product-images CRUD (S10, REQUIREMENTS DV-02, ARCHITECTURE.md D54). Every
  * write runs in one transaction that locks the product row and then the product's whole image set
  * (`SELECT … FOR UPDATE`, the same product-then-children lock order `variants-staff-service.ts`
  * takes), re-checks the rules under that lock, and writes `audit_logs` rows (CLAUDE.md #10).
@@ -48,7 +48,7 @@ function refusal(error: unknown): StaffActionResult {
   throw error;
 }
 
-export const MAX_IMAGES_MESSAGE = `A product can have at most ${MAX_PRODUCT_IMAGES} images.`;
+const MAX_IMAGES_MESSAGE = `A product can have at most ${MAX_PRODUCT_IMAGES} images.`;
 
 // ── The read model ──────────────────────────────────────────────────────────────────────────
 

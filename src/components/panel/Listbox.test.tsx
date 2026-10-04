@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Component test for the shared Listbox (S10 phase 2b follow-up): proves the hidden input that
+ * Component test for the shared Listbox (S10 follow-up): proves the hidden input that
  * carries the form value actually changes when an option is chosen (the thing every panel form
  * depends on, now that every native <select> in the panel has been replaced — see CLAUDE.md's
  * "never use a native <select>" rule and ARCHITECTURE.md D52), plus the keyboard behaviour the

@@ -6,7 +6,7 @@ import { LoginInputSchema, login } from "@/features/auth/service";
 import { getClientIp, getUserAgent } from "@/server/request";
 import { getSession } from "@/server/auth/session";
 
-export type LoginActionState = { error: string } | undefined;
+type LoginActionState = { error: string } | undefined;
 
 export async function loginAction(_prevState: LoginActionState, formData: FormData): Promise<LoginActionState> {
   const parsed = LoginInputSchema.safeParse({

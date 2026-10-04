@@ -25,7 +25,7 @@ const goodsTotalSql = sql`(${orders.subtotal} - ${orders.discountTotal} - ${orde
 
 // ── Stat cards ──────────────────────────────────────────────────────────────────────────────
 
-export type OrderAggregates = {
+type OrderAggregates = {
   /** DECIMAL(12,2) strings — converted to paisa by the service, never summed as floats here. */
   revenuePaisaStr: string;
   pendingPaisaStr: string;
@@ -64,7 +64,7 @@ export async function getWholesaleLeadsCount(from: Date | null, to: Date): Promi
 
 // ── Chart ───────────────────────────────────────────────────────────────────────────────────
 
-export type DailyRevenueRow = { karachiDate: string; revenuePaisaStr: string; orderCount: number };
+type DailyRevenueRow = { karachiDate: string; revenuePaisaStr: string; orderCount: number };
 
 /**
  * One row per Karachi day that had at least one order placed (`dashboard/chart.ts` zero-fills the
@@ -106,7 +106,7 @@ export async function getEarliestOrderCreatedAt(): Promise<Date | null> {
 
 // ── Most selling products ───────────────────────────────────────────────────────────────────
 
-export type TopProductRow = { productId: number; name: string; unitsSold: number; revenuePaisaStr: string };
+type TopProductRow = { productId: number; name: string; unitsSold: number; revenuePaisaStr: string };
 
 /**
  * Top units sold from `order_items` of orders not cancelled or rejected, in the period. Grouped by
@@ -138,7 +138,7 @@ export async function getMostSellingProducts(from: Date | null, to: Date, limit:
 
 // ── Recent orders ───────────────────────────────────────────────────────────────────────────
 
-export type RecentOrderRow = {
+type RecentOrderRow = {
   orderNumber: string;
   paymentMethod: typeof orders.$inferSelect.paymentMethod;
   orderStatus: typeof orders.$inferSelect.orderStatus;

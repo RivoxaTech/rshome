@@ -10,7 +10,7 @@ import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 const knownKeys = new Set<string>(Object.values(PERMISSIONS));
 
 /** The posted `permissions` field: known keys only, de-duplicated, in `PERMISSIONS` order. */
-export const permissionsField = z.string().max(5_000).transform((raw, ctx) => {
+const permissionsField = z.string().max(5_000).transform((raw, ctx) => {
   const chosen = new Set<string>();
   for (const token of raw.split(",")) {
     const key = token.trim();
@@ -25,7 +25,7 @@ export const permissionsField = z.string().max(5_000).transform((raw, ctx) => {
 });
 
 /** Lowercase letters, digits and single dashes, 2–50 characters: a stable identifier shown beside the name. */
-export const ROLE_KEY_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const ROLE_KEY_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 const nameField = z.string().trim().min(2, "Enter a role name.").max(100, "Keep this under 100 characters.");
 const versionField = z.string().min(1).max(100);
@@ -43,7 +43,6 @@ export const createRoleInputSchema = z.object({
     .regex(ROLE_KEY_PATTERN, "Use lowercase letters, numbers and single dashes only."),
   permissions: permissionsField,
 });
-export type CreateRoleInput = z.infer<typeof createRoleInputSchema>;
 
 /** The per-role edit page: the key is fixed after creation; the name and the permission set change. */
 export const updateRoleInputSchema = z.object({
@@ -52,7 +51,6 @@ export const updateRoleInputSchema = z.object({
   version: versionField,
   confirmSensitive: confirmField,
 });
-export type UpdateRoleInput = z.infer<typeof updateRoleInputSchema>;
 
 /** The matrix page's per-column save: only the permission set (the name is edited on the role's own page). */
 export const savePermissionsInputSchema = z.object({
@@ -60,7 +58,6 @@ export const savePermissionsInputSchema = z.object({
   version: versionField,
   confirmSensitive: confirmField,
 });
-export type SavePermissionsInput = z.infer<typeof savePermissionsInputSchema>;
 
 export const resetRoleInputSchema = z.object({
   version: versionField,

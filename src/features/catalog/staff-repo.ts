@@ -1,5 +1,5 @@
 /**
- * The panel's categories CRUD (S10 phase 1): DB access only, no business rules (ARCHITECTURE.md
+ * The panel's categories CRUD (S10): DB access only, no business rules (ARCHITECTURE.md
  * §2) — `staff-service.ts` owns the parent/child rules, slug-clash messaging and audit rows.
  */
 import { and, asc, count, eq, inArray, like, ne, or, type SQL } from "drizzle-orm";
@@ -8,7 +8,7 @@ import { categories, products } from "@/server/db/schema/catalog";
 import { likeContains } from "@/lib/sql-like";
 
 export type CategoryRow = typeof categories.$inferSelect;
-export type CategoryUpdate = Partial<typeof categories.$inferInsert>;
+type CategoryUpdate = Partial<typeof categories.$inferInsert>;
 
 const contains = likeContains;
 

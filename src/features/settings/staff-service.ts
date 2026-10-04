@@ -71,7 +71,7 @@ export function settingsVersion(rows: readonly Pick<SettingRow, "key" | "updated
 
 const BANK_KEYS = [SETTING_KEYS.bankAccounts, SETTING_KEYS.contact] as const;
 
-export type BankSettingsFormData = { accounts: BankAccount[]; contact: Contact; version: string };
+type BankSettingsFormData = { accounts: BankAccount[]; contact: Contact; version: string };
 
 export async function getBankSettingsForEdit(): Promise<BankSettingsFormData> {
   const [accounts, contact, rows] = await Promise.all([getBankAccounts(), getContactInfo(), getSettingRows(BANK_KEYS)]);
@@ -136,7 +136,7 @@ const STORE_KEYS = [
   SETTING_KEYS.notifyOwnerWholesaleEmails,
 ] as const;
 
-export type StoreSettingsFormData = {
+type StoreSettingsFormData = {
   identity: StoreIdentity;
   announcementText: string;
   socialLinks: SocialLinks;

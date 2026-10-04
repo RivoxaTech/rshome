@@ -3,13 +3,13 @@ import { db } from "@/server/db/client";
 import { categories, productImages, products, productVariants } from "@/server/db/schema/catalog";
 import { likeContains } from "@/lib/sql-like";
 
-export type CategoryRow = typeof categories.$inferSelect;
+type CategoryRow = typeof categories.$inferSelect;
 export type ProductImageRow = typeof productImages.$inferSelect;
 export type VariantRow = typeof productVariants.$inferSelect;
 
 /**
  * Every category, active or not (a handful of rows): `features/catalog/service.ts` computes which
- * ones are actually visible (a hidden parent hides its children too, S10 phase 1), so the whole
+ * ones are actually visible (a hidden parent hides its children too, S10), so the whole
  * table is needed here rather than a `WHERE is_active` filter.
  */
 export function listAllCategories(): Promise<CategoryRow[]> {
@@ -39,7 +39,7 @@ function selectActiveListingProducts(...conditions: SQL[]) {
 
 export type ListingProductRow = Awaited<ReturnType<typeof selectActiveListingProducts>>[number];
 
-/** Featured strip order (S10 phase 2b, `products.featured_sort_order`); ties: newest first. */
+/** Featured strip order (S10, `products.featured_sort_order`); ties: newest first. */
 export function getFeaturedActiveProducts(): Promise<ListingProductRow[]> {
   return selectActiveListingProducts(eq(products.isFeatured, true)).orderBy(
     asc(products.featuredSortOrder),

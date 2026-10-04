@@ -10,8 +10,8 @@ import { MAX_BANK_ACCOUNTS, bankAccountFieldName } from "@/features/settings/sch
 import type { StaffActionResult } from "@/features/settings/staff-service";
 import { normalizePhone } from "@/lib/phone";
 
-export type BankAccountFormValues = { bankName: string; accountTitle: string; accountNumber: string; iban: string; note: string };
-export type BankSettingsFormValues = { accounts: BankAccountFormValues[]; phone: string; whatsapp: string; address: string };
+type BankAccountFormValues = { bankName: string; accountTitle: string; accountNumber: string; iban: string; note: string };
+type BankSettingsFormValues = { accounts: BankAccountFormValues[]; phone: string; whatsapp: string; address: string };
 
 const EMPTY_ACCOUNT: BankAccountFormValues = { bankName: "", accountTitle: "", accountNumber: "", iban: "", note: "" };
 

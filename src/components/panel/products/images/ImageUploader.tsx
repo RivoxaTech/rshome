@@ -8,7 +8,7 @@ import { addProductImageAction } from "@/app/panel/(protected)/products/[id]/act
 type FileStatus = { id: number; name: string; progress: number; error: string | null; done: boolean };
 
 /**
- * A multi-file picker and drop area (S10 phase 3b): each file uploads through the existing
+ * A multi-file picker and drop area (S10): each file uploads through the existing
  * `/api/panel/uploads` one at a time, with progress (XHR, since `fetch` has no upload-progress
  * event), then is added to the product through `addProductImageAction`. A refused add (max count,
  * duplicate path) is shown per file; the server itself deletes the now-orphaned upload

@@ -11,7 +11,7 @@ import { Listbox, type ListboxItem } from "@/components/panel/Listbox";
 import { MediaImageField } from "@/components/panel/MediaImageField";
 import { Switch } from "@/components/panel/Switch";
 
-export type ProductFormValues = {
+type ProductFormValues = {
   id: number | null;
   name: string;
   slug: string;
@@ -28,7 +28,7 @@ export type ProductFormValues = {
 };
 
 /** The create form's one "Default" variant; on edit, variants live in their own card (`VariantsSection`). */
-export type DefaultVariantFormValues = { sku: string; stock: number };
+type DefaultVariantFormValues = { sku: string; stock: number };
 
 const STATUS_LABELS: Record<ProductStatus, string> = { draft: "Draft", active: "Active", archived: "Archived" };
 
@@ -48,12 +48,12 @@ const inputClass =
   "border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none";
 
 /** The product's current position in the relevant order; `current` is null on create, and on edit while not yet featured. */
-export type PlacementPosition = { current: number | null; total: number };
+type PlacementPosition = { current: number | null; total: number };
 
 const PLACEMENT_LABELS: Record<PlacementCreate, string> = { top: "At the top", end: "At the end", position: "At position" };
 
 /**
- * One "Show in shop"/"Show in featured strip" radio group (S10 phase 2b). On create, End is the
+ * One "Show in shop"/"Show in featured strip" radio group (S10). On create, End is the
  * default and there's no "keep" option; on edit, "Keep current position" is the default so saving
  * the rest of the form never silently moves the product. The position number input only posts
  * when "At position" is selected — a disabled input isn't included in FormData.
@@ -238,7 +238,7 @@ export function ProductForm({
           <textarea id="description" name="description" defaultValue={initial.description ?? ""} rows={6} maxLength={5000} className={inputClass} />
         </Field>
 
-        {/* Edit mode manages every image in its own card below the form (S10 phase 3b); only the
+        {/* Edit mode manages every image in its own card below the form (S10); only the
             create form takes one main image here, which becomes the first gallery image. */}
         {mode === "create" && (
           <MediaImageField

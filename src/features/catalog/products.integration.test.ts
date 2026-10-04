@@ -1,9 +1,9 @@
 /**
- * The panel's products CRUD against the test database (S10 phase 2): default-variant and image
+ * The panel's products CRUD against the test database (S10): default-variant and image
  * creation, slug/SKU clashes, edits (general fields and the inline variant fields), a price change's
  * audit row and its order snapshots staying untouched, draft/archived/hidden-category absence from
  * the storefront queries, the delete guard (refused once ordered, allowed otherwise), and the
- * Developer-vs-Admin RBAC wall. Mirrors `categories.integration.test.ts` (S10 phase 1).
+ * Developer-vs-Admin RBAC wall. Mirrors `categories.integration.test.ts` (S10).
  */
 import { and, asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -175,7 +175,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       expect(result.fieldErrors?.sku).toBeDefined();
     });
 
-    it("refuses a malformed imagePath at the schema boundary, before any row is written (S10 phase 3b hardening)", async () => {
+    it("refuses a malformed imagePath at the schema boundary, before any row is written (S10 hardening)", async () => {
       for (const badPath of ["categories/" + "a".repeat(32), "../x", "/etc/x", "products/short"]) {
         const result = await staffService.createProduct(validInput(categoryId, { slug: "bad-image-path-test", sku: "BAD-IMAGE-SKU", imagePath: badPath, imagePathWidth: "800", imagePathHeight: "600" }), {
           id: actorId,
@@ -194,7 +194,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
   });
 
   describe("update", () => {
-    // S10 phase 3b (D54): the images card on the edit page owns every image action now — the
+    // S10 (D54): the images card on the edit page owns every image action now — the
     // product save form no longer reads or writes images on edit, even when posted (a browser
     // never posts them from that form any more, but the Server Action ignores them regardless).
     it("leaves an existing image row untouched, even if image fields are posted", async () => {
@@ -354,7 +354,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
     });
   });
 
-  describe("sale price display (S10 phase 2b, reuses features/pricing only)", () => {
+  describe("sale price display (S10, reuses features/pricing only)", () => {
     async function insertDiscount(values: Partial<typeof discounts.$inferInsert> & Pick<typeof discounts.$inferInsert, "type" | "value" | "targetType">): Promise<number> {
       const [row] = await db.insert(discounts).values({ name: "Test discount", isActive: true, ...values });
       return row.insertId;
@@ -414,7 +414,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
     });
   });
 
-  describe("manual ordering (S10 phase 2b)", () => {
+  describe("manual ordering (S10)", () => {
     it("a new product lands at the end by default, then at the top, then at a position", async () => {
       const p1 = await staffService.createProduct(validInput(categoryId, { slug: "order-p1", sku: "ORDER-P1" }), { id: actorId });
       const p2 = await staffService.createProduct(validInput(categoryId, { slug: "order-p2", sku: "ORDER-P2" }), { id: actorId });
@@ -681,7 +681,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       expect(image).toMatchObject({ path: hexPath("4"), width: 1408, height: 1008 });
     });
 
-    // The shared Listbox component (replacing every native <select> in the panel, S10 phase 2b
+    // The shared Listbox component (replacing every native <select> in the panel, S10
     // follow-up) posts a plain hidden input named after the field ("categoryId", "status"), the
     // same shape `validInput` already builds — this pins the real Server Action to that wire
     // format rather than a hand-built service call, the same reasoning as the test above.

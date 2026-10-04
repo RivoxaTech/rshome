@@ -9,7 +9,7 @@ import { MIN_PASSWORD_LENGTH } from "@/features/users/schemas";
 const ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const GENERATED_LENGTH = 14;
 
-export function generatePassword(): string {
+function generatePassword(): string {
   const bytes = new Uint32Array(GENERATED_LENGTH);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (value) => ALPHABET[value % ALPHABET.length]).join("");

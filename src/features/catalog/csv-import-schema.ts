@@ -29,7 +29,7 @@ export const PRODUCT_IMPORT_HEADERS = [
   "Variant active",
 ] as const;
 
-export type ProductImportHeader = (typeof PRODUCT_IMPORT_HEADERS)[number];
+type ProductImportHeader = (typeof PRODUCT_IMPORT_HEADERS)[number];
 
 export const PRODUCT_IMPORT_EXAMPLE_ROW: readonly string[] = [
   "Ceramic Dinner Plate",

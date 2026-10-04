@@ -27,7 +27,7 @@ export function assertTestDatabase(): void {
 }
 
 export async function resetTables(db: Db): Promise<void> {
-  // `categories.parent_id` self-references the same table (S10 phase 1), so a plain bulk delete
+  // `categories.parent_id` self-references the same table (S10), so a plain bulk delete
   // can fail with a child row still pointing at a parent row not yet gone; breaking every
   // self-reference first avoids ordering the deletes row by row.
   await db.update(categories).set({ parentId: null });

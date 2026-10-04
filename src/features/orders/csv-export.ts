@@ -10,7 +10,7 @@ import { ORDER_STATUS_LABELS, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS } fro
 import type { PaymentMethod } from "./status";
 import type { OrderTab } from "./transitions";
 
-export const ORDER_EXPORT_ROW_CAP = 5000;
+const ORDER_EXPORT_ROW_CAP = 5000;
 
 export const ORDER_EXPORT_HEADERS = [
   "Order number",

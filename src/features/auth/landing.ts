@@ -9,7 +9,7 @@ import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
  * different pages (S14): `settings.bank` on the Admin's bank/contact page, `settings.manage` on the
  * Developer's store settings — each is the last Admin-side / Developer-side entry, so a full role
  * never lands there, but a role holding only that one key does. Categories, discounts, coupons and
- * shipping sit after products (S10 phase 1, S12/S13, S14): the Developer holds all of them by
+ * shipping sit after products (S10, S12/S13, S14): the Developer holds all of them by
  * default and keeps landing on products unchanged; the entries exist so a role holding only one of
  * those keys still lands on its own page instead of falling back to `/panel/account`.
  */

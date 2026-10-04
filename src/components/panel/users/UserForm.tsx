@@ -12,7 +12,7 @@ import { CopyButton } from "@/components/ui/CopyButton";
 import { MIN_PASSWORD_LENGTH } from "@/features/users/schemas";
 import type { RoleOption, StaffActionResult } from "@/features/users/staff-service";
 
-export type UserFormValues = {
+type UserFormValues = {
   id: number | null;
   name: string;
   email: string;

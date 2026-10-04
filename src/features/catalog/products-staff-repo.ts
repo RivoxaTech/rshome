@@ -1,13 +1,13 @@
 /**
- * The panel's products CRUD (S10 phase 2): DB access only, no business rules (ARCHITECTURE.md §2)
+ * The panel's products CRUD (S10): DB access only, no business rules (ARCHITECTURE.md §2)
  * — `products-staff-service.ts` owns the slug/SKU/category checks, audit rows and the delete guard.
- * Mirrors `staff-repo.ts` (categories, S10 phase 1). Variant queries moved to
+ * Mirrors `staff-repo.ts` (categories, S10). Variant queries moved to
  * `variants-staff-repo.ts` in phase 3a.
  */
 import { and, asc, count, desc, eq, inArray, like, max, ne, or, sql, sum, type SQL } from "drizzle-orm";
 // Variant queries (incl. the create form's "Default" variant) live in `variants-staff-repo.ts` (S10
 // phase 3a); image queries (incl. the whole-product delete's image cleanup) live in
-// `images-staff-repo.ts` (S10 phase 3b).
+// `images-staff-repo.ts` (S10).
 import { db, type DbClient } from "@/server/db/client";
 import { categories, productVariants, products } from "@/server/db/schema/catalog";
 import { orderItems } from "@/server/db/schema/orders";
@@ -15,7 +15,7 @@ import type { ProductTab } from "./schemas";
 import { likeContains } from "@/lib/sql-like";
 
 export type ProductRow = typeof products.$inferSelect;
-export type ProductUpdate = Partial<typeof products.$inferInsert>;
+type ProductUpdate = Partial<typeof products.$inferInsert>;
 
 const contains = likeContains;
 
@@ -29,7 +29,7 @@ function statusCondition(tab: ProductTab): SQL | undefined {
 
 // `parentCategoryId` is needed to resolve a category-targeted discount against a product in a
 // child category (features/pricing/pricing.ts#discountMatchesProduct checks both levels).
-export type StaffProductListRow = ProductRow & { categoryName: string; parentCategoryId: number | null };
+type StaffProductListRow = ProductRow & { categoryName: string; parentCategoryId: number | null };
 
 export async function listProductsPage(filter: {
   tab: ProductTab;
@@ -233,7 +233,7 @@ export async function getCategoryParentId(categoryId: number): Promise<number | 
   return row?.parentId ?? null;
 }
 
-// ── Manual ordering (S10 phase 2b): shop order (global) / featured order (featured+active only) ─
+// ── Manual ordering (S10): shop order (global) / featured order (featured+active only) ─
 
 /** Every product id in shop-order, optionally scoped to one category (its own relative order). */
 export async function getOrderedProductIds(client: DbClient, categoryId?: number): Promise<number[]> {

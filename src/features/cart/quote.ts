@@ -27,12 +27,12 @@ export type CartVariant = {
   image: ProductImage | null;
 };
 
-export type ReconciledLine = { variantId: number; quantity: number; variant: CartVariant };
+type ReconciledLine = { variantId: number; quantity: number; variant: CartVariant };
 
 /** Something the server changed about the cart, for the UI to show once. */
 export type CartNotice = { kind: "line" | "coupon"; message: string };
 
-export type ReconciledCart = {
+type ReconciledCart = {
   lines: ReconciledLine[];
   notices: CartNotice[];
 };

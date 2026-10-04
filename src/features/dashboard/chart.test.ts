@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bucketSeries, buildLinePath, buildSmoothAreaPath, buildSmoothPath, fillDailySeries, scaleLinear, type DailyPoint } from "./chart";
+import { bucketSeries, buildSmoothAreaPath, buildSmoothPath, fillDailySeries, scaleLinear, type DailyPoint } from "./chart";
 import { dayIndexFromKarachiDateString } from "./ranges";
 
 const day = (dateStr: string) => dayIndexFromKarachiDateString(dateStr);
@@ -76,21 +76,6 @@ describe("scaleLinear", () => {
   it("maps every value to the range start when the domain is flat (avoids dividing by zero)", () => {
     const scale = scaleLinear([5, 5], [0, 100]);
     expect(scale(5)).toBe(0);
-  });
-});
-
-describe("buildLinePath", () => {
-  it("is empty for no points", () => {
-    expect(buildLinePath([])).toBe("");
-  });
-
-  it("starts with M and continues with L for each following point", () => {
-    const path = buildLinePath([
-      { x: 0, y: 10 },
-      { x: 5, y: 20 },
-      { x: 10, y: 0 },
-    ]);
-    expect(path).toBe("M0.00 10.00 L5.00 20.00 L10.00 0.00");
   });
 });
 

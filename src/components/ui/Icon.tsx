@@ -48,19 +48,19 @@ export const ICON_PATHS = {
   wholesale: "M3 8l9-5 9 5-9 5-9-5zM3 8v8l9 5 9-5V8M12 13v8M3 8l9 5M21 8l-9 5",
   // Average order value stat card (S16): an upward sparkline.
   trendingUp: "M3 17l6-6 4 4 8-9M15 6h6v6",
-  // Categories nav item (S10 phase 1): a price tag outline.
+  // Categories nav item (S10): a price tag outline.
   tag: "M3 11V3h8l10 10-8 8L3 11zM7 7h.01",
-  // Upload picker (S10 phase 1): an arrow into a tray.
+  // Upload picker (S10): an arrow into a tray.
   upload: "M12 16V4M7 9l5-5 5 5M4 16v4h16v-4",
-  // Featured toggle (S10 phase 2): a five-point star outline.
+  // Featured toggle (S10): a five-point star outline.
   star: "M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.2-5.4 3.2 1.3-6L3.3 9.2l6.1-.6z",
-  // Archive quick action (S10 phase 2): a storage box with its lid.
+  // Archive quick action (S10): a storage box with its lid.
   archive: "M3 7h18v3H3zM5 10v10h14V10M9 14h6",
-  // Drag handle (S10 phase 2b, /panel/products/arrange): a six-dot grip.
+  // Drag handle (S10, /panel/products/arrange): a six-dot grip.
   grip: "M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01",
-  // Edit quick action (S10 phase 3a, the variants card): a pencil outline.
+  // Edit quick action (S10, the variants card): a pencil outline.
   edit: "M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z",
-  // Activate/deactivate toggle (S10 phase 3a, the variants card): a power glyph.
+  // Activate/deactivate toggle (S10, the variants card): a power glyph.
   power: "M12 2v9M18.4 6.6a8 8 0 11-12.8 0",
   // Discounts nav item (S12): a percent sign.
   percent: "M19 5L5 19M7.5 9a2 2 0 100-4 2 2 0 000 4zM16.5 19a2 2 0 100-4 2 2 0 000 4z",

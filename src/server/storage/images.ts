@@ -131,7 +131,7 @@ export async function deleteMediaImage(mediaPath: string): Promise<void> {
  * Payment screenshots (ARCHITECTURE.md §4.4). A phone screenshot is a few megapixels and a 24 MP
  * photo still fits; anything larger is refused from its header, before a pixel is decoded.
  */
-export const PROOF_MAX_INPUT_PIXELS = 25_000_000;
+const PROOF_MAX_INPUT_PIXELS = 25_000_000;
 const PROOF_MAX_SIDE = 2000;
 const PROOF_FORMATS: ReadonlySet<string> = new Set(["jpeg", "png", "webp"]);
 

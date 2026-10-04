@@ -11,7 +11,7 @@ import { DISCOUNT_TARGET_TYPES, DISCOUNT_TYPES, MAX_DISCOUNT_PRODUCTS, type Disc
 import type { CategoryOption, ProductOption } from "@/features/discounts/staff-repo";
 import { discountOverlapAction } from "@/app/panel/(protected)/discounts/actions";
 
-export type DiscountFormValues = {
+type DiscountFormValues = {
   id: number | null;
   name: string;
   type: DiscountType;

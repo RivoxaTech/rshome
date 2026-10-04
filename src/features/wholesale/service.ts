@@ -6,7 +6,7 @@ import { wholesaleInquiryInputSchema } from "./schemas";
 
 const WHOLESALE_RATE_LIMIT = { max: 5, windowMs: 60 * 60 * 1000 };
 
-export type CreateWholesaleInquiryResult =
+type CreateWholesaleInquiryResult =
   // `notify` is false for the honeypot path: the caller must still answer success, but fires no
   // push or email for it ("looks successful, stores nothing, notifies nobody"); `id` is the new
   // row's id when one was created (null for the honeypot path), for the caller to pass to

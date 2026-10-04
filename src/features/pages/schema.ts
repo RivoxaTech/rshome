@@ -5,13 +5,13 @@
  * rule fails `npm test` rather than surfacing only at runtime.
  */
 
-export type HeadingBlock = { type: "heading"; text: string };
-export type ParagraphBlock = { type: "paragraph"; text: string };
-export type ListBlock = { type: "list"; items: string[] };
-export type OrderedListBlock = { type: "ordered"; items: string[] };
-export type LinkBlock = { type: "link"; text: string; href: string };
+type HeadingBlock = { type: "heading"; text: string };
+type ParagraphBlock = { type: "paragraph"; text: string };
+type ListBlock = { type: "list"; items: string[] };
+type OrderedListBlock = { type: "ordered"; items: string[] };
+type LinkBlock = { type: "link"; text: string; href: string };
 /** Renders the live phone/WhatsApp/address from `features/settings/service.ts` — no text of its own. */
-export type ContactBlock = { type: "contact" };
+type ContactBlock = { type: "contact" };
 
 export type PageBlock = HeadingBlock | ParagraphBlock | ListBlock | OrderedListBlock | LinkBlock | ContactBlock;
 

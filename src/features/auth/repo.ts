@@ -3,7 +3,7 @@ import type { PermissionKey } from "@/features/auth/permissions";
 import { db, type DbClient } from "@/server/db/client";
 import { permissions, rolePermissions, roles, sessions, users } from "@/server/db/schema/access-control";
 
-export type UserWithRole = {
+type UserWithRole = {
   id: number;
   name: string;
   email: string;
@@ -44,7 +44,7 @@ export async function touchLastLogin(userId: number): Promise<void> {
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, userId));
 }
 
-export type UserCredentials = { id: number; passwordHash: string };
+type UserCredentials = { id: number; passwordHash: string };
 
 export async function findUserById(userId: number): Promise<UserCredentials | null> {
   const [row] = await db.select({ id: users.id, passwordHash: users.passwordHash }).from(users).where(eq(users.id, userId)).limit(1);

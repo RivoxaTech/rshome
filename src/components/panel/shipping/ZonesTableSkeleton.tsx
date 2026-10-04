@@ -1,7 +1,7 @@
 import { Skeleton } from "@/components/panel/Skeleton";
 
 /** Table-shaped rows on desktop, cards on phones. */
-export function ZonesTableSkeleton() {
+function ZonesTableSkeleton() {
   return (
     <>
       <div className="bg-card border-border hidden rounded-lg border p-4 md:block">

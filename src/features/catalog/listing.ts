@@ -3,7 +3,7 @@ import type { Paisa } from "@/features/pricing/money";
 
 export const SHOP_SORTS = ["recommended", "newest", "price_asc", "price_desc"] as const;
 export type ShopSort = (typeof SHOP_SORTS)[number];
-/** The staff-controlled order (S10 phase 2b); the one value the listing URL leaves out. */
+/** The staff-controlled order (S10); the one value the listing URL leaves out. */
 export const DEFAULT_SORT: ShopSort = "recommended";
 
 export type SortableProduct = {
@@ -11,7 +11,7 @@ export type SortableProduct = {
   createdAt: Date;
   /** The price the card shows: the cheapest active variant's discounted unit price. */
   fromPrice: Paisa;
-  /** Staff-controlled display order (S10 phase 2b, `products.sort_order`). */
+  /** Staff-controlled display order (S10, `products.sort_order`). */
   sortOrder: number;
 };
 
@@ -37,7 +37,7 @@ export function sortProducts<T extends SortableProduct>(items: T[], sort: ShopSo
   return [...items].sort(compare);
 }
 
-export type Pagination = { page: number; totalPages: number; offset: number };
+type Pagination = { page: number; totalPages: number; offset: number };
 
 /** A page past the end shows the last page; there is always at least one (possibly empty) page. */
 export function paginate(totalItems: number, requestedPage: number, pageSize: number): Pagination {

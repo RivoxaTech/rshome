@@ -108,7 +108,6 @@ export const testDestinationSchema = z.object({
   city: z.string().trim().max(100, "Enter a shorter city name.").default(""),
   goodsTotal: optionalMoneyField,
 });
-export type TestDestinationInput = z.infer<typeof testDestinationSchema>;
 
 // Next hands repeated query keys over as arrays (?q=a&q=b); only the first counts.
 const firstQueryValue = (value: unknown) => (Array.isArray(value) ? value[0] : value);

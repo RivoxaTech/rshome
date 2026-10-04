@@ -19,7 +19,7 @@ export function fillDailySeries(rows: DailyPoint[], fromDayIndex: number, toDayI
   return points;
 }
 
-export type ChartPoint = { label: string; dateKarachi: string; revenuePaisa: number; orderCount: number };
+type ChartPoint = { label: string; dateKarachi: string; revenuePaisa: number; orderCount: number };
 
 /**
  * `dayIndex * DAY_MS` is the "pretend UTC" instant standing for that Karachi calendar date (the
@@ -87,7 +87,7 @@ export function bucketSeries(daily: DailyPoint[], bucket: Bucket): ChartPoint[] 
 
 // ── SVG geometry ────────────────────────────────────────────────────────────────────────────
 
-export type Point = { x: number; y: number };
+type Point = { x: number; y: number };
 
 /** Maps a domain value to a pixel range; a flat domain (every value equal) maps to the range's start. */
 export function scaleLinear(domain: [number, number], range: [number, number]): (value: number) => number {
@@ -98,15 +98,9 @@ export function scaleLinear(domain: [number, number], range: [number, number]): 
   return (value: number) => r0 + ((value - d0) / span) * (r1 - r0);
 }
 
-/** A plain polyline path: `"M x y L x y L x y"`. Empty input returns `""`. */
-export function buildLinePath(points: Point[]): string {
-  if (points.length === 0) return "";
-  return points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
-}
-
 /**
  * A smoothed curve through every point (a Catmull-Rom spline converted to cubic Beziers, tension
- * 1/6 — the standard conversion). Unlike `buildLinePath` this still passes through each point
+ * 1/6 — the standard conversion). Unlike a plain polyline this still passes through each point
  * exactly; only the curve between them is smoothed, matching the owner's reference dashboard.
  */
 export function buildSmoothPath(points: Point[]): string {

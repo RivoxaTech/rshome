@@ -90,11 +90,11 @@ const sortKeys = (keys: Iterable<PermissionKey>): PermissionKey[] => {
 
 // ── Audit values and the version token ──────────────────────────────────────────────────────────
 
-export function auditValues(role: Pick<RoleRow, "key" | "name" | "isSystem">, keys: readonly PermissionKey[]) {
+function auditValues(role: Pick<RoleRow, "key" | "name" | "isSystem">, keys: readonly PermissionKey[]) {
   return { key: role.key, name: role.name, isSystem: role.isSystem, permissions: sortKeys(keys) };
 }
 
-export function roleVersion(role: Pick<RoleRow, "key" | "name" | "isSystem" | "updatedAt">, keys: readonly PermissionKey[]): string {
+function roleVersion(role: Pick<RoleRow, "key" | "name" | "isSystem" | "updatedAt">, keys: readonly PermissionKey[]): string {
   return `${role.updatedAt.getTime()}@${fingerprint(auditValues(role, keys))}`;
 }
 
@@ -134,7 +134,7 @@ export async function listRoleColumns(): Promise<StaffRoleColumn[]> {
 
 // ── The edit page ───────────────────────────────────────────────────────────────────────────────
 
-export type RoleEditFormData = {
+type RoleEditFormData = {
   role: RoleRow;
   permissions: PermissionKey[];
   version: string;

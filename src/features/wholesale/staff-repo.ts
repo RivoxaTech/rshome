@@ -7,7 +7,7 @@ import { wholesaleInquiries, wholesaleInquiryItems, wholesaleInquiryNotes } from
 import type { WholesaleStatus } from "./transitions";
 import { likeContains } from "@/lib/sql-like";
 
-export type InquiryUpdate = Partial<typeof wholesaleInquiries.$inferInsert>;
+type InquiryUpdate = Partial<typeof wholesaleInquiries.$inferInsert>;
 
 const contains = likeContains;
 
@@ -47,7 +47,7 @@ export async function listInquiries(
 
 /** Every matching inquiry, capped at 5,000, for the CSV export — no pagination. */
 /** The export reads one row past the cap so the caller can tell a full export from a truncated one (S22 BUG-24). */
-export const WHOLESALE_EXPORT_ROW_CAP = 5000;
+const WHOLESALE_EXPORT_ROW_CAP = 5000;
 
 export async function listInquiriesForExport(status: WholesaleStatus | "all", search: string | undefined) {
   const where = and(status === "all" ? undefined : eq(wholesaleInquiries.status, status), search ? searchCondition(search) : undefined);

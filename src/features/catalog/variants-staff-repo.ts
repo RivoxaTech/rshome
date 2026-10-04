@@ -1,5 +1,5 @@
 /**
- * The panel's variant CRUD (S10 phase 3a): DB access only, no business rules (ARCHITECTURE.md §2)
+ * The panel's variant CRUD (S10): DB access only, no business rules (ARCHITECTURE.md §2)
  * — `variants-staff-service.ts` owns the SKU/attribute/last-variant rules and the audit rows.
  * Holds every staff-side `product_variants` query, including the ones the product form itself
  * needs (the create form's "Default" variant, the product delete).
@@ -10,7 +10,7 @@ import { productVariants } from "@/server/db/schema/catalog";
 import { orderItems } from "@/server/db/schema/orders";
 
 export type ProductVariantRow = typeof productVariants.$inferSelect;
-export type ProductVariantUpdate = Partial<typeof productVariants.$inferInsert>;
+type ProductVariantUpdate = Partial<typeof productVariants.$inferInsert>;
 
 /** Takes a `DbClient` (pool or an open transaction) so a caller already inside a transaction sees its own uncommitted writes. */
 export async function getVariantsByProductId(client: DbClient, productId: number): Promise<ProductVariantRow[]> {

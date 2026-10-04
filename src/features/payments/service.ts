@@ -13,14 +13,14 @@ import { PROOF_TOKEN_TTL_MS, encodeProofToken } from "./proof-token";
 import { getProofFilePath, getProofSummaries, insertPaymentProof, lockOrder, setPaymentStatus } from "./repo";
 
 /** ARCHITECTURE.md §4.4. The route rejects a larger body from its Content-Length, unread. */
-export const PROOF_MAX_BODY_BYTES = 5.5 * 1024 * 1024;
-export const PROOF_MAX_FILE_BYTES = 5 * 1024 * 1024;
-export const MAX_PROOFS_PER_ORDER = 5;
+const PROOF_MAX_BODY_BYTES = 5.5 * 1024 * 1024;
+const PROOF_MAX_FILE_BYTES = 5 * 1024 * 1024;
+const MAX_PROOFS_PER_ORDER = 5;
 // Both upload routes share the per-IP bucket; the order-page route also counts per order.
 const IP_RATE_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 };
 const ORDER_RATE_LIMIT = { max: 5, windowMs: 60 * 60 * 1000 };
 
-export type UploadFailure = { ok: false; status: number; error: string };
+type UploadFailure = { ok: false; status: number; error: string };
 const failure = (status: number, error: string): UploadFailure => ({ ok: false, status, error });
 
 const TOO_MANY_ATTEMPTS = failure(429, "Too many uploads. Please try again in a few minutes.");

@@ -19,7 +19,7 @@ import { getVariantBySku, getVariantsByProductId, insertVariant, lockVariantsByP
 import { sameAttributes } from "./variants";
 
 export const MAX_IMPORT_FILE_BYTES = 2 * 1024 * 1024;
-export const MAX_IMPORT_ROWS = 1000;
+const MAX_IMPORT_ROWS = 1000;
 
 export type ImportReport = {
   totalRows: number;
@@ -188,7 +188,7 @@ async function runChecks(text: string): Promise<CheckedFile> {
 /** The unique index compares SKUs case-insensitively, so every in-memory comparison does too (S22 BUG-11). */
 const skuKey = (sku: string) => sku.toUpperCase();
 
-export type CheckResult = { ok: true; report: ImportReport; token: string } | { ok: false; error: string };
+type CheckResult = { ok: true; report: ImportReport; token: string } | { ok: false; error: string };
 
 export async function checkProductImport(buffer: Buffer): Promise<CheckResult> {
   if (buffer.byteLength > MAX_IMPORT_FILE_BYTES) return { ok: false, error: "The file is larger than 2 MB." };
@@ -199,7 +199,7 @@ export async function checkProductImport(buffer: Buffer): Promise<CheckResult> {
   return { ok: true, report: result.report, token };
 }
 
-export type CommitResult = { ok: true; created: number; updated: number } | { ok: false; error: string; report?: ImportReport };
+type CommitResult = { ok: true; created: number; updated: number } | { ok: false; error: string; report?: ImportReport };
 
 /** The uploaded file's name is kept for the audit row's `new_values` only, capped here (S22 BUG-03). */
 export const MAX_IMPORT_FILE_NAME_LENGTH = 200;

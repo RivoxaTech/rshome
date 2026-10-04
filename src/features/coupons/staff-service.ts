@@ -57,7 +57,7 @@ function refused(error: CouponActionError): StaffActionResult {
 }
 
 /** The pricing module's shape for a stored row, with the live usage count in place of `used_count`. */
-export function toPricingCoupon(row: CouponRow, usageCount: number): PricingCoupon {
+function toPricingCoupon(row: CouponRow, usageCount: number): PricingCoupon {
   return {
     id: row.id,
     code: row.code,
@@ -144,7 +144,7 @@ export type CouponUsageSummary = {
   recent: { at: string; order: { orderNumber: string; paymentMethod: "cod" | "bank_transfer" } | null }[];
 };
 
-export type CouponEditFormData = { coupon: CouponRow; status: CouponStatus; usage: CouponUsageSummary };
+type CouponEditFormData = { coupon: CouponRow; status: CouponStatus; usage: CouponUsageSummary };
 
 export async function getCouponForEdit(id: number, viewer: { canViewOrders: boolean }): Promise<CouponEditFormData | null> {
   const coupon = await getCouponById(id);

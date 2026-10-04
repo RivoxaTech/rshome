@@ -68,7 +68,7 @@ describe("productInputSchema", () => {
     if (result.success) expect(result.data.imagePath).toBe(`products/${hex32}`);
   });
 
-  it("rejects a malformed imagePath (S10 phase 3b hardening, D54): traversal, absolute, URL, the categories folder, uppercase hex, empty-but-present", () => {
+  it("rejects a malformed imagePath (S10 hardening, D54): traversal, absolute, URL, the categories folder, uppercase hex, empty-but-present", () => {
     for (const badPath of ["../x", "products/../x", "C:\\x", "/etc/x", "https://x", `categories/${hex32}`, `products/${hex32.toUpperCase()}`, "products/short"]) {
       const result = productInputSchema.safeParse({ ...validProduct, imagePath: badPath });
       expect(result.success, `expected imagePath "${badPath}" to be refused`).toBe(false);

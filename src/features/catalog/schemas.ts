@@ -6,8 +6,6 @@ import { DEFAULT_SORT, SHOP_SORTS } from "./listing";
 import { SLUG_PATTERN } from "./slug";
 import { ATTRIBUTE_SLOTS, generateVariantLabel, validateAttributePairs } from "./variants";
 
-export { variantAttributesSchema } from "./variants";
-
 // Next hands repeated query keys over as arrays (?sort=a&sort=b); only the first counts.
 const firstValue = (value: unknown) => (Array.isArray(value) ? value[0] : value);
 
@@ -19,11 +17,10 @@ export const listingQuerySchema = z.object({
   page: z.preprocess(firstValue, z.coerce.number().int().min(1).max(10_000)).catch(1),
 });
 
-export type ListingQuery = z.infer<typeof listingQuerySchema>;
 
 export const slugSchema = z.string().min(1).max(191);
 
-// ── Panel: categories CRUD (S10 phase 1) ───────────────────────────────────────────────────────
+// ── Panel: categories CRUD (S10) ───────────────────────────────────────────────────────
 
 /** `""`/missing -> `null`, so an empty optional field is stored as NULL rather than an empty string. */
 const optionalText = (max: number) =>
@@ -119,7 +116,7 @@ export const categoryBackHrefSchema = z
   .preprocess(firstQueryValue, z.string().max(300).regex(/^\/panel\/categories(\?[\w=&%.+-]*)?$/).optional())
   .catch(undefined);
 
-// ── Panel: products CRUD (S10 phase 2) ──────────────────────────────────────────────────────────
+// ── Panel: products CRUD (S10) ──────────────────────────────────────────────────────────
 
 // `moneyField`/`optionalMoneyField` live in `features/pricing/schemas.ts` (shared with the
 // discounts and coupons forms since S12/S13).
@@ -153,7 +150,7 @@ export const productInputSchema = z.object({
   // `MediaImageField`'s hidden inputs are named from its `name` prop ("imagePath" here), so the
   // width/height companions it actually posts are "imagePathWidth"/"imagePathHeight" — matching
   // that, not a shorter guess, is what makes the image row actually get inserted/updated. Only the
-  // create form ever posts a non-empty value here (S10 phase 3b, D54): the edit form's own Images
+  // create form ever posts a non-empty value here (S10, D54): the edit form's own Images
   // card uses `productImageSchema` below, under its own row lock.
   imagePath: optionalPathField(PRODUCT_MEDIA_PATH_PATTERN),
   imagePathWidth: optionalInt(20_000),
@@ -168,9 +165,8 @@ export const stockField = z.coerce.number().int("Enter a whole number.").min(0, 
 /** The create form's one "Default" variant (SKU + stock); every later variant goes through `variantInputSchema`. */
 export const defaultVariantCreateSchema = z.object({ sku: skuField, stock: stockField });
 
-export type DefaultVariantCreateInput = z.infer<typeof defaultVariantCreateSchema>;
 
-// ── Panel: variant CRUD (S10 phase 3a) ──────────────────────────────────────────────────────────
+// ── Panel: variant CRUD (S10) ──────────────────────────────────────────────────────────
 
 /** `""`/missing -> `""`: an attribute row the dialog left blank, or a label left for auto-generation. */
 const blankableText = (max: number, message: string) => z.preprocess((value) => (value === null || value === undefined ? "" : value), z.string().trim().max(max, message));
@@ -240,7 +236,6 @@ export const saveVariantOrderSchema = z.object({
     .max(200, "Too many variants in one save.")
     .refine((ids) => new Set(ids).size === ids.length, "Duplicate variant id."),
 });
-export type SaveVariantOrderInput = z.infer<typeof saveVariantOrderSchema>;
 
 export const PRODUCT_TABS = ["all", ...PRODUCT_STATUSES] as const;
 export type ProductTab = (typeof PRODUCT_TABS)[number];
@@ -266,7 +261,7 @@ export const productBackHrefSchema = z
   .preprocess(firstQueryValue, z.string().max(300).regex(/^\/panel\/products(\?[\w=&%.+-]*)?$/).optional())
   .catch(undefined);
 
-// ── Panel: manual ordering placement (S10 phase 2b) ─────────────────────────────────────────────
+// ── Panel: manual ordering placement (S10) ─────────────────────────────────────────────
 
 export const PLACEMENT_CREATE = ["top", "end", "position"] as const;
 export const PLACEMENT_EDIT = ["keep", "top", "end", "position"] as const;
@@ -312,7 +307,6 @@ export type FeaturedPlacementEditInput = z.infer<typeof featuredPlacementEditSch
 export const moveToPlacementSchema = z
   .object({ placement: z.enum(PLACEMENT_CREATE), position: optionalPosition })
   .refine((value) => value.placement !== "position" || value.position !== undefined, { message: "Enter a position.", path: ["position"] });
-export type MoveToPlacementInput = z.infer<typeof moveToPlacementSchema>;
 
 /** `/panel/products/arrange`'s full drag-drop save: called directly from the client (not a `<form>`), so this is the one boundary check its payload gets. */
 const orderedIdsSchema = z
@@ -324,12 +318,10 @@ export const saveShopOrderSchema = z.object({
   categoryId: z.coerce.number().int().positive().optional(),
   orderedIds: orderedIdsSchema,
 });
-export type SaveShopOrderInput = z.infer<typeof saveShopOrderSchema>;
 
 export const saveFeaturedOrderSchema = z.object({ orderedIds: orderedIdsSchema });
-export type SaveFeaturedOrderInput = z.infer<typeof saveFeaturedOrderSchema>;
 
-// ── Panel: product images (S10 phase 3b) ────────────────────────────────────────────────────────
+// ── Panel: product images (S10) ────────────────────────────────────────────────────────
 
 export const MAX_PRODUCT_IMAGES = 8;
 
@@ -360,4 +352,3 @@ export const saveImageOrderSchema = z.object({
     .max(MAX_PRODUCT_IMAGES, "Too many images in one save.")
     .refine((ids) => new Set(ids).size === ids.length, "Duplicate image id."),
 });
-export type SaveImageOrderInput = z.infer<typeof saveImageOrderSchema>;

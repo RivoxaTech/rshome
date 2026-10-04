@@ -2,9 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
-export type ListboxOption = { value: string; label: string };
+type ListboxOption = { value: string; label: string };
 /** A non-interactive group header, interspersed with options — for a grouped list (e.g. categories by parent). */
-export type ListboxGroupLabel = { groupLabel: string };
+type ListboxGroupLabel = { groupLabel: string };
 export type ListboxItem = ListboxOption | ListboxGroupLabel;
 
 function isGroupLabel(item: ListboxItem): item is ListboxGroupLabel {

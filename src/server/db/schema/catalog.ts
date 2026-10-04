@@ -52,7 +52,7 @@ export const products = mysqlTable(
     weightGrams: int("weight_grams", { unsigned: true }),
     isFeatured: boolean("is_featured").notNull().default(false),
     status: mysqlEnum("status", ["draft", "active", "archived"]).notNull().default("draft"),
-    // Manual display order (S10 phase 2b): one global ordering across every product, any status.
+    // Manual display order (S10): one global ordering across every product, any status.
     // `/shop`'s "Recommended" sort and the category pages read it directly; `featuredSortOrder`
     // is the home "RS Home Edit" strip's own separate ordering, scoped to featured active products.
     sortOrder: int("sort_order").notNull().default(0),

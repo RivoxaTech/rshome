@@ -1,5 +1,5 @@
 /**
- * The panel's variant CRUD against the test database (S10 phase 3a), through the real Server
+ * The panel's variant CRUD against the test database (S10), through the real Server
  * Actions with the dialog's literal FormData field names: create, edit, the SKU clash, identical
  * attributes refused, stock and price-override audit rows, delete refused once ordered and allowed
  * otherwise, the last-variant rules, reorder keeping dense positions, the storefront's cheapest

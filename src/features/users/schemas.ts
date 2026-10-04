@@ -10,7 +10,7 @@ const activeField = z.preprocess((value) => value === "true" || value === true, 
 
 /** Same strength rule as the self-service change-password schema (`features/auth/service.ts`): at least 8 characters. */
 export const MIN_PASSWORD_LENGTH = 8;
-export const passwordField = z.string().min(MIN_PASSWORD_LENGTH, `Use at least ${MIN_PASSWORD_LENGTH} characters.`).max(200, "Keep this under 200 characters.");
+const passwordField = z.string().min(MIN_PASSWORD_LENGTH, `Use at least ${MIN_PASSWORD_LENGTH} characters.`).max(200, "Keep this under 200 characters.");
 
 const nameField = z.string().trim().min(2, "Enter the person's name.").max(150, "Keep this under 150 characters.");
 /** Trimmed and lower-cased, so uniqueness is case-insensitive whatever the index's collation does. */

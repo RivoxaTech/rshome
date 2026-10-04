@@ -25,16 +25,16 @@ export type AuditListItem = {
   newValues: string | null;
 };
 
-export const SYSTEM_ACTOR = "System";
+const SYSTEM_ACTOR = "System";
 
 /** "YYYY-MM-DD" (a Karachi calendar day) -> the UTC instant that day starts, plus `days` days. */
-export function karachiDayStart(date: string, days = 0): Date {
+function karachiDayStart(date: string, days = 0): Date {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day + days) - KARACHI_OFFSET_MS);
 }
 
 /** The URL query as the repo's filter: the Karachi dates become a `[from, to)` pair of UTC instants. */
-export function toAuditFilter(query: AuditListQuery): AuditFilter {
+function toAuditFilter(query: AuditListQuery): AuditFilter {
   return {
     user: query.user,
     action: query.action,

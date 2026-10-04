@@ -6,9 +6,9 @@
  * snapshot can't flood the page.
  */
 
-export type DiffRow = { key: string; oldValue: string | null; newValue: string | null; changed: boolean };
+type DiffRow = { key: string; oldValue: string | null; newValue: string | null; changed: boolean };
 
-export type AuditDiff =
+type AuditDiff =
   | { kind: "diff"; rows: DiffRow[] }
   /** A snapshot that isn't a JSON object (a bare string, an array, or unparseable text): shown as-is, pretty-printed when possible. */
   | { kind: "raw"; oldText: string | null; newText: string | null };

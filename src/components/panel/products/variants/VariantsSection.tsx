@@ -12,10 +12,10 @@ import { DeleteVariantDialog } from "./DeleteVariantDialog";
 import { VariantDialog } from "./VariantDialog";
 import { VARIANT_GRID, VariantRow } from "./VariantRow";
 
-export type VariantsProduct = { id: number; name: string; price: string; status: ProductStatus };
+type VariantsProduct = { id: number; name: string; price: string; status: ProductStatus };
 
 /**
- * The edit page's variants card (S10 phase 3a): its own section *below and outside* the product
+ * The edit page's variants card (S10): its own section *below and outside* the product
  * save form — every control here (the dialogs, the inline stock form, the move form) is a
  * `<form>` of its own, which must never sit inside another form (CLAUDE.md UI rules, D49).
  * Drops and per-row moves save immediately, like the arrange page; `variants` resyncs local

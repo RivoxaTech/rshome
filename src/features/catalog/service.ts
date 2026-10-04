@@ -21,7 +21,7 @@ import type { PricingProduct, VariantPrice } from "@/features/pricing/pricing";
 import { getVariantPricer, type VariantPricer } from "@/features/pricing/service";
 import { productAvailability, type JsonLdAvailability } from "@/features/seo/jsonld";
 
-export const SHOP_PAGE_SIZE = 12;
+const SHOP_PAGE_SIZE = 12;
 /** At or below this many units a variant shows "Only N left". */
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -50,7 +50,7 @@ export type ProductCard = {
   singleVariant: { id: number; soldOut: boolean } | null;
 };
 
-export type StockState = "in_stock" | "low_stock" | "sold_out";
+type StockState = "in_stock" | "low_stock" | "sold_out";
 
 export type VariantOption = {
   id: number;
@@ -61,9 +61,9 @@ export type VariantOption = {
 };
 
 /** The data a Product JSON-LD block needs (features/seo/jsonld.ts), from the cheapest active variant. */
-export type ProductSeoFacts = { sku: string; price: string; availability: JsonLdAvailability };
+type ProductSeoFacts = { sku: string; price: string; availability: JsonLdAvailability };
 
-export type ProductDetail = {
+type ProductDetail = {
   id: number;
   name: string;
   shortDescription: string | null;
@@ -97,7 +97,7 @@ function stockStateOf(stock: number): StockState {
 // pages render per request, so this never goes stale across a deploy or a settings change.
 /**
  * Only the categories the storefront should show: a hidden category disappears, and so does an
- * otherwise-active child of a hidden parent (S10 phase 1, one level of nesting) — the rule lives
+ * otherwise-active child of a hidden parent (S10, one level of nesting) — the rule lives
  * in `visibleCategoryIds` (pure, unit-tested) and is applied once here rather than per component.
  */
 export const getStoreCategories = cache(async (): Promise<StoreCategory[]> => {
@@ -140,7 +140,7 @@ type PricedListingProduct = {
  * Prices every active variant; a product with no active variant has nothing to sell and is
  * dropped. Also drops a product whose category (or whose category's parent) is hidden — the
  * single choke point both the shop grid and the home page's featured list pass through, so the
- * active-category rule only has to be applied once (S10 phase 1).
+ * active-category rule only has to be applied once (S10).
  */
 async function priceListingProducts(rows: ListingProductRow[]): Promise<PricedListingProduct[]> {
   const [pricer, visibleIds] = await Promise.all([getVariantPricer(), getVisibleCategoryIds()]);
@@ -272,7 +272,7 @@ export const getProductDetail = cache(async (slug: string): Promise<ProductDetai
   };
 });
 
-export type SitemapProductEntry = { slug: string; updatedAt: Date };
+type SitemapProductEntry = { slug: string; updatedAt: Date };
 
 /** Active products in a visible category, for `app/sitemap.ts` — slug and last-updated time only. */
 export const getSitemapProducts = cache(async (): Promise<SitemapProductEntry[]> => {

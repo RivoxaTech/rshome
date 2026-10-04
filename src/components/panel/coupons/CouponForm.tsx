@@ -8,7 +8,7 @@ import { COUPON_TYPES, type CouponType } from "@/features/coupons/schemas";
 import type { StaffActionResult } from "@/features/coupons/staff-service";
 import { dateInputMin } from "@/features/discounts/dates";
 
-export type CouponFormValues = {
+type CouponFormValues = {
   id: number | null;
   code: string;
   type: CouponType;

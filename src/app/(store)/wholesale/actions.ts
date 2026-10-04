@@ -5,7 +5,7 @@ import { notifyWholesaleInquiry } from "@/features/notify/service";
 import { createWholesaleInquiry } from "@/features/wholesale/service";
 import { getClientIp } from "@/server/request";
 
-export type WholesaleFormResult = { ok: true } | { ok: false; error: string; fieldErrors?: Record<string, string> };
+type WholesaleFormResult = { ok: true } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 /**
  * The storefront wholesale form's submit (REQUIREMENTS SF-08). `result.notify` tells the honeypot

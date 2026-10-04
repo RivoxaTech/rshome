@@ -2,8 +2,8 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { orderItems, orders } from "@/server/db/schema/orders";
 
-export type OrderRow = typeof orders.$inferSelect;
-export type OrderItemRow = typeof orderItems.$inferSelect;
+type OrderRow = typeof orders.$inferSelect;
+type OrderItemRow = typeof orderItems.$inferSelect;
 
 export async function getOrderByNumber(orderNumber: string): Promise<OrderRow | undefined> {
   const [row] = await db.select().from(orders).where(eq(orders.orderNumber, orderNumber)).limit(1);

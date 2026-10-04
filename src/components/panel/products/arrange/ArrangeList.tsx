@@ -16,11 +16,11 @@ import {
   saveShopOrderAction,
 } from "@/app/panel/(protected)/products/arrange/actions";
 
-export type ArrangeScope = { kind: "shop"; categoryId?: number } | { kind: "featured" };
+type ArrangeScope = { kind: "shop"; categoryId?: number } | { kind: "featured" };
 
 const STATUS_LABEL: Record<ArrangeItem["status"], string> = { active: "Active", draft: "Draft", archived: "Archived" };
 
-/** The per-row move, through the shared `MoveToControl` (S10 phase 3a generalised it out of here for the variants card). */
+/** The per-row move, through the shared `MoveToControl` (S10 generalised it out of here for the variants card). */
 function ArrangeMove({ scope, item, total }: { scope: ArrangeScope; item: ArrangeItem; total: number }) {
   const hiddenFields: Record<string, string | number> = { productId: item.id };
   if (scope.kind === "shop" && scope.categoryId !== undefined) hiddenFields.categoryId = scope.categoryId;
@@ -57,7 +57,7 @@ function ArrangeRow({ scope, item, total }: { scope: ArrangeScope; item: Arrange
 }
 
 /**
- * Touch-friendly drag-and-drop (S10 phase 2b): drops and per-row moves save immediately (the
+ * Touch-friendly drag-and-drop (S10): drops and per-row moves save immediately (the
  * panel's usual quick-action convention, no separate explicit Save step). `items` resyncs local
  * state whenever fresh server data arrives (a sibling row's move action refreshing the page).
  */

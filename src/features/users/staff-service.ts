@@ -84,7 +84,7 @@ function refused(error: UserActionError): StaffActionResult {
 type UserAuditFields = Pick<UserStaffRow, "name" | "email" | "roleId" | "roleKey" | "isActive">;
 
 /** What an audit row records about a user: identity, role and status. No hash, ever. */
-export function auditValues(user: UserAuditFields) {
+function auditValues(user: UserAuditFields) {
   return { name: user.name, email: user.email, roleId: user.roleId, roleKey: user.roleKey, isActive: user.isActive };
 }
 
@@ -92,7 +92,7 @@ export function auditValues(user: UserAuditFields) {
  * The optimistic-concurrency token, posted back as `version`: the row's `updated_at` plus a
  * fingerprint of what the form edits, since `updated_at` is whole-second (`lib/fingerprint.ts`).
  */
-export function userVersion(user: UserAuditFields & Pick<UserStaffRow, "updatedAt">): string {
+function userVersion(user: UserAuditFields & Pick<UserStaffRow, "updatedAt">): string {
   return `${user.updatedAt.getTime()}@${fingerprint(auditValues(user))}`;
 }
 
@@ -137,7 +137,7 @@ export function getRoleOptions(): Promise<RoleOption[]> {
   return listRoleOptions();
 }
 
-export type UserEditFormData = { user: UserStaffRow; version: string; lastLoginAt: string | null; createdAt: string; deleteGuard: UserDeleteGuard };
+type UserEditFormData = { user: UserStaffRow; version: string; lastLoginAt: string | null; createdAt: string; deleteGuard: UserDeleteGuard };
 
 export async function getUserForEdit(id: number): Promise<UserEditFormData | null> {
   const user = await getUserStaffRow(id);

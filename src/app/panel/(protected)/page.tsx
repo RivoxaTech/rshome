@@ -32,7 +32,7 @@ async function RecentOrdersSection() {
 /**
  * The admin dashboard (BUILD_PLAN.md C28, ARCHITECTURE.md §4.7). The Developer no longer holds
  * `dashboard.view` (C24), so this is never their landing page — redirect to their own
- * first-allowed page instead of the generic 403 (S9b), exactly as the placeholder page did.
+ * first-allowed page instead of the generic 403 (S9b).
  */
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await requireSession();

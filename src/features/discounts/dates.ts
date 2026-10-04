@@ -18,7 +18,7 @@ export const START_IN_PAST_MESSAGE = "Choose a start in the future.";
 export const END_IN_PAST_MESSAGE = "The end must be in the future.";
 
 export type DateWindow = { startsAt: Date | null; endsAt: Date | null };
-export type DateWindowError = { field: "startsAt" | "endsAt"; message: string };
+type DateWindowError = { field: "startsAt" | "endsAt"; message: string };
 
 const sameInstant = (a: Date | null, b: Date | null) => (a === null ? b === null : b !== null && a.getTime() === b.getTime());
 

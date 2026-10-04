@@ -1,9 +1,9 @@
 /**
- * The panel's categories CRUD (S10 phase 1, BUILD_PLAN.md owner decisions C24/C27, DATABASE.md
+ * The panel's categories CRUD (S10, BUILD_PLAN.md owner decisions C24/C27, DATABASE.md
  * `categories`). Every write locks the row(s) it touches (`SELECT … FOR UPDATE`, mirroring
  * `features/wholesale/staff-actions.ts`) and records an `audit_logs` row (CLAUDE.md #10). One
  * level of nesting only: a category with a parent can't itself be a parent, and a category with
- * children can't be given one (owner decision, S10 phase 1 follow-up).
+ * children can't be given one (owner decision, S10 follow-up).
  */
 import type { z } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
@@ -85,12 +85,12 @@ export async function listStaffCategories(query: {
 export type ParentOption = { id: number; name: string };
 
 /** Top-level categories only, excluding the one being edited (a category can't be its own parent). */
-export async function getParentOptions(excludeId?: number): Promise<ParentOption[]> {
+async function getParentOptions(excludeId?: number): Promise<ParentOption[]> {
   const all = await listAllCategoriesForStaff();
   return all.filter((category) => category.parentId === null && category.id !== excludeId).map((category) => ({ id: category.id, name: category.name }));
 }
 
-export type CategoryEditFormData = {
+type CategoryEditFormData = {
   category: CategoryRow;
   parentOptions: ParentOption[];
   /** The category currently has sub-categories, so it can't be given a parent itself. */

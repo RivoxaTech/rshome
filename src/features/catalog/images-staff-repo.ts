@@ -1,5 +1,5 @@
 /**
- * The panel's product-images CRUD (S10 phase 3b): DB access only, no business rules
+ * The panel's product-images CRUD (S10): DB access only, no business rules
  * (ARCHITECTURE.md §2) — `images-staff-service.ts` owns the max-count/path/alt rules and the audit
  * rows. Mirrors `variants-staff-repo.ts`. Also holds the whole-product delete's image cleanup
  * (`deleteImagesByProductId`), used by `products-staff-service.ts#deleteProductById`.
@@ -9,7 +9,7 @@ import { db, type DbClient } from "@/server/db/client";
 import { productImages } from "@/server/db/schema/catalog";
 
 export type ProductImageRow = typeof productImages.$inferSelect;
-export type ProductImageUpdate = Partial<typeof productImages.$inferInsert>;
+type ProductImageUpdate = Partial<typeof productImages.$inferInsert>;
 
 /** Takes a `DbClient` (pool or an open transaction) so a caller already inside a transaction sees its own uncommitted writes. */
 export async function getImagesByProductId(client: DbClient, productId: number): Promise<ProductImageRow[]> {

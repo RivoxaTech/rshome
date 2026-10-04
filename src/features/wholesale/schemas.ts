@@ -45,7 +45,7 @@ const neededByDateSchema = z
   .refine((value) => value === null || isValidIsoDate(value), "Enter a valid date.")
   .refine((value) => value === null || value >= todayInKarachi(), "Choose a date that hasn't already passed.");
 
-export const wholesaleItemSchema = z.object({
+const wholesaleItemSchema = z.object({
   itemName: z.string().trim().min(1, "Enter what you'd like.").max(200, "Keep this under 200 characters."),
   quantity: z.coerce.number().int("Enter a whole number.").min(1, "Enter a quantity.").max(100_000, "Enter a smaller quantity."),
   note: optionalText(255),

@@ -1,10 +1,10 @@
 /**
- * The panel's product-images CRUD against the test database (S10 phase 3b): add (through the real
+ * The panel's product-images CRUD against the test database (S10): add (through the real
  * Server Action, uploaded-path shape only), the max-count and path-allowlist rules, duplicate-path
  * refusal, alt-text change with its audit row, reorder (dense positions, primary follows the first
  * position, a stale reorder refused), delete (renumbers, removes files), a whole-product delete
  * removing every image file, and the Developer-vs-Admin RBAC wall. Mirrors
- * `variants.integration.test.ts` (S10 phase 3a).
+ * `variants.integration.test.ts` (S10).
  */
 import { randomBytes } from "node:crypto";
 import path from "node:path";

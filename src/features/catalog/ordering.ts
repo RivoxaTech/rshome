@@ -1,5 +1,5 @@
 /**
- * Manual product ordering (S10 phase 2b): pure functions over plain id arrays, shared by the
+ * Manual product ordering (S10): pure functions over plain id arrays, shared by the
  * shop order (`products.sort_order`, global) and the featured order (`products.featured_sort_order`,
  * scoped to featured active products). No DB access here — `arrange-service.ts` and
  * `products-staff-service.ts` load/lock the real rows and call these to compute the new order.

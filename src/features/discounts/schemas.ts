@@ -134,7 +134,6 @@ export const discountOverlapQuerySchema = z.object({
   /** The discount being edited, left out of its own hint. */
   excludeId: optionalIdField,
 });
-export type DiscountOverlapQuery = z.infer<typeof discountOverlapQuerySchema>;
 
 // ── The list ────────────────────────────────────────────────────────────────────────────────────
 

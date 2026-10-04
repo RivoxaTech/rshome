@@ -7,9 +7,9 @@
 import type { MetadataRoute } from "next";
 import { canonicalUrl } from "@/features/seo/metadata";
 
-export type SitemapCategory = { slug: string };
-export type SitemapProduct = { slug: string; updatedAt: Date };
-export type SitemapPage = { slug: string };
+type SitemapCategory = { slug: string };
+type SitemapProduct = { slug: string; updatedAt: Date };
+type SitemapPage = { slug: string };
 
 export function buildSitemapEntries(input: {
   appUrl: string;

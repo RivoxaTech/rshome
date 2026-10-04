@@ -10,7 +10,7 @@ import { ZoneAreasField } from "@/components/panel/shipping/ZoneAreasField";
 import { ZONE_MODES, ZONE_MODE_LABELS, type ZoneMode } from "@/features/shipping/schemas";
 import type { StaffActionResult, ZoneAreaView } from "@/features/shipping/staff-service";
 
-export type ZoneFormValues = {
+type ZoneFormValues = {
   id: number | null;
   name: string;
   mode: ZoneMode;
