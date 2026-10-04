@@ -2,9 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRef } from "react";
+import { createPortal } from "react-dom";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
 import { usePanelUi } from "@/components/panel/PanelUiContext";
+import { usePanelOverlayRoot } from "@/components/panel/overlay-root";
 import type { PanelNavItem } from "@/components/panel/nav-items";
+import { useModal } from "@/components/ui/use-modal";
 
 function isActive(pathname: string, href: string): boolean {
   return href === "/panel" ? pathname === "/panel" : pathname.startsWith(href);
@@ -28,6 +32,12 @@ export function PanelSidebar({
 }) {
   const pathname = usePathname();
   const { collapsed, toggleCollapsed, mobileOpen, setMobileOpen, counts } = usePanelUi();
+  const drawerRef = useRef<HTMLElement>(null);
+  const root = usePanelOverlayRoot();
+  const closeMobile = () => setMobileOpen(false);
+  // The phone drawer is a modal (S22 QA-01): Esc closes it, Tab stays inside, focus goes back to
+  // the header's menu button. Portalled next to the frame so the frame can be inert behind it.
+  useModal({ ref: drawerRef, open: mobileOpen && root !== null, onClose: closeMobile });
 
   const nav = (
     <>
@@ -101,17 +111,24 @@ export function PanelSidebar({
         {nav}
       </aside>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <button
-            type="button"
-            aria-label="Close menu"
-            onClick={() => setMobileOpen(false)}
-            className="absolute inset-0 bg-black/40"
-          />
-          <aside className="bg-card relative flex h-full w-[240px] flex-col py-4 shadow-xl">{nav}</aside>
-        </div>
-      )}
+      {mobileOpen &&
+        root &&
+        createPortal(
+          <div className="fixed inset-0 z-40 md:hidden">
+            <button type="button" aria-label="Close menu" onClick={closeMobile} className="absolute inset-0 bg-black/40" />
+            <aside
+              ref={drawerRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu"
+              tabIndex={-1}
+              className="bg-card relative flex h-full w-[240px] flex-col py-4 shadow-xl outline-none"
+            >
+              {nav}
+            </aside>
+          </div>,
+          root,
+        )}
     </>
   );
 }

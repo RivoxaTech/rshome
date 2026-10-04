@@ -27,8 +27,9 @@ export default async function StoreLayout({ children }: { children: React.ReactN
 
   return (
     <CartProvider>
-      {/* `data-announcement` lets PageContainer shorten its top offset when the bar is hidden (blank text). */}
-      <div className="group/shell flex min-h-screen flex-1 flex-col" data-announcement={announcementText ? "on" : "off"}>
+      {/* `data-announcement` lets PageContainer shorten its top offset when the bar is hidden (blank text).
+          `data-modal-shell`: inert while the cart drawer is open (useModal); the drawer is a sibling. */}
+      <div className="group/shell flex min-h-screen flex-1 flex-col" data-announcement={announcementText ? "on" : "off"} data-modal-shell>
         <Header logoText={identity.logoText} announcementText={announcementText} navItems={navItems} />
         <main className="flex-1">{children}</main>
         <Footer

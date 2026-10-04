@@ -23,7 +23,10 @@ export function FloatingActions({ whatsappHref }: { whatsappHref: string }) {
   }, []);
 
   return (
-    <div className="fixed right-[calc(1rem_+_env(safe-area-inset-right))] bottom-[calc(1rem_+_env(safe-area-inset-bottom))] z-40 flex flex-col items-center gap-3 lg:right-6 lg:bottom-6">
+    <div
+      data-modal-shell
+      className="fixed right-[calc(1rem_+_env(safe-area-inset-right))] bottom-[calc(1rem_+_env(safe-area-inset-bottom))] z-40 flex flex-col items-center gap-3 lg:right-6 lg:bottom-6"
+    >
       <button
         type="button"
         aria-label="Back to top"

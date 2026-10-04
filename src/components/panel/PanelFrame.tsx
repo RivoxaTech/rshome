@@ -36,7 +36,8 @@ export async function PanelFrame({
   return (
     <PanelUiProvider initialTheme={theme} initialCollapsed={collapsed} initialCounts={counts}>
       {canSeeOrderAlerts && <OrderCountsPoller />}
-      <div className="flex h-dvh w-full overflow-hidden">
+      {/* `data-modal-shell`: inert while a dialog, viewer or the phone drawer is open (useModal). */}
+      <div className="flex h-dvh w-full overflow-hidden" data-modal-shell>
         <PanelSidebar items={items} logoText={logoText} userName={userName} roleLabel={roleLabel} />
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <PanelHeader showNotifications={canSeeOrderAlerts} vapidPublicKey={env.VAPID_PUBLIC_KEY ?? null} />

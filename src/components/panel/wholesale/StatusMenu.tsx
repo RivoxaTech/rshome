@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { changeWholesaleStatusAction } from "@/app/panel/(protected)/wholesale/actions";
+import { usePanelOverlayRoot } from "@/components/panel/overlay-root";
 import { useStaffAction } from "@/components/panel/use-staff-action";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
 import type { InquiryControl } from "@/features/wholesale/staff-service";
@@ -15,7 +16,7 @@ type Position = { top: number; left: number };
 /**
  * The status pill (S17): a popover of the two statuses that aren't the current one, submitting
  * directly on choice — unlike the orders list, a status change needs no reason or extra field, so
- * there's no dialog step. Portalled to `document.body` and positioned from the trigger's own rect,
+ * there's no dialog step. Portalled to the panel overlay root and positioned from the trigger's own rect,
  * same as the orders list's `StatusMenu`, for the same reason: a table wrapped in
  * `overflow-x-auto` clips an absolutely positioned popover on the other axis. Read-only (a plain
  * pill, no button) without `wholesale.manage` or once an inquiry has no other status to offer.
@@ -29,6 +30,7 @@ export function StatusMenu({ id, control, onChanged }: { id: number; control: In
   const formRef = useRef<HTMLFormElement>(null);
   const statusInputRef = useRef<HTMLInputElement>(null);
   const { state, formAction, pending } = useStaffAction(changeWholesaleStatusAction, () => onChanged?.());
+  const root = usePanelOverlayRoot();
 
   const rows = control.options;
   const colors = STATUS_COLORS[control.status];
@@ -119,6 +121,7 @@ export function StatusMenu({ id, control, onChanged }: { id: number; control: In
 
       {open &&
         position &&
+        root &&
         createPortal(
           <div
             ref={menuRef}
@@ -142,7 +145,7 @@ export function StatusMenu({ id, control, onChanged }: { id: number; control: In
               </button>
             ))}
           </div>,
-          document.body,
+          root,
         )}
     </div>
   );

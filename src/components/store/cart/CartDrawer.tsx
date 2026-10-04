@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/store/Button";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
+import { useModal } from "@/components/ui/use-modal";
 import { CartLineItem } from "./CartLineItem";
 import { CartNotices } from "./CartNotices";
 import { useCart } from "./CartProvider";
@@ -10,27 +11,25 @@ import { CartSummary } from "./CartSummary";
 
 /**
  * Slide-out cart, opened by the header icon and by Add to Cart. Overlay and panel follow the
- * demo's product modal (bg-espresso/50 backdrop-blur, bg-background shadow-lift).
+ * demo's product modal (bg-espresso/50 backdrop-blur, bg-background shadow-lift). A modal
+ * (`useModal`): focus starts on Close and stays inside, Esc closes, the page behind is inert.
  */
 export function CartDrawer({ deliveryNote }: { deliveryNote: string }) {
   const { drawerOpen, closeDrawer, quote, status, pending } = useCart();
+  const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const hasLines = quote !== null && quote.lines.length > 0;
 
+  useModal({ ref: panelRef, open: drawerOpen, onClose: closeDrawer, initialFocus: closeRef });
+
   useEffect(() => {
     if (!drawerOpen) return;
-    closeRef.current?.focus();
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeDrawer();
-    };
-    document.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onKeyDown);
     };
-  }, [drawerOpen, closeDrawer]);
+  }, [drawerOpen]);
 
   return (
     <div className={`fixed inset-0 z-[60] ${drawerOpen ? "" : "pointer-events-none"}`} aria-hidden={!drawerOpen}>
@@ -41,6 +40,7 @@ export function CartDrawer({ deliveryNote }: { deliveryNote: string }) {
         }`}
       />
       <aside
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Your cart"

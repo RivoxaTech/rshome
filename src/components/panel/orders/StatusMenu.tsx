@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
+import { usePanelOverlayRoot } from "@/components/panel/overlay-root";
 import { ACTION_LABELS } from "@/components/panel/orders/action-labels";
 import { TAB_COLORS } from "@/components/panel/orders/tab-colors";
 import type { OpenDialog } from "@/components/panel/orders/types";
@@ -19,7 +20,7 @@ type Position = { top: number; left: number; openUpward: boolean };
 /**
  * The coloured status pill (C21/C22): a popover of the next allowed statuses, never the current
  * or an earlier one, then Cancel/Reject below a divider; choosing one opens a dialog. Portalled to
- * `document.body` and positioned in fixed coordinates from the trigger's own rect (not CSS
+ * the panel overlay root and positioned in fixed coordinates from the trigger's own rect (not CSS
  * `absolute` inside the table): the desktop table sits in an `overflow-x-auto` wrapper, and once one
  * axis of `overflow` is scrollable the browser clips the *other* axis too, so an absolutely
  * positioned popover a few rows down would get cut off instead of floating over the page.
@@ -36,6 +37,7 @@ export function StatusMenu({
   const [focusIndex, setFocusIndex] = useState(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const root = usePanelOverlayRoot();
 
   const forward = control.actions.filter((item) => item.action !== "cancel" && item.action !== "reject");
   const closing = control.actions.filter((item) => item.action === "cancel" || item.action === "reject");
@@ -68,6 +70,9 @@ export function StatusMenu({
   }, [open]);
 
   const choose = (action: StatusAction) => {
+    // Focus the pill before the dialog mounts: the dialog remembers the active element as its
+    // opener and returns focus there on close, and the menu row is about to disappear.
+    triggerRef.current?.focus();
     setOpen(false);
     setOpenDialog(action);
   };
@@ -122,6 +127,7 @@ export function StatusMenu({
 
       {open &&
         position &&
+        root &&
         createPortal(
           <div
             ref={menuRef}
@@ -165,7 +171,7 @@ export function StatusMenu({
               </>
             )}
           </div>,
-          document.body,
+          root,
         )}
     </>
   );

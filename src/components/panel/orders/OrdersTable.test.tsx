@@ -73,6 +73,36 @@ describe("OrdersTable phone card", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  // S22 QA-01: the status menu is portalled outside the dialog it opens. The dialog's focus trap
+  // must still work from that hand-off, and Esc must land focus back on the status pill.
+  it("hands focus from the status menu to the dialog, traps Tab there, and returns it to the pill on Esc", async () => {
+    const user = userEvent.setup();
+    render(<OrdersTable items={[item]} method="cod" backHref="/panel/orders/cod" />);
+
+    const pill = screen.getAllByRole("button", { name: /Need review/ })[0];
+    await user.click(pill);
+    await user.click(screen.getByRole("menuitem", { name: "Cancel order" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Cancel order" });
+    expect(dialog).toHaveFocus();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    // Close → textarea → submit, then back round to Close: never out to the table.
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("textbox")).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Cancel order" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(pill).toHaveFocus();
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it("still navigates when the card itself is clicked", async () => {
     const user = userEvent.setup();
     render(<OrdersTable items={[item]} method="cod" backHref="/panel/orders/cod" />);

@@ -82,6 +82,9 @@ export function Listbox({
       if (event.key !== "Escape" || !details.open) return;
       details.open = false;
       details.querySelector("summary")?.focus();
+      // An Escape that closed the list is spent: the dialog this listbox may sit in (its listener
+      // registered after this child's) must not close as well.
+      event.stopImmediatePropagation();
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
