@@ -66,7 +66,16 @@ export function useModal({
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     openModals.push(container);
     if (openModals.length === 1) setShellsInert(true);
-    (initialFocus?.current ?? container).focus();
+
+    // A drawer that transitions `visibility` is still hidden on the frame it opens, so a first
+    // `focus()` can be refused; retry on the next frames until it sticks (the cart drawer).
+    const target = initialFocus?.current ?? container;
+    let frame = 0;
+    const focusTarget = (attempt: number) => {
+      target.focus();
+      if (document.activeElement !== target && attempt < 10) frame = requestAnimationFrame(() => focusTarget(attempt + 1));
+    };
+    focusTarget(0);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (!isTopModal(container)) return;
@@ -95,6 +104,7 @@ export function useModal({
     document.addEventListener("keydown", onKeyDown);
 
     return () => {
+      if (frame !== 0) cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKeyDown);
       openModals.splice(openModals.indexOf(container), 1);
       if (openModals.length === 0) setShellsInert(false);
