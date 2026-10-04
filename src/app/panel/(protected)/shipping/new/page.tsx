@@ -5,7 +5,7 @@ import { ZoneForm } from "@/components/panel/shipping/ZoneForm";
 import { getCountryOptions } from "@/config/countries";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { zoneBackHrefSchema } from "@/features/shipping/schemas";
-import { fallbackExists } from "@/features/shipping/staff-service";
+import { fallbackExists } from "@/features/shipping/staff-readers";
 import { requirePermission } from "@/server/auth/permissions";
 import { createZoneAction } from "@/app/panel/(protected)/shipping/actions";
 

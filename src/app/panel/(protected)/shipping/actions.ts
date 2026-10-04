@@ -9,11 +9,10 @@ import {
   deleteZoneById,
   moveZone,
   setZoneActive,
-  testDestination,
   updateZoneById,
   type StaffActionResult,
-  type TestDestinationResult,
 } from "@/features/shipping/staff-service";
+import { testDestination, type TestDestinationResult } from "@/features/shipping/staff-readers";
 import { parseFormId } from "@/lib/form-id";
 import { requirePermission } from "@/server/auth/permissions";
 

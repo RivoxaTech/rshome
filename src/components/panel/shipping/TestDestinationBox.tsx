@@ -5,7 +5,7 @@ import type { CountryOption } from "@/config/countries";
 import { DetailCard } from "@/components/panel/DetailCard";
 import { Field, inputClass } from "@/components/panel/FormField";
 import { CountrySearch } from "@/components/panel/shipping/CountrySearch";
-import type { TestDestinationResult } from "@/features/shipping/staff-service";
+import type { TestDestinationResult } from "@/features/shipping/staff-readers";
 import { testDestinationAction } from "@/app/panel/(protected)/shipping/actions";
 
 const PAKISTAN = "PK";

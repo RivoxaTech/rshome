@@ -6,7 +6,7 @@ import { MoveToControl } from "@/components/panel/MoveToControl";
 import { StatusPill } from "@/components/panel/StatusPill";
 import { ZoneActiveToggle } from "@/components/panel/shipping/ZoneRowActions";
 import { ZONE_MODE_LABELS } from "@/features/shipping/schemas";
-import type { StaffZoneListItem } from "@/features/shipping/staff-service";
+import type { StaffZoneListItem } from "@/features/shipping/staff-readers";
 import { moveZoneAction } from "@/app/panel/(protected)/shipping/actions";
 import { PILL_COLORS } from "@/lib/pill-colors";
 

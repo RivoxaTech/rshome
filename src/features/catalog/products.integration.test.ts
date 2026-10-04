@@ -45,6 +45,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
   let pool: Db["pool"];
   let hashToken: typeof import("@/server/auth/session").hashToken;
   let staffService: typeof import("./products-staff-service");
+  let readers: typeof import("./products-staff-readers");
   let repo: typeof import("./repo");
   let service: typeof import("./service");
   let createOrder: typeof import("@/features/checkout/service").createOrder;
@@ -116,6 +117,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
     ({ db, pool } = await import("@/server/db/client"));
     ({ hashToken } = await import("@/server/auth/session"));
     staffService = await import("./products-staff-service");
+    readers = await import("./products-staff-readers");
     repo = await import("./repo");
     service = await import("./service");
     ({ createOrder } = await import("@/features/checkout/service"));
@@ -327,7 +329,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       const order = await createOrder(checkoutInput(ids, { lines: [{ variantId: variant.id, quantity: 1 }], expectedTotal: "1500.00" }), { ip: "test" });
       if (!order.ok) throw new Error(`createOrder failed: ${order.error}`);
 
-      const guard = await staffService.checkProductDeletable(created.id!);
+      const guard = await readers.checkProductDeletable(created.id!);
       expect(guard).toMatchObject({ allowed: false, reason: "has_orders" });
 
       const result = await staffService.deleteProductById(created.id!, { id: actorId });
@@ -342,7 +344,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       const created = await staffService.createProduct(validInput(categoryId, { slug: "deletable-product", sku: "DELETABLE-SKU" }), { id: actorId });
       if (!created.ok) throw new Error("unreachable");
 
-      const guard = await staffService.checkProductDeletable(created.id!);
+      const guard = await readers.checkProductDeletable(created.id!);
       expect(guard).toMatchObject({ allowed: true });
 
       const result = await staffService.deleteProductById(created.id!, { id: actorId });
@@ -366,11 +368,11 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       const discountId = await insertDiscount({ type: "percent", value: "10.00", targetType: "product" });
       await db.insert(discountTargets).values({ discountId, targetId: created.id! });
 
-      const list = await staffService.listStaffProducts("all", { page: 1, pageSize: 25 });
+      const list = await readers.listStaffProducts("all", { page: 1, pageSize: 25 });
       const item = list.items.find((row) => row.id === created.id);
       expect(item?.salePrice).toEqual({ original: "1000.00", discounted: "900.00" });
 
-      const edit = await staffService.getProductForEdit(created.id!);
+      const edit = await readers.getProductForEdit(created.id!);
       expect(edit?.salePrice).toEqual({ original: "1000.00", discounted: "900.00" });
     });
 
@@ -380,7 +382,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       const discountId = await insertDiscount({ type: "fixed", value: "300.00", targetType: "category" });
       await db.insert(discountTargets).values({ discountId, targetId: categoryId });
 
-      const list = await staffService.listStaffProducts("all", { page: 1, pageSize: 25 });
+      const list = await readers.listStaffProducts("all", { page: 1, pageSize: 25 });
       const item = list.items.find((row) => row.id === created.id);
       expect(item?.salePrice).toEqual({ original: "2000.00", discounted: "1700.00" });
     });
@@ -389,7 +391,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       const created = await staffService.createProduct(validInput(categoryId, { slug: "no-sale-product", sku: "NO-SALE-SKU", price: "1000.00" }), { id: actorId });
       if (!created.ok) throw new Error("unreachable");
 
-      const list = await staffService.listStaffProducts("all", { page: 1, pageSize: 25 });
+      const list = await readers.listStaffProducts("all", { page: 1, pageSize: 25 });
       expect(list.items.find((row) => row.id === created.id)?.salePrice).toBeNull();
     });
 
@@ -399,7 +401,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       const discountId = await insertDiscount({ type: "percent", value: "50.00", targetType: "product", isActive: false });
       await db.insert(discountTargets).values({ discountId, targetId: created.id! });
 
-      const list = await staffService.listStaffProducts("all", { page: 1, pageSize: 25 });
+      const list = await readers.listStaffProducts("all", { page: 1, pageSize: 25 });
       expect(list.items.find((row) => row.id === created.id)?.salePrice).toBeNull();
     });
 
@@ -409,7 +411,7 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       const discountId = await insertDiscount({ type: "percent", value: "50.00", targetType: "product", endsAt: new Date("2020-01-01") });
       await db.insert(discountTargets).values({ discountId, targetId: created.id! });
 
-      const list = await staffService.listStaffProducts("all", { page: 1, pageSize: 25 });
+      const list = await readers.listStaffProducts("all", { page: 1, pageSize: 25 });
       expect(list.items.find((row) => row.id === created.id)?.salePrice).toBeNull();
     });
   });

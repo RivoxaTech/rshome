@@ -5,7 +5,7 @@ import { TestDestinationBox } from "@/components/panel/shipping/TestDestinationB
 import { ZonesTable } from "@/components/panel/shipping/ZonesTable";
 import { DEFAULT_COUNTRY, getCountryOptions } from "@/config/countries";
 import { PERMISSIONS } from "@/features/auth/permissions";
-import { listStaffZones } from "@/features/shipping/staff-service";
+import { listStaffZones } from "@/features/shipping/staff-readers";
 import { requirePermission } from "@/server/auth/permissions";
 
 export const metadata: Metadata = { title: "Shipping" };

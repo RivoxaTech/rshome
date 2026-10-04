@@ -4,7 +4,8 @@ import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/panel/Dialog";
 import { useStaffAction } from "@/components/panel/use-staff-action";
-import type { StaffActionResult, ZoneDeleteGuard } from "@/features/shipping/staff-service";
+import type { ZoneDeleteGuard } from "@/features/shipping/staff-readers";
+import type { StaffActionResult } from "@/features/shipping/staff-service";
 import { deleteZoneAction, setZoneActiveAction } from "@/app/panel/(protected)/shipping/actions";
 
 /**

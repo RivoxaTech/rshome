@@ -6,7 +6,7 @@ import { Field, inputClass } from "@/components/panel/FormField";
 import { CountrySearch } from "@/components/panel/shipping/CountrySearch";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
 import { MAX_ZONE_AREAS, normalizeCity } from "@/features/shipping/schemas";
-import type { ZoneAreaView } from "@/features/shipping/staff-service";
+import type { ZoneAreaView } from "@/features/shipping/staff-readers";
 
 /** "karachi" -> "Karachi" for a chip; the server stores cities lowercase. */
 function titleCase(city: string): string {

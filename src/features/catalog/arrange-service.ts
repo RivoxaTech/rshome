@@ -5,7 +5,7 @@
  * pure reorder math and `ARCHITECTURE.md` D51 for the slot-preserving category-scoped design.
  */
 import { insertAuditLog } from "@/features/audit/repo";
-import { db } from "@/server/db/client";
+import { db, type DbClient } from "@/server/db/client";
 import { moveId, renormalize, reorderScope, type Placement } from "./ordering";
 import { getPrimaryImagesByProductId } from "./repo";
 import {
@@ -45,6 +45,56 @@ export async function getShopArrangeList(categoryId?: number): Promise<ArrangeIt
 export async function getFeaturedArrangeList(): Promise<ArrangeItem[]> {
   return toArrangeItems(await getOrderedFeaturedProductIds(db));
 }
+
+// ── Placement on create and edit (the product form's "top/end/position" fields) ─────────────
+
+/** `"keep"` (edit only) means "don't touch this order" — the caller skips applying anything. */
+export function toPlacement(placement: "top" | "end" | "position" | "keep", position?: number): Placement | null {
+  if (placement === "keep") return null;
+  if (placement === "position") return { type: "position", position: position! };
+  return { type: placement };
+}
+
+/**
+ * Moves (or, for a brand-new id not yet in the list, inserts) `productId` within the shop order
+ * and writes every row whose `sort_order` changed, inside `tx`. `moveId` removing-then-reinserting
+ * an id that isn't present yet is exactly an insert, so this one function covers both create and
+ * edit. One audit row records the whole before/after order (ARCHITECTURE.md D51).
+ */
+export async function applyShopPlacement(tx: DbClient, productId: number, placement: Placement, actor: Actor, now: Date): Promise<void> {
+  const existing = await lockOrderedProductIds(tx);
+  const next = moveId(existing, productId, placement);
+  const positions = renormalize(next);
+  await updateProductSortOrders(tx, [...positions.entries()].map(([id, sortOrder]) => ({ id, sortOrder })));
+  await insertAuditLog(tx, {
+    userId: actor.id,
+    action: "product.sort_change",
+    entity: "product_order",
+    entityId: "shop",
+    oldValues: { order: existing },
+    newValues: { order: next },
+    createdAt: now,
+  });
+}
+
+/** Same as `applyShopPlacement`, for the featured order (scoped to active, featured products only). */
+export async function applyFeaturedPlacement(tx: DbClient, productId: number, placement: Placement, actor: Actor, now: Date): Promise<void> {
+  const existing = await lockOrderedFeaturedProductIds(tx);
+  const next = moveId(existing, productId, placement);
+  const positions = renormalize(next);
+  await updateProductFeaturedSortOrders(tx, [...positions.entries()].map(([id, featuredSortOrder]) => ({ id, featuredSortOrder })));
+  await insertAuditLog(tx, {
+    userId: actor.id,
+    action: "product.sort_change",
+    entity: "product_order",
+    entityId: "featured",
+    oldValues: { order: existing },
+    newValues: { order: next },
+    createdAt: now,
+  });
+}
+
+// ── The arrange page's own saves ────────────────────────────────────────────────────────────
 
 function sameIdSet(a: number[], b: number[]): boolean {
   if (a.length !== b.length) return false;

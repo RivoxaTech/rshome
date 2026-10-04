@@ -42,6 +42,7 @@ describe.skipIf(!TEST_DATABASE_URL)("product variants (integration)", () => {
   let pool: Db["pool"];
   let hashToken: typeof import("@/server/auth/session").hashToken;
   let productsService: typeof import("./products-staff-service");
+  let readers: typeof import("./products-staff-readers");
   let variantsService: typeof import("./variants-staff-service");
   let storefront: typeof import("./service");
   let createOrder: typeof import("@/features/checkout/service").createOrder;
@@ -107,6 +108,7 @@ describe.skipIf(!TEST_DATABASE_URL)("product variants (integration)", () => {
     ({ db, pool } = await import("@/server/db/client"));
     ({ hashToken } = await import("@/server/auth/session"));
     productsService = await import("./products-staff-service");
+    readers = await import("./products-staff-readers");
     variantsService = await import("./variants-staff-service");
     storefront = await import("./service");
     ({ createOrder } = await import("@/features/checkout/service"));
@@ -416,7 +418,7 @@ describe.skipIf(!TEST_DATABASE_URL)("product variants (integration)", () => {
     it("the products list's stock column sums active variants only", async () => {
       await actions.createVariantAction(null, form({ productId, ...variantForm({ stock: "7" }) }));
       await actions.createVariantAction(null, form({ productId, ...variantForm({ sku: "VAR-OFF", stock: "100", attributeValue0: "Grey", isActive: "false" }) }));
-      const list = await productsService.listStaffProducts("all", { page: 1, pageSize: 25 });
+      const list = await readers.listStaffProducts("all", { page: 1, pageSize: 25 });
       expect(list.items.find((item) => item.id === productId)?.stock).toBe(17);
     });
   });

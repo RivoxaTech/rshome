@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
 import { ArchiveRestoreButton, FeaturedStarButton } from "@/components/panel/products/ProductRowActions";
-import type { StaffProductListItem } from "@/features/catalog/products-staff-service";
+import type { StaffProductListItem } from "@/features/catalog/products-staff-readers";
 import { formatMoney, decimalToPaisa } from "@/features/pricing/money";
 import type { ProductStatus } from "@/features/catalog/schemas";
 import { PILL_COLORS } from "@/lib/pill-colors";

@@ -49,6 +49,7 @@ describe.skipIf(!TEST_DATABASE_URL)("shipping zone editor (integration)", () => 
   let hashToken: typeof import("@/server/auth/session").hashToken;
   let actions: Actions;
   let staff: typeof import("./staff-service");
+  let readers: typeof import("./staff-readers");
   let resolveShippingZone: typeof import("./service").resolveShippingZone;
   let quoteCart: typeof import("@/features/cart/service").quoteCart;
   let checkout: typeof import("@/features/checkout/service");
@@ -92,7 +93,7 @@ describe.skipIf(!TEST_DATABASE_URL)("shipping zone editor (integration)", () => 
     db.select().from(auditLogs).where(and(eq(auditLogs.entity, "shipping_zone"), eq(auditLogs.entityId, String(entityId)), eq(auditLogs.action, action)));
 
   /** The edit form's current version token for a zone. */
-  const versionOf = async (id: number) => (await staff.getZoneForEdit(id))!.version;
+  const versionOf = async (id: number) => (await readers.getZoneForEdit(id))!.version;
 
   /** The Karachi zone's own fields, as the edit form would post them, with overrides. */
   async function karachiFields(overrides: Record<string, string | number> = {}) {
@@ -117,6 +118,7 @@ describe.skipIf(!TEST_DATABASE_URL)("shipping zone editor (integration)", () => 
     ({ hashToken } = await import("@/server/auth/session"));
     actions = await import("@/app/panel/(protected)/shipping/actions");
     staff = await import("./staff-service");
+    readers = await import("./staff-readers");
     ({ resolveShippingZone } = await import("./service"));
     ({ quoteCart } = await import("@/features/cart/service"));
     checkout = await import("@/features/checkout/service");
@@ -137,7 +139,7 @@ describe.skipIf(!TEST_DATABASE_URL)("shipping zone editor (integration)", () => 
 
   describe("the seeded setup", () => {
     it("lists the three zones in quote mode with their areas, orders and the fallback marked, untouched", async () => {
-      const items = await staff.listStaffZones();
+      const items = await readers.listStaffZones();
       expect(items.map((item) => [item.name, item.mode, item.flatRateText, item.codEnabled, item.isActive, item.isFallback, item.areaCount, item.orderCount])).toEqual([
         ["Karachi", "quote", null, true, true, false, 1, 0],
         ["Pakistan", "quote", null, true, true, false, 1, 0],
@@ -152,10 +154,10 @@ describe.skipIf(!TEST_DATABASE_URL)("shipping zone editor (integration)", () => 
     });
 
     it("the edit view shows areas with labels and the Pakistan-only note only for a zone reaching outside Pakistan", async () => {
-      const karachi = await staff.getZoneForEdit(ids.karachiZone);
+      const karachi = await readers.getZoneForEdit(ids.karachiZone);
       expect(karachi?.areas).toEqual([{ countryCode: "PK", city: "karachi", token: "PK:karachi", label: "Karachi, Pakistan" }]);
       expect(karachi?.coversOutsidePakistan).toBe(false);
-      expect((await staff.getZoneForEdit(ids.internationalZone))?.coversOutsidePakistan).toBe(true);
+      expect((await readers.getZoneForEdit(ids.internationalZone))?.coversOutsidePakistan).toBe(true);
     });
   });
 
@@ -244,7 +246,7 @@ describe.skipIf(!TEST_DATABASE_URL)("shipping zone editor (integration)", () => 
       expect(viaForm).toMatchObject({ ok: false, fieldErrors: { isActive: staff.FALLBACK_PROTECTED_MESSAGE } });
       expect(await actions.setZoneActiveAction(null, form({ id: ids.internationalZone, isActive: "false" }))).toEqual({ ok: false, error: staff.FALLBACK_PROTECTED_MESSAGE });
       expect(await actions.deleteZoneAction(null, form({ id: ids.internationalZone }))).toEqual({ ok: false, error: staff.FALLBACK_PROTECTED_MESSAGE });
-      expect(await staff.checkZoneDeletable(ids.internationalZone)).toEqual({ allowed: false, reason: "fallback" });
+      expect(await readers.checkZoneDeletable(ids.internationalZone)).toEqual({ allowed: false, reason: "fallback" });
       expect((await zoneById(ids.internationalZone)).isActive).toBe(true);
     });
   });
@@ -254,7 +256,7 @@ describe.skipIf(!TEST_DATABASE_URL)("shipping zone editor (integration)", () => 
       const order = await placeKarachiOrder();
       expect(order.shippingZoneId).toBe(ids.karachiZone);
 
-      expect(await staff.checkZoneDeletable(ids.karachiZone)).toEqual({ allowed: false, reason: "orders", orderCount: 1 });
+      expect(await readers.checkZoneDeletable(ids.karachiZone)).toEqual({ allowed: false, reason: "orders", orderCount: 1 });
       const refused = await actions.deleteZoneAction(null, form({ id: ids.karachiZone }));
       expect(refused.ok).toBe(false);
       if (!refused.ok) expect(refused.error).toMatch(/1 order was .* Deactivate it instead/);
@@ -271,12 +273,12 @@ describe.skipIf(!TEST_DATABASE_URL)("shipping zone editor (integration)", () => 
     it("an unused non-fallback zone deletes with its areas, renumbering the rest and auditing", async () => {
       const created = await staff.createZone(zoneFields(), { id: actorId });
       const id = (created as { id: number }).id;
-      expect(await staff.checkZoneDeletable(id)).toEqual({ allowed: true });
+      expect(await readers.checkZoneDeletable(id)).toEqual({ allowed: true });
       await expectRedirectTo(() => actions.deleteZoneAction(null, form({ id })), "/panel/shipping");
       expect(await zoneById(id)).toBeUndefined();
       expect(await areasOf(id)).toEqual([]);
       expect(await auditRows(id, "shipping_zone.delete")).toHaveLength(1);
-      expect((await staff.listStaffZones()).map((item) => item.position)).toEqual([1, 2, 3]);
+      expect((await readers.listStaffZones()).map((item) => item.position)).toEqual([1, 2, 3]);
       expect((await resolveShippingZone("PK", "Lahore"))?.id).toBe(pakistanZone);
     });
 
@@ -309,9 +311,9 @@ describe.skipIf(!TEST_DATABASE_URL)("shipping zone editor (integration)", () => 
   describe("sort order", () => {
     it("moves a zone with the MoveToControl fields, audits the before/after order, and changes no resolution", async () => {
       expect(await actions.moveZoneAction(null, form({ id: ids.internationalZone, placement: "top" }))).toEqual({ ok: true });
-      expect((await staff.listStaffZones()).map((item) => item.name)).toEqual(["International", "Karachi", "Pakistan"]);
+      expect((await readers.listStaffZones()).map((item) => item.name)).toEqual(["International", "Karachi", "Pakistan"]);
       expect(await actions.moveZoneAction(null, form({ id: ids.internationalZone, placement: "position", position: 3 }))).toEqual({ ok: true });
-      expect((await staff.listStaffZones()).map((item) => item.name)).toEqual(["Karachi", "Pakistan", "International"]);
+      expect((await readers.listStaffZones()).map((item) => item.name)).toEqual(["Karachi", "Pakistan", "International"]);
       const rows = await db.select().from(auditLogs).where(eq(auditLogs.action, "shipping_zone.sort_change"));
       expect(rows).toHaveLength(2);
       expect(JSON.parse(rows[0].newValues!)).toEqual({ orderedIds: [ids.internationalZone, ids.karachiZone, pakistanZone] });

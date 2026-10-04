@@ -13,7 +13,7 @@ import { ProductsTable } from "@/components/panel/products/ProductsTable";
 import { ProductsTableSkeleton } from "@/components/panel/products/ProductsTableSkeleton";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { productListQuerySchema, type ProductListQuery } from "@/features/catalog/schemas";
-import { getProductStatusCounts, listStaffProducts } from "@/features/catalog/products-staff-service";
+import { getProductStatusCounts, listStaffProducts } from "@/features/catalog/products-staff-readers";
 import { listCategoryOptions } from "@/features/catalog/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";

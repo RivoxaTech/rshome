@@ -1,6 +1,6 @@
 import { PanelFormHeader } from "@/components/panel/PanelFormHeader";
 import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
-import type { SaleInfo } from "@/features/catalog/products-staff-service";
+import type { SaleInfo } from "@/features/catalog/products-staff-readers";
 
 /** The back chevron + title row shared by the new/edit product pages, plus the variant count and the read-only "On sale" price. */
 export function ProductFormHeader({ title, backHref, salePrice, variantCount }: { title: string; backHref: string; salePrice?: SaleInfo; variantCount?: number }) {

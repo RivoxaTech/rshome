@@ -9,7 +9,7 @@ import { VariantsSection } from "@/components/panel/products/variants/VariantsSe
 import { ImagesSection } from "@/components/panel/products/images/ImagesSection";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { productBackHrefSchema } from "@/features/catalog/schemas";
-import { checkProductDeletable, getActiveCategoryGroups, getProductForEdit } from "@/features/catalog/products-staff-service";
+import { checkProductDeletable, getActiveCategoryGroups, getProductForEdit } from "@/features/catalog/products-staff-readers";
 import { requirePermission } from "@/server/auth/permissions";
 import { updateProductAction } from "@/app/panel/(protected)/products/actions";
 

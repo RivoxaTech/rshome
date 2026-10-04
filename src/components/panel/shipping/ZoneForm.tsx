@@ -8,7 +8,8 @@ import { Listbox } from "@/components/panel/Listbox";
 import { Switch } from "@/components/panel/Switch";
 import { ZoneAreasField } from "@/components/panel/shipping/ZoneAreasField";
 import { ZONE_MODES, ZONE_MODE_LABELS, type ZoneMode } from "@/features/shipping/schemas";
-import type { StaffActionResult, ZoneAreaView } from "@/features/shipping/staff-service";
+import type { ZoneAreaView } from "@/features/shipping/staff-readers";
+import type { StaffActionResult } from "@/features/shipping/staff-service";
 
 type ZoneFormValues = {
   id: number | null;

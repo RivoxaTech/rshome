@@ -1,23 +1,28 @@
 /**
- * The panel's products CRUD (S10, BUILD_PLAN.md S10): every write locks the row(s) it
+ * The panel's products writes (S10, BUILD_PLAN.md S10): every write locks the row(s) it
  * touches (`SELECT … FOR UPDATE`) and records `audit_logs` rows (CLAUDE.md #10), mirroring
  * `staff-service.ts` (categories, S10). A new product gets one "Default" variant (SKU +
  * stock) in the same transaction; everything else about variants is `variants-staff-service.ts`
- * (phase 3a), surfaced on the edit page as its own card outside the product form.
+ * (phase 3a), surfaced on the edit page as its own card outside the product form. The read models
+ * (list, edit form, totals, delete guard) are `products-staff-readers.ts` (S22 QA-10).
  */
 import { insertAuditLog } from "@/features/audit/repo";
-import { decimalToPaisa, paisaToDecimal } from "@/features/pricing/money";
-import { isDiscounted } from "@/features/pricing/pricing";
-import { getVariantPricer } from "@/features/pricing/service";
+import { StaffActionError, invalidInput } from "@/features/shared/staff-result";
+import { isDuplicateEntry } from "@/server/db/errors";
+import { db } from "@/server/db/client";
 import { deleteMediaImage } from "@/server/storage/images";
-import { db, type DbClient } from "@/server/db/client";
-import { getPrimaryImagesByProductId } from "./repo";
+import { applyFeaturedPlacement, applyShopPlacement, toPlacement } from "./arrange-service";
 import { deleteImagesByProductId, insertProductImage } from "./images-staff-repo";
-import { getPanelImages, type PanelImage } from "./images-staff-service";
-import { moveId, renormalize, type Placement } from "./ordering";
-import type { StaffActionResult } from "./staff-service";
-
-export type { StaffActionResult };
+import {
+  countOrderItemsByProductId,
+  deleteProduct,
+  getCategoryByIdActive,
+  insertProduct,
+  lockProductById,
+  slugInUse,
+  updateProduct,
+  type ProductRow,
+} from "./products-staff-repo";
 import {
   defaultVariantCreateSchema,
   featuredPlacementCreateSchema,
@@ -29,47 +34,13 @@ import {
   type FeaturedPlacementInput,
   type ProductInput,
   type ProductStatus,
-  type ProductTab,
   type ShopPlacementEditInput,
   type ShopPlacementInput,
 } from "./schemas";
-import {
-  countOrderItemsByProductId,
-  deleteProduct,
-  getActiveCategoryGroups,
-  getActiveStockSumsByProductIds,
-  getCategoryByIdActive,
-  getCategoryParentId,
-  getFeaturedProductCount,
-  getOrderedFeaturedProductIds,
-  getOrderedProductIds,
-  getProductCount,
-  getProductById,
-  getProductStatusCounts,
-  insertProduct,
-  listProductsPage,
-  lockOrderedFeaturedProductIds,
-  lockOrderedProductIds,
-  lockProductById,
-  slugInUse,
-  updateProduct,
-  updateProductFeaturedSortOrders,
-  updateProductSortOrders,
-  type ProductRow,
-} from "./products-staff-repo";
+import type { StaffActionResult } from "./staff-service";
 import { deleteVariantsByProductId, insertVariant, skuInUse } from "./variants-staff-repo";
-import { getPanelVariants, type PanelVariant } from "./variants-staff-service";
-import { isDuplicateEntry } from "@/server/db/errors";
-import { pageCountOf } from "@/features/shared/pagination";
-import { StaffActionError, invalidInput } from "@/features/shared/staff-result";
 
-export { getActiveCategoryGroups, getProductStatusCounts };
-
-/** Totals for the create form's placement fields (what "at the end" currently means). */
-export async function getPlacementTotals(): Promise<{ shopTotal: number; featuredTotal: number }> {
-  const [shopTotal, featuredTotal] = await Promise.all([getProductCount(), getFeaturedProductCount()]);
-  return { shopTotal, featuredTotal };
-}
+export type { StaffActionResult };
 
 type Actor = { id: number };
 
@@ -97,74 +68,6 @@ async function assertCategoryValid(categoryId: number, currentCategoryId?: numbe
   if (!category.isActive && categoryId !== currentCategoryId) throw new StaffActionError("That category is hidden. Choose an active category.");
 }
 
-// ── Manual ordering (S10) ──────────────────────────────────────────────────────────────
-
-/** `"keep"` (edit only) means "don't touch this order" — the caller skips applying anything. */
-function toPlacement(placement: "top" | "end" | "position" | "keep", position?: number): Placement | null {
-  if (placement === "keep") return null;
-  if (placement === "position") return { type: "position", position: position! };
-  return { type: placement };
-}
-
-/**
- * Moves (or, for a brand-new id not yet in the list, inserts) `productId` within the shop order
- * and writes every row whose `sort_order` changed, inside `tx`. `moveId` removing-then-reinserting
- * an id that isn't present yet is exactly an insert, so this one function covers both create and
- * edit. One audit row records the whole before/after order (ARCHITECTURE.md D51).
- */
-async function applyShopPlacement(tx: DbClient, productId: number, placement: Placement, actor: Actor, now: Date): Promise<void> {
-  const existing = await lockOrderedProductIds(tx);
-  const next = moveId(existing, productId, placement);
-  const positions = renormalize(next);
-  await updateProductSortOrders(tx, [...positions.entries()].map(([id, sortOrder]) => ({ id, sortOrder })));
-  await insertAuditLog(tx, {
-    userId: actor.id,
-    action: "product.sort_change",
-    entity: "product_order",
-    entityId: "shop",
-    oldValues: { order: existing },
-    newValues: { order: next },
-    createdAt: now,
-  });
-}
-
-/** Same as `applyShopPlacement`, for the featured order (scoped to active, featured products only). */
-async function applyFeaturedPlacement(tx: DbClient, productId: number, placement: Placement, actor: Actor, now: Date): Promise<void> {
-  const existing = await lockOrderedFeaturedProductIds(tx);
-  const next = moveId(existing, productId, placement);
-  const positions = renormalize(next);
-  await updateProductFeaturedSortOrders(tx, [...positions.entries()].map(([id, featuredSortOrder]) => ({ id, featuredSortOrder })));
-  await insertAuditLog(tx, {
-    userId: actor.id,
-    action: "product.sort_change",
-    entity: "product_order",
-    entityId: "featured",
-    oldValues: { order: existing },
-    newValues: { order: next },
-    createdAt: now,
-  });
-}
-
-// ── Sale price display (read-only; reuses features/pricing, no new pricing logic) ──────────────
-
-export type SaleInfo = { original: string; discounted: string } | null;
-
-/**
- * One discount load (`getVariantPricer`), then `priceVariant` per row in memory — cheap even for a
- * full page of staff rows (features/pricing/service.ts already does this once per request).
- * Computed from `products.price` (no variant override): the list and edit header already show
- * that as *the* price, and variant pricing stays out of scope until phase 3.
- */
-async function computeSaleInfo(rows: { id: number; price: string; categoryId: number; parentCategoryId: number | null }[]): Promise<Map<number, SaleInfo>> {
-  const pricer = await getVariantPricer();
-  const map = new Map<number, SaleInfo>();
-  for (const row of rows) {
-    const price = pricer({ id: row.id, price: decimalToPaisa(row.price), categoryId: row.categoryId, parentCategoryId: row.parentCategoryId }, null);
-    map.set(row.id, isDiscounted(price) ? { original: paisaToDecimal(price.basePrice), discounted: paisaToDecimal(price.unitPrice) } : null);
-  }
-  return map;
-}
-
 type ProductAuditFields = Pick<ProductRow, "name" | "slug" | "categoryId" | "shortDescription" | "description" | "price" | "weightGrams" | "isFeatured" | "status">;
 
 function productAuditValues(product: ProductAuditFields) {
@@ -178,94 +81,6 @@ function productAuditValues(product: ProductAuditFields) {
     weightGrams: product.weightGrams,
     isFeatured: product.isFeatured,
     status: product.status,
-  };
-}
-
-// ── The list ────────────────────────────────────────────────────────────────────────────────
-
-export type StaffProductListItem = {
-  serial: number;
-  id: number;
-  name: string;
-  slug: string;
-  categoryName: string;
-  imagePath: string | null;
-  price: string;
-  stock: number;
-  status: ProductStatus;
-  isFeatured: boolean;
-  salePrice: SaleInfo;
-};
-
-export async function listStaffProducts(
-  tab: ProductTab,
-  query: { q?: string; categoryId?: number; page: number; pageSize: number },
-): Promise<{ items: StaffProductListItem[]; total: number; page: number; pageSize: number; pageCount: number }> {
-  const offset = (query.page - 1) * query.pageSize;
-  const { rows, total } = await listProductsPage({ tab, q: query.q, categoryId: query.categoryId, limit: query.pageSize, offset });
-  const ids = rows.map((row) => row.id);
-  const [stockSums, images, saleInfo] = await Promise.all([
-    getActiveStockSumsByProductIds(ids),
-    getPrimaryImagesByProductId(ids),
-    computeSaleInfo(rows),
-  ]);
-
-  const items: StaffProductListItem[] = rows.map((row, index) => ({
-    serial: offset + index + 1,
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    categoryName: row.categoryName,
-    imagePath: images.get(row.id)?.path ?? null,
-    price: row.price,
-    stock: stockSums.get(row.id) ?? 0,
-    status: row.status,
-    isFeatured: row.isFeatured,
-    salePrice: saleInfo.get(row.id) ?? null,
-  }));
-
-  return { items, total, page: query.page, pageSize: query.pageSize, pageCount: pageCountOf(total, query.pageSize) };
-}
-
-// ── The create/edit form ────────────────────────────────────────────────────────────────────
-
-type ProductEditFormData = {
-  product: ProductRow;
-  /** Every variant in display order, for the edit page's variants card (S10). */
-  variants: PanelVariant[];
-  /** Every image in display order, for the edit page's images card (S10). The product
-   *  form itself no longer reads or writes images on edit — only the create form's one field does. */
-  images: PanelImage[];
-  salePrice: SaleInfo;
-  /** 1-based current position in the shop order, and how many products share that order. */
-  shopPosition: number;
-  shopTotal: number;
-  /** Null unless the product is currently featured — its current position in the featured order. */
-  featuredPosition: number | null;
-  featuredTotal: number;
-};
-
-export async function getProductForEdit(id: number): Promise<ProductEditFormData | null> {
-  const product = await getProductById(id);
-  if (!product) return null;
-  const [variants, images, parentCategoryId, shopOrder, featuredOrder] = await Promise.all([
-    getPanelVariants(id),
-    getPanelImages(id),
-    getCategoryParentId(product.categoryId),
-    getOrderedProductIds(db),
-    getOrderedFeaturedProductIds(db),
-  ]);
-  const saleInfoMap = await computeSaleInfo([{ id: product.id, price: product.price, categoryId: product.categoryId, parentCategoryId }]);
-
-  return {
-    product,
-    variants,
-    images,
-    salePrice: saleInfoMap.get(id) ?? null,
-    shopPosition: shopOrder.indexOf(id) + 1,
-    shopTotal: shopOrder.length,
-    featuredPosition: product.isFeatured ? featuredOrder.indexOf(id) + 1 : null,
-    featuredTotal: featuredOrder.length,
   };
 }
 
@@ -502,14 +317,6 @@ export async function setProductFeatured(id: number, isFeatured: boolean, actor:
 }
 
 // ── Delete ──────────────────────────────────────────────────────────────────────────────────
-
-export type ProductDeleteGuard = { allowed: true } | { allowed: false; reason: "has_orders"; count: number };
-
-export async function checkProductDeletable(id: number): Promise<ProductDeleteGuard> {
-  const orderCount = await countOrderItemsByProductId(id);
-  if (orderCount > 0) return { allowed: false, reason: "has_orders", count: orderCount };
-  return { allowed: true };
-}
 
 export async function deleteProductById(id: number, actor: Actor): Promise<StaffActionResult> {
   let imagePathsToDelete: string[] = [];

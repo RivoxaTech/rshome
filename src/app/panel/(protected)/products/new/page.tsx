@@ -4,7 +4,7 @@ import { ProductForm } from "@/components/panel/products/ProductForm";
 import { ProductFormHeader } from "@/components/panel/products/ProductFormHeader";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { productBackHrefSchema } from "@/features/catalog/schemas";
-import { getActiveCategoryGroups, getPlacementTotals } from "@/features/catalog/products-staff-service";
+import { getActiveCategoryGroups, getPlacementTotals } from "@/features/catalog/products-staff-readers";
 import { requirePermission } from "@/server/auth/permissions";
 import { createProductAction } from "@/app/panel/(protected)/products/actions";
 

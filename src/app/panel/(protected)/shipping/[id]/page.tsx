@@ -9,7 +9,7 @@ import { ZoneActiveToggle } from "@/components/panel/shipping/ZoneRowActions";
 import { getCountryOptions } from "@/config/countries";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { zoneBackHrefSchema } from "@/features/shipping/schemas";
-import { checkZoneDeletable, getZoneForEdit } from "@/features/shipping/staff-service";
+import { checkZoneDeletable, getZoneForEdit } from "@/features/shipping/staff-readers";
 import { requirePermission } from "@/server/auth/permissions";
 import { updateZoneAction } from "@/app/panel/(protected)/shipping/actions";
 import { PILL_COLORS } from "@/lib/pill-colors";

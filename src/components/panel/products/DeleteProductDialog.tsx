@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/panel/Dialog";
 import { useStaffAction } from "@/components/panel/use-staff-action";
-import type { ProductDeleteGuard } from "@/features/catalog/products-staff-service";
+import type { ProductDeleteGuard } from "@/features/catalog/products-staff-readers";
 import type { StaffActionResult } from "@/features/catalog/staff-service";
 import { archiveProductAction, deleteProductAction } from "@/app/panel/(protected)/products/actions";
 
