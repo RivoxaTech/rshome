@@ -9,6 +9,7 @@ import { KARACHI_OFFSET_MS, formatKarachiDateTime } from "@/lib/karachi-datetime
 import { auditActionLabel, auditEntityLabel } from "./actions";
 import type { AuditListQuery } from "./schemas";
 import { countAuditRows, listAuditActors, listAuditRows, type AuditFilter } from "./staff-repo";
+import { pageCountOf } from "@/features/shared/pagination";
 
 export type AuditListItem = {
   id: number;
@@ -48,7 +49,7 @@ function toAuditFilter(query: AuditListQuery): AuditFilter {
 export async function listAuditLog(query: AuditListQuery): Promise<{ items: AuditListItem[]; total: number; page: number; pageSize: number; pageCount: number }> {
   const filter = toAuditFilter(query);
   const total = await countAuditRows(filter);
-  const pageCount = Math.max(1, Math.ceil(total / query.pageSize));
+  const pageCount = pageCountOf(total, query.pageSize);
   const page = Math.min(query.page, pageCount);
   const rows = await listAuditRows(filter, page, query.pageSize);
 

@@ -6,17 +6,15 @@ import { Dialog } from "@/components/panel/Dialog";
 import { Switch } from "@/components/panel/Switch";
 import { useStaffAction } from "@/components/panel/use-staff-action";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
+import { fieldErrorsOf } from "@/lib/field-errors";
 import { variantInputSchema } from "@/features/catalog/schemas";
 import { MAX_VARIANT_ATTRIBUTES, SUGGESTED_ATTRIBUTE_NAMES, generateVariantLabel, validateAttributePairs } from "@/features/catalog/variants";
 import type { PanelVariant } from "@/features/catalog/variants-staff-service";
 import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
 import { createVariantAction, updateVariantAction } from "@/app/panel/(protected)/products/[id]/actions";
+import { inputClass } from "@/components/panel/FormField";
 
 type AttributeRow = { rowId: number; key: string; value: string };
-
-const inputClass =
-  "border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none";
 
 function Field({ id, label, error, hint, children }: { id: string; label: string; error?: string; hint?: string; children: React.ReactNode }) {
   return (

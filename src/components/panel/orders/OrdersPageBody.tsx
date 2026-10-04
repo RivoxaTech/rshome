@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 import { getOrderCounts, listStaffOrders } from "@/features/orders/staff-service";
 import { orderListQuerySchema, type OrderListQuery } from "@/features/orders/schemas";
-import { DEFAULT_PAGE_SIZE, METHOD_PAGES, PAGE_SIZE_OPTIONS, TAB_INFO, ordersPath, tabsFor, type OrderTab } from "@/features/orders/transitions";
+import { METHOD_PAGES, TAB_INFO, ordersPath, tabsFor, type OrderTab } from "@/features/orders/transitions";
 import type { PaymentMethod } from "@/features/orders/status";
 import { requirePermission } from "@/server/auth/permissions";
 import { PanelPageTitle } from "@/components/panel/PanelPageTitle";
@@ -14,6 +14,7 @@ import { OrdersTableSkeleton } from "@/components/panel/orders/OrdersTableSkelet
 import { Pagination } from "@/components/panel/Pagination";
 import { RowsPerPageSelect } from "@/components/panel/RowsPerPageSelect";
 import { SearchBox } from "@/components/panel/SearchBox";
+import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";
 
 /**
  * The table and its pagination, in their own Suspense boundary (S9): the tabs and the search box

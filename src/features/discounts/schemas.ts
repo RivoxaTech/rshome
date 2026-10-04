@@ -3,6 +3,7 @@ import { z } from "zod";
 import { decimalToPaisa } from "@/features/pricing/money";
 import { moneyField } from "@/features/pricing/schemas";
 import { karachiLocalToUtc } from "@/lib/karachi-datetime";
+import { pageSizeField } from "@/features/shared/pagination";
 
 export const DISCOUNT_TYPES = ["percent", "fixed"] as const;
 export type DiscountType = (typeof DISCOUNT_TYPES)[number];
@@ -143,17 +144,11 @@ export type DiscountTab = (typeof DISCOUNT_TABS)[number];
 // Next hands repeated query keys over as arrays (?q=a&q=b); only the first counts.
 const firstQueryValue = (value: unknown) => (Array.isArray(value) ? value[0] : value);
 
-export const DISCOUNT_PAGE_SIZE_OPTIONS = [25, 50, 75, 100] as const;
-export const DISCOUNT_DEFAULT_PAGE_SIZE: (typeof DISCOUNT_PAGE_SIZE_OPTIONS)[number] = 25;
-
 export const discountListQuerySchema = z.object({
   tab: z.preprocess(firstQueryValue, z.enum(DISCOUNT_TABS)).catch("all"),
   q: z.preprocess(firstQueryValue, z.string().trim().max(100).optional()).catch(undefined),
   page: z.preprocess(firstQueryValue, z.coerce.number().int().min(1).max(10_000)).catch(1),
-  pageSize: z
-    .preprocess(firstQueryValue, z.coerce.number().int())
-    .refine((value): value is (typeof DISCOUNT_PAGE_SIZE_OPTIONS)[number] => (DISCOUNT_PAGE_SIZE_OPTIONS as readonly number[]).includes(value))
-    .catch(DISCOUNT_DEFAULT_PAGE_SIZE),
+  pageSize: pageSizeField,
 });
 export type DiscountListQuery = z.infer<typeof discountListQuerySchema>;
 

@@ -8,6 +8,7 @@
 import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
 import { resolveCoupon, type PricingCoupon } from "@/features/pricing/pricing";
 import type { CouponTab, CouponType } from "./schemas";
+import { PILL_COLORS } from "@/lib/pill-colors";
 
 export type CouponStatus = Exclude<CouponTab, "all">;
 
@@ -48,11 +49,11 @@ export const COUPON_TAB_LABELS: Record<CouponTab, string> = { all: "All", ...COU
 
 /** One colour per status, readable in light and dark: dot, pill background and pill text. */
 export const COUPON_STATUS_COLORS: Record<CouponStatus, { dot: string; bg: string; text: string }> = {
-  active: { dot: "bg-emerald-500", bg: "bg-emerald-500/15", text: "text-emerald-700 dark:text-emerald-400" },
-  scheduled: { dot: "bg-blue-500", bg: "bg-blue-500/15", text: "text-blue-700 dark:text-blue-400" },
-  expired: { dot: "bg-amber-500", bg: "bg-amber-500/15", text: "text-amber-700 dark:text-amber-400" },
-  used_up: { dot: "bg-red-500", bg: "bg-red-500/15", text: "text-red-700 dark:text-red-400" },
-  inactive: { dot: "bg-muted-foreground/60", bg: "bg-muted", text: "text-muted-foreground" },
+  active: PILL_COLORS.emerald,
+  scheduled: PILL_COLORS.blue,
+  expired: PILL_COLORS.amber,
+  used_up: PILL_COLORS.red,
+  inactive: PILL_COLORS.muted,
 };
 
 /** "10%" (with "up to PKR 500" when capped) for a percentage, "PKR 200 off" for a fixed amount. */

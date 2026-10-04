@@ -5,7 +5,7 @@ import { createWholesaleInquiryAction } from "@/app/(store)/wholesale/actions";
 import { WhatsAppButton, whatsAppHref } from "@/components/store/WhatsAppButton";
 import { SelectField, TextAreaField, TextField } from "@/components/store/forms/fields";
 import { EMPTY_ITEM_ROW, WholesaleItemRows, type WholesaleItemRow } from "@/components/store/wholesale/WholesaleItemRows";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
+import { fieldErrorsOf } from "@/lib/field-errors";
 import { todayInKarachi, wholesaleInquiryInputSchema } from "@/features/wholesale/schemas";
 
 // Dashed, not a plain solid line: a solid `border-t` here reads as just another field's

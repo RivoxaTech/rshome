@@ -14,6 +14,7 @@ import {
   type ProofState,
   type TimelineOrder,
 } from "./status";
+import { DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";
 
 type OrderRow = typeof orders.$inferSelect;
 
@@ -139,10 +140,6 @@ export const METHOD_PAGES: Record<PaymentMethod, { slug: "bank" | "cod"; title: 
   bank_transfer: { slug: "bank", title: "Orders – Bank transfer", navLabel: "Orders – Bank transfer" },
   cod: { slug: "cod", title: "Orders – Cash on delivery", navLabel: "Orders – COD" },
 };
-
-/** Rows per page, chosen by the viewer; carried in the URL like the tab and search. */
-export const PAGE_SIZE_OPTIONS = [25, 50, 75, 100] as const;
-export const DEFAULT_PAGE_SIZE: (typeof PAGE_SIZE_OPTIONS)[number] = 25;
 
 /** A method's page with its tab, search, page and page size in the URL: `/panel/orders/bank?tab=need-review&q=ali&page=2`. */
 export function ordersPath(

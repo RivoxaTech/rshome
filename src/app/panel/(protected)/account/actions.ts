@@ -1,6 +1,6 @@
 "use server";
 
-import { fieldErrorsOf } from "@/features/checkout/schemas";
+import { fieldErrorsOf } from "@/lib/field-errors";
 import { ChangePasswordInputSchema, changePassword } from "@/features/auth/service";
 import { requireSession } from "@/server/auth/permissions";
 

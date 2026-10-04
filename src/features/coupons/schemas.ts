@@ -3,6 +3,7 @@ import { z } from "zod";
 import { checkDateOrder, checkValueRange, karachiDateTimeField } from "@/features/discounts/schemas";
 import { decimalToPaisa } from "@/features/pricing/money";
 import { moneyField, optionalMoneyField } from "@/features/pricing/schemas";
+import { pageSizeField } from "@/features/shared/pagination";
 
 export const COUPON_TYPES = ["percent", "fixed"] as const;
 export type CouponType = (typeof COUPON_TYPES)[number];
@@ -67,17 +68,11 @@ export type CouponTab = (typeof COUPON_TABS)[number];
 // Next hands repeated query keys over as arrays (?q=a&q=b); only the first counts.
 const firstQueryValue = (value: unknown) => (Array.isArray(value) ? value[0] : value);
 
-export const COUPON_PAGE_SIZE_OPTIONS = [25, 50, 75, 100] as const;
-export const COUPON_DEFAULT_PAGE_SIZE: (typeof COUPON_PAGE_SIZE_OPTIONS)[number] = 25;
-
 export const couponListQuerySchema = z.object({
   tab: z.preprocess(firstQueryValue, z.enum(COUPON_TABS)).catch("all"),
   q: z.preprocess(firstQueryValue, z.string().trim().max(100).optional()).catch(undefined),
   page: z.preprocess(firstQueryValue, z.coerce.number().int().min(1).max(10_000)).catch(1),
-  pageSize: z
-    .preprocess(firstQueryValue, z.coerce.number().int())
-    .refine((value): value is (typeof COUPON_PAGE_SIZE_OPTIONS)[number] => (COUPON_PAGE_SIZE_OPTIONS as readonly number[]).includes(value))
-    .catch(COUPON_DEFAULT_PAGE_SIZE),
+  pageSize: pageSizeField,
 });
 export type CouponListQuery = z.infer<typeof couponListQuerySchema>;
 

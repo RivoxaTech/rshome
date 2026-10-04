@@ -12,13 +12,14 @@ import { ProductTabs } from "@/components/panel/products/ProductTabs";
 import { ProductsTable } from "@/components/panel/products/ProductsTable";
 import { ProductsTableSkeleton } from "@/components/panel/products/ProductsTableSkeleton";
 import { PERMISSIONS } from "@/features/auth/permissions";
-import { PRODUCT_DEFAULT_PAGE_SIZE, PRODUCT_PAGE_SIZE_OPTIONS, productListQuerySchema, type ProductListQuery } from "@/features/catalog/schemas";
+import { productListQuerySchema, type ProductListQuery } from "@/features/catalog/schemas";
 import { getProductStatusCounts, listStaffProducts } from "@/features/catalog/products-staff-service";
 import { listCategoryOptions } from "@/features/catalog/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
+import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";
 
 function productsPath(query: { tab?: string; q?: string; category?: string; page?: number; pageSize?: number }): string {
-  return buildListPath("/panel/products", query.tab === "all" ? undefined : query.tab, query, PRODUCT_DEFAULT_PAGE_SIZE);
+  return buildListPath("/panel/products", query.tab === "all" ? undefined : query.tab, query, DEFAULT_PAGE_SIZE);
 }
 
 /**
@@ -49,7 +50,7 @@ async function ProductsTableSection({ query, backHref }: { query: ProductListQue
         pageCount={pageCount}
         total={total}
         pageSize={pageSize}
-        defaultPageSize={PRODUCT_DEFAULT_PAGE_SIZE}
+        defaultPageSize={DEFAULT_PAGE_SIZE}
       />
     </>
   );
@@ -97,7 +98,7 @@ export async function ProductsPageBody({ searchParams }: { searchParams: Record<
                 tabSlug={query.tab === "all" ? undefined : query.tab}
                 category={categoryParam}
                 pageSize={query.pageSize}
-                defaultPageSize={PRODUCT_DEFAULT_PAGE_SIZE}
+                defaultPageSize={DEFAULT_PAGE_SIZE}
                 placeholder="Search products"
                 ariaLabel="Search products"
               />
@@ -127,8 +128,8 @@ export async function ProductsPageBody({ searchParams }: { searchParams: Record<
               q={query.q}
               category={categoryParam}
               pageSize={query.pageSize}
-              options={PRODUCT_PAGE_SIZE_OPTIONS}
-              defaultPageSize={PRODUCT_DEFAULT_PAGE_SIZE}
+              options={PAGE_SIZE_OPTIONS}
+              defaultPageSize={DEFAULT_PAGE_SIZE}
             />
           </div>
         </div>

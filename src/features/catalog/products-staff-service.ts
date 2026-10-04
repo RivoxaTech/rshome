@@ -5,9 +5,7 @@
  * stock) in the same transaction; everything else about variants is `variants-staff-service.ts`
  * (phase 3a), surfaced on the edit page as its own card outside the product form.
  */
-import type { ZodError } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
 import { decimalToPaisa, paisaToDecimal } from "@/features/pricing/money";
 import { isDiscounted } from "@/features/pricing/pricing";
 import { getVariantPricer } from "@/features/pricing/service";
@@ -62,6 +60,8 @@ import {
 import { deleteVariantsByProductId, insertVariant, skuInUse } from "./variants-staff-repo";
 import { getPanelVariants, type PanelVariant } from "./variants-staff-service";
 import { isDuplicateEntry } from "@/server/db/errors";
+import { pageCountOf } from "@/features/shared/pagination";
+import { StaffActionError, invalidInput } from "@/features/shared/staff-result";
 
 export { getActiveCategoryGroups, getProductStatusCounts };
 
@@ -73,13 +73,6 @@ export async function getPlacementTotals(): Promise<{ shopTotal: number; feature
 
 type Actor = { id: number };
 
-/** A refusal staff see; anything else thrown is a real failure and rolls the transaction back. */
-class ProductActionError extends Error {}
-
-function invalid(error: ZodError): StaffActionResult {
-  return { ok: false, error: error.issues[0]?.message ?? "Please check the form.", fieldErrors: fieldErrorsOf(error) };
-}
-
 /** Maps a known refusal message to the field it's about, so the form highlights the right input. */
 function fieldErrorFor(message: string): Record<string, string> | undefined {
   if (message.includes("slug")) return { slug: message };
@@ -89,19 +82,19 @@ function fieldErrorFor(message: string): Record<string, string> | undefined {
 }
 
 async function assertSlugAvailable(slug: string, excludeId?: number): Promise<void> {
-  if (await slugInUse(slug, excludeId)) throw new ProductActionError("That slug is already in use. Choose another.");
+  if (await slugInUse(slug, excludeId)) throw new StaffActionError("That slug is already in use. Choose another.");
 }
 
 /** Only the create form posts a SKU (its "Default" variant); every later SKU change goes through the variants card. */
 async function assertSkuAvailable(sku: string): Promise<void> {
-  if (await skuInUse(sku)) throw new ProductActionError("That SKU is already in use. Choose another.");
+  if (await skuInUse(sku)) throw new StaffActionError("That SKU is already in use. Choose another.");
 }
 
 /** A category must exist and be active — unless it's the product's own current category, kept on save even if since hidden. */
 async function assertCategoryValid(categoryId: number, currentCategoryId?: number): Promise<void> {
   const category = await getCategoryByIdActive(categoryId);
-  if (!category) throw new ProductActionError("Choose a valid category.");
-  if (!category.isActive && categoryId !== currentCategoryId) throw new ProductActionError("That category is hidden. Choose an active category.");
+  if (!category) throw new StaffActionError("Choose a valid category.");
+  if (!category.isActive && categoryId !== currentCategoryId) throw new StaffActionError("That category is hidden. Choose an active category.");
 }
 
 // ── Manual ordering (S10) ──────────────────────────────────────────────────────────────
@@ -231,7 +224,7 @@ export async function listStaffProducts(
     salePrice: saleInfo.get(row.id) ?? null,
   }));
 
-  return { items, total, page: query.page, pageSize: query.pageSize, pageCount: Math.max(1, Math.ceil(total / query.pageSize)) };
+  return { items, total, page: query.page, pageSize: query.pageSize, pageCount: pageCountOf(total, query.pageSize) };
 }
 
 // ── The create/edit form ────────────────────────────────────────────────────────────────────
@@ -280,13 +273,13 @@ export async function getProductForEdit(id: number): Promise<ProductEditFormData
 
 export async function createProduct(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsedProduct = productInputSchema.safeParse(rawInput);
-  if (!parsedProduct.success) return invalid(parsedProduct.error);
+  if (!parsedProduct.success) return invalidInput(parsedProduct.error);
   const parsedVariant = defaultVariantCreateSchema.safeParse(rawInput);
-  if (!parsedVariant.success) return invalid(parsedVariant.error);
+  if (!parsedVariant.success) return invalidInput(parsedVariant.error);
   const parsedShopPlacement = shopPlacementCreateSchema.safeParse(rawInput);
-  if (!parsedShopPlacement.success) return invalid(parsedShopPlacement.error);
+  if (!parsedShopPlacement.success) return invalidInput(parsedShopPlacement.error);
   const parsedFeaturedPlacement = featuredPlacementCreateSchema.safeParse(rawInput);
-  if (!parsedFeaturedPlacement.success) return invalid(parsedFeaturedPlacement.error);
+  if (!parsedFeaturedPlacement.success) return invalidInput(parsedFeaturedPlacement.error);
   const input: ProductInput = parsedProduct.data;
   const variantInput = parsedVariant.data;
   const shopPlacement: ShopPlacementInput = parsedShopPlacement.data;
@@ -347,7 +340,7 @@ export async function createProduct(rawInput: unknown, actor: Actor): Promise<St
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof ProductActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
     if (isDuplicateEntry(error)) {
       return { ok: false, error: "That slug or SKU is already in use. Choose another." };
     }
@@ -359,11 +352,11 @@ export async function createProduct(rawInput: unknown, actor: Actor): Promise<St
 
 export async function updateProductById(id: number, rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsedProduct = productInputSchema.safeParse(rawInput);
-  if (!parsedProduct.success) return invalid(parsedProduct.error);
+  if (!parsedProduct.success) return invalidInput(parsedProduct.error);
   const parsedShopPlacement = shopPlacementEditSchema.safeParse(rawInput);
-  if (!parsedShopPlacement.success) return invalid(parsedShopPlacement.error);
+  if (!parsedShopPlacement.success) return invalidInput(parsedShopPlacement.error);
   const parsedFeaturedPlacement = featuredPlacementEditSchema.safeParse(rawInput);
-  if (!parsedFeaturedPlacement.success) return invalid(parsedFeaturedPlacement.error);
+  if (!parsedFeaturedPlacement.success) return invalidInput(parsedFeaturedPlacement.error);
   const input: ProductInput = parsedProduct.data;
   const shopPlacement: ShopPlacementEditInput = parsedShopPlacement.data;
   const featuredPlacement: FeaturedPlacementEditInput = parsedFeaturedPlacement.data;
@@ -371,7 +364,7 @@ export async function updateProductById(id: number, rawInput: unknown, actor: Ac
   try {
     await db.transaction(async (tx) => {
       const product = await lockProductById(tx, id);
-      if (!product) throw new ProductActionError("Product not found.");
+      if (!product) throw new StaffActionError("Product not found.");
 
       await assertSlugAvailable(input.slug, id);
       await assertCategoryValid(input.categoryId, product.categoryId);
@@ -444,7 +437,7 @@ export async function updateProductById(id: number, rawInput: unknown, actor: Ac
       }
     });
   } catch (error) {
-    if (error instanceof ProductActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
     if (isDuplicateEntry(error)) {
       return { ok: false, error: "That slug is already in use. Choose another.", fieldErrors: { slug: "That slug is already in use. Choose another." } };
     }
@@ -460,8 +453,8 @@ export async function setProductStatus(id: number, status: ProductStatus, actor:
   try {
     await db.transaction(async (tx) => {
       const product = await lockProductById(tx, id);
-      if (!product) throw new ProductActionError("Product not found.");
-      if (product.status === status) throw new ProductActionError(`This product is already ${status}.`);
+      if (!product) throw new StaffActionError("Product not found.");
+      if (product.status === status) throw new StaffActionError(`This product is already ${status}.`);
 
       const now = new Date();
       await updateProduct(tx, id, { status, updatedAt: now });
@@ -477,7 +470,7 @@ export async function setProductStatus(id: number, status: ProductStatus, actor:
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof ProductActionError) return { ok: false, error: error.message };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message };
     throw error;
   }
 }
@@ -486,8 +479,8 @@ export async function setProductFeatured(id: number, isFeatured: boolean, actor:
   try {
     await db.transaction(async (tx) => {
       const product = await lockProductById(tx, id);
-      if (!product) throw new ProductActionError("Product not found.");
-      if (product.isFeatured === isFeatured) throw new ProductActionError(`This product is already ${isFeatured ? "featured" : "not featured"}.`);
+      if (!product) throw new StaffActionError("Product not found.");
+      if (product.isFeatured === isFeatured) throw new StaffActionError(`This product is already ${isFeatured ? "featured" : "not featured"}.`);
 
       const now = new Date();
       await updateProduct(tx, id, { isFeatured, updatedAt: now });
@@ -503,7 +496,7 @@ export async function setProductFeatured(id: number, isFeatured: boolean, actor:
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof ProductActionError) return { ok: false, error: error.message };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message };
     throw error;
   }
 }
@@ -523,11 +516,11 @@ export async function deleteProductById(id: number, actor: Actor): Promise<Staff
   try {
     await db.transaction(async (tx) => {
       const product = await lockProductById(tx, id);
-      if (!product) throw new ProductActionError("Product not found.");
+      if (!product) throw new StaffActionError("Product not found.");
 
       const orderCount = await countOrderItemsByProductId(id);
       if (orderCount > 0) {
-        throw new ProductActionError(`${orderCount} ${orderCount === 1 ? "order uses" : "orders use"} this product, so it can't be deleted. Archive it instead.`);
+        throw new StaffActionError(`${orderCount} ${orderCount === 1 ? "order uses" : "orders use"} this product, so it can't be deleted. Archive it instead.`);
       }
 
       const now = new Date();
@@ -545,7 +538,7 @@ export async function deleteProductById(id: number, actor: Actor): Promise<Staff
       });
     });
   } catch (error) {
-    if (error instanceof ProductActionError) return { ok: false, error: error.message };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message };
     throw error;
   }
 

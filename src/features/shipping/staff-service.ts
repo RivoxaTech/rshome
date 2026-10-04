@@ -6,13 +6,12 @@
  * Refusals come back as `{ ok: false }`, never a throw. Nothing here changes a past order (orders
  * snapshot their totals) or an in-flight checkout, which recomputes under its own lock.
  */
-import type { ZodError } from "zod";
 import { getCountryOptions } from "@/config/countries";
 import { features } from "@/config/features";
 import { insertAuditLog } from "@/features/audit/repo";
 import type { StaffActionResult } from "@/features/catalog/staff-service";
 import { moveId, renormalize, type Placement } from "@/features/catalog/ordering";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
+import { fieldErrorsOf } from "@/lib/field-errors";
 import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
 import { fingerprint } from "@/lib/fingerprint";
 import { db } from "@/server/db/client";
@@ -36,6 +35,7 @@ import {
   type ZoneStaffRow,
 } from "./staff-repo";
 import type { ZoneAreaRow, ZoneRow } from "./zones";
+import { StaffActionError, invalidInput, refusal } from "@/features/shared/staff-result";
 
 export type { StaffActionResult };
 
@@ -44,24 +44,6 @@ type Actor = { id: number };
 export const STALE_ZONE_MESSAGE = "Someone else changed this zone after you opened it. Reload to see their changes, then make yours again.";
 export const FALLBACK_PROTECTED_MESSAGE = "The rest-of-world zone covers every address no other zone does, so it can't be deleted or deactivated.";
 export const ONE_FALLBACK_MESSAGE = "There is already a rest-of-world zone; only one zone can be the fallback.";
-
-/** A refusal staff see; anything else thrown is a real failure and rolls the transaction back. */
-class ZoneActionError extends Error {
-  constructor(
-    message: string,
-    readonly field?: string,
-  ) {
-    super(message);
-  }
-}
-
-function invalid(error: ZodError): StaffActionResult {
-  return { ok: false, error: error.issues[0]?.message ?? "Please check the form.", fieldErrors: fieldErrorsOf(error) };
-}
-
-function refused(error: ZoneActionError): StaffActionResult {
-  return error.field ? { ok: false, error: error.message, fieldErrors: { [error.field]: error.message } } : { ok: false, error: error.message };
-}
 
 /** `Intl.DisplayNames` through the checkout's own country list (D31), so panel and storefront name countries identically. */
 const countryNames = new Map(getCountryOptions().map((option) => [option.code, option.name]));
@@ -166,7 +148,7 @@ function assertNoAreaConflicts(existing: ZoneAreaRow[], ownZoneId: number | null
   const first = conflicts[0];
   const owner = zones.find((zone) => zone.id === first.zoneId)?.name ?? `zone #${first.zoneId}`;
   const more = conflicts.length > 1 ? ` (and ${conflicts.length - 1} more)` : "";
-  throw new ZoneActionError(`${areaLabel(first.area, countryName)} already belongs to "${owner}"${more}. An area can only be in one zone.`, "areas");
+  throw new StaffActionError(`${areaLabel(first.area, countryName)} already belongs to "${owner}"${more}. An area can only be in one zone.`, "areas");
 }
 
 type ZoneSet = { zones: ZoneRow[]; areas: ZoneAreaRow[] };
@@ -174,14 +156,14 @@ type ZoneSet = { zones: ZoneRow[]; areas: ZoneAreaRow[] };
 /** Refuses a change that would newly leave a checkout destination with no zone (the real resolver decides), or no active zone at all. */
 function assertCoverage(before: ZoneSet, after: ZoneSet, what: string): void {
   if (before.zones.some((zone) => zone.isActive) && !after.zones.some((zone) => zone.isActive)) {
-    throw new ZoneActionError(`${what} would leave no active delivery zone at all.`);
+    throw new StaffActionError(`${what} would leave no active delivery zone at all.`);
   }
   const gaps = newCoverageGaps(before, after);
   if (gaps.length === 0) return;
   const first = gaps[0];
   const place = first.city ? areaLabel({ countryCode: first.country, city: first.city }, countryName) : countryName(first.country);
   const more = gaps.length > 1 ? ` and ${gaps.length - 1} other ${gaps.length === 2 ? "destination" : "destinations"}` : "";
-  throw new ZoneActionError(`${what} would leave ${place}${more} with no delivery zone.`);
+  throw new StaffActionError(`${what} would leave ${place}${more} with no delivery zone.`);
 }
 
 type ZoneAuditFields = Pick<ZoneStaffRow, "name" | "mode" | "flatRate" | "freeOverAmount" | "codEnabled" | "isActive" | "isFallback">;
@@ -216,15 +198,15 @@ function toRow(input: ZoneInput) {
 
 export async function createZone(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = zoneInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   try {
     const id = await db.transaction(async (tx) => {
       const zones = await lockAllZones(tx);
       const areas = await lockAllAreas(tx);
-      if (input.isFallback && countFallbacks(zones) > 0) throw new ZoneActionError(ONE_FALLBACK_MESSAGE, "isFallback");
-      if (input.isFallback && !input.isActive) throw new ZoneActionError("The rest-of-world zone must be active.", "isActive");
+      if (input.isFallback && countFallbacks(zones) > 0) throw new StaffActionError(ONE_FALLBACK_MESSAGE, "isFallback");
+      if (input.isFallback && !input.isActive) throw new StaffActionError("The rest-of-world zone must be active.", "isActive");
       assertNoAreaConflicts(areas, null, input.areas, zones);
 
       const now = new Date();
@@ -243,7 +225,7 @@ export async function createZone(rawInput: unknown, actor: Actor): Promise<Staff
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof ZoneActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
@@ -252,7 +234,7 @@ export async function createZone(rawInput: unknown, actor: Actor): Promise<Staff
 
 export async function updateZoneById(id: number, rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = zoneInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   try {
@@ -260,11 +242,11 @@ export async function updateZoneById(id: number, rawInput: unknown, actor: Actor
       const zones = await lockAllZones(tx);
       const areas = await lockAllAreas(tx);
       const current = zones.find((zone) => zone.id === id);
-      if (!current) throw new ZoneActionError("Zone not found.");
+      if (!current) throw new StaffActionError("Zone not found.");
       const currentAreas = areas.filter((area) => area.zoneId === id).map(({ countryCode, city }) => ({ countryCode, city }));
-      if (zoneVersion(current, currentAreas) !== input.version) throw new ZoneActionError(STALE_ZONE_MESSAGE);
+      if (zoneVersion(current, currentAreas) !== input.version) throw new StaffActionError(STALE_ZONE_MESSAGE);
       // The fallback flag isn't editable here; the rest-of-world zone must also stay active.
-      if (current.isFallback && !input.isActive) throw new ZoneActionError(FALLBACK_PROTECTED_MESSAGE, "isActive");
+      if (current.isFallback && !input.isActive) throw new StaffActionError(FALLBACK_PROTECTED_MESSAGE, "isActive");
       assertNoAreaConflicts(areas, id, input.areas, zones);
 
       // Deactivating, or moving areas out of, this zone must not strand a checkout destination.
@@ -299,7 +281,7 @@ export async function updateZoneById(id: number, rawInput: unknown, actor: Actor
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof ZoneActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
@@ -312,9 +294,9 @@ export async function setZoneActive(id: number, isActive: boolean, actor: Actor)
       const zones = await lockAllZones(tx);
       const areas = await lockAllAreas(tx);
       const current = zones.find((zone) => zone.id === id);
-      if (!current) throw new ZoneActionError("Zone not found.");
-      if (current.isActive === isActive) throw new ZoneActionError(`This zone is already ${isActive ? "active" : "inactive"}.`);
-      if (current.isFallback && !isActive) throw new ZoneActionError(FALLBACK_PROTECTED_MESSAGE);
+      if (!current) throw new StaffActionError("Zone not found.");
+      if (current.isActive === isActive) throw new StaffActionError(`This zone is already ${isActive ? "active" : "inactive"}.`);
+      if (current.isFallback && !isActive) throw new StaffActionError(FALLBACK_PROTECTED_MESSAGE);
       if (!isActive) {
         assertCoverage({ zones: zones.map(toZoneRow), areas }, { zones: zones.map((zone) => toZoneRow(zone.id === id ? { ...zone, isActive } : zone)), areas }, `Deactivating "${current.name}"`);
       }
@@ -333,7 +315,7 @@ export async function setZoneActive(id: number, isActive: boolean, actor: Actor)
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof ZoneActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
@@ -360,10 +342,10 @@ export async function deleteZoneById(id: number, actor: Actor): Promise<StaffAct
       const zones = await lockAllZones(tx);
       const areas = await lockAllAreas(tx);
       const current = zones.find((zone) => zone.id === id);
-      if (!current) throw new ZoneActionError("Zone not found.");
-      if (current.isFallback) throw new ZoneActionError(FALLBACK_PROTECTED_MESSAGE);
+      if (!current) throw new StaffActionError("Zone not found.");
+      if (current.isFallback) throw new StaffActionError(FALLBACK_PROTECTED_MESSAGE);
       const orderCount = await countOrdersByZoneId(id, tx);
-      if (orderCount > 0) throw new ZoneActionError(orderedMessage(orderCount));
+      if (orderCount > 0) throw new StaffActionError(orderedMessage(orderCount));
       const remaining = zones.filter((zone) => zone.id !== id);
       assertCoverage(
         { zones: zones.map(toZoneRow), areas },
@@ -379,7 +361,7 @@ export async function deleteZoneById(id: number, actor: Actor): Promise<StaffAct
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof ZoneActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
@@ -391,7 +373,7 @@ export async function moveZone(input: { zoneId: number; placement: Placement }, 
   try {
     await db.transaction(async (tx) => {
       const zones = await lockAllZones(tx);
-      if (!zones.some((zone) => zone.id === input.zoneId)) throw new ZoneActionError("Zone not found.");
+      if (!zones.some((zone) => zone.id === input.zoneId)) throw new StaffActionError("Zone not found.");
       const before = zones.map((zone) => zone.id);
       const after = moveId(before, input.zoneId, input.placement);
       if (after.every((id, index) => id === before[index])) return;
@@ -408,7 +390,7 @@ export async function moveZone(input: { zoneId: number; placement: Placement }, 
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof ZoneActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }

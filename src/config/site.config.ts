@@ -5,6 +5,8 @@
  * when a row exists; these are the fallback when a settings row is missing, and the source for
  * values that aren't in `settings` (nav copy, timezone, order numbers, message templates).
  */
+import { KARACHI_TIMEZONE } from "@/lib/karachi-datetime";
+
 export const siteConfig = {
   storeName: "RS Home",
   logoText: "RS Home",
@@ -16,7 +18,7 @@ export const siteConfig = {
   deliveryPendingNote: "Delivery charge: to be confirmed, we will contact you on WhatsApp",
   /** Checkout's optional email field (S21 Phase 2: order-lifecycle emails only go out when this is filled in). */
   checkoutEmailHint: "Add your email to get order updates.",
-  timezone: "Asia/Karachi",
+  timezone: KARACHI_TIMEZONE,
   /** Order numbers are `PREFIX-YYMMDD-XXXX` (ARCHITECTURE.md D14). */
   orderNumberPrefix: "RSH",
   /** The customer-to-shop WhatsApp message on the order page; `{store}` and `{orderNumber}` are filled in. */

@@ -1,5 +1,6 @@
 import "@/lib/zod-config";
 import { z } from "zod";
+import { pageSizeField } from "@/features/shared/pagination";
 
 // The panel's users CRUD (S20, REQUIREMENTS DV-08): one Zod schema per form, shared by the form
 // (field errors as the Developer types) and the Server Action (the only check that matters).
@@ -49,16 +50,10 @@ export const resetPasswordInputSchema = z.object({
 
 const firstQueryValue = (value: unknown) => (Array.isArray(value) ? value[0] : value);
 
-export const USER_PAGE_SIZE_OPTIONS = [25, 50, 75, 100] as const;
-export const USER_DEFAULT_PAGE_SIZE: (typeof USER_PAGE_SIZE_OPTIONS)[number] = 25;
-
 export const userListQuerySchema = z.object({
   q: z.preprocess(firstQueryValue, z.string().trim().max(100).optional()).catch(undefined),
   page: z.preprocess(firstQueryValue, z.coerce.number().int().min(1).max(10_000)).catch(1),
-  pageSize: z
-    .preprocess(firstQueryValue, z.coerce.number().int())
-    .refine((value): value is (typeof USER_PAGE_SIZE_OPTIONS)[number] => (USER_PAGE_SIZE_OPTIONS as readonly number[]).includes(value))
-    .catch(USER_DEFAULT_PAGE_SIZE),
+  pageSize: pageSizeField,
 });
 export type UserListQuery = z.infer<typeof userListQuerySchema>;
 

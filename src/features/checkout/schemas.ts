@@ -58,16 +58,6 @@ export const checkoutInputSchema = z.object({
 
 export type CheckoutInput = z.infer<typeof checkoutInputSchema>;
 
-/** The first message per field, keyed by field name, for the form and the action alike. */
-export function fieldErrorsOf(error: z.ZodError): Record<string, string> {
-  const fieldErrors: Record<string, string> = {};
-  for (const issue of error.issues) {
-    const field = String(issue.path[0] ?? "form");
-    if (!(field in fieldErrors)) fieldErrors[field] = issue.message;
-  }
-  return fieldErrors;
-}
-
 /** Loose enough for any prefix (config/site.config.ts); the DB lookup decides whether it exists. */
 export const orderNumberSchema = z
   .string()

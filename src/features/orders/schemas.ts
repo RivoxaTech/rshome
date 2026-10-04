@@ -1,7 +1,8 @@
 import "@/lib/zod-config";
 import { z } from "zod";
 import { orderNumberSchema } from "@/features/checkout/schemas";
-import { DEFAULT_PAGE_SIZE, ORDER_TABS, PAGE_SIZE_OPTIONS, TAB_INFO } from "./transitions";
+import { ORDER_TABS, TAB_INFO } from "./transitions";
+import { pageSizeField } from "@/features/shared/pagination";
 
 // Next hands repeated query keys over as arrays (?q=a&q=b); only the first counts.
 const firstValue = (value: unknown) => (Array.isArray(value) ? value[0] : value);
@@ -17,10 +18,7 @@ export const orderListQuerySchema = z.object({
     .catch("all" as const),
   q: z.preprocess(firstValue, z.string().trim().max(100).optional()).catch(undefined),
   page: z.preprocess(firstValue, z.coerce.number().int().min(1).max(10_000)).catch(1),
-  pageSize: z
-    .preprocess(firstValue, z.coerce.number().int())
-    .refine((value): value is (typeof PAGE_SIZE_OPTIONS)[number] => (PAGE_SIZE_OPTIONS as readonly number[]).includes(value))
-    .catch(DEFAULT_PAGE_SIZE),
+  pageSize: pageSizeField,
 });
 
 export type OrderListQuery = z.infer<typeof orderListQuerySchema>;

@@ -10,6 +10,7 @@ import type { StaffActionResult, DiscountOverlapResult } from "@/features/discou
 import { DISCOUNT_TARGET_TYPES, DISCOUNT_TYPES, MAX_DISCOUNT_PRODUCTS, type DiscountTargetType, type DiscountType } from "@/features/discounts/schemas";
 import type { CategoryOption, ProductOption } from "@/features/discounts/staff-repo";
 import { discountOverlapAction } from "@/app/panel/(protected)/discounts/actions";
+import { inputClass } from "@/components/panel/FormField";
 
 type DiscountFormValues = {
   id: number | null;
@@ -27,9 +28,6 @@ type DiscountFormValues = {
 
 const TYPE_LABELS: Record<DiscountType, string> = { percent: "Percentage off", fixed: "Fixed amount off (PKR)" };
 const TARGET_LABELS: Record<DiscountTargetType, string> = { all: "Whole store", category: "One category", product: "Chosen products" };
-
-const inputClass =
-  "border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none";
 
 function Field({ id, label, error, hint, children }: { id: string; label: string; error?: string; hint?: string; children: React.ReactNode }) {
   return (

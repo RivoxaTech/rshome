@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { buildListPath } from "@/components/panel/list-path";
-import { PRODUCT_DEFAULT_PAGE_SIZE, PRODUCT_TABS, type ProductTab } from "@/features/catalog/schemas";
+import { PRODUCT_TABS, type ProductTab } from "@/features/catalog/schemas";
 import type { ProductStatusCounts } from "@/features/catalog/products-staff-repo";
+import { DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";
 
 const TAB_LABELS: Record<ProductTab, string> = { all: "All", active: "Active", draft: "Draft", archived: "Archived" };
 
@@ -14,7 +15,7 @@ export function ProductTabs({ currentTab, counts, q, category }: { currentTab: P
         return (
           <Link
             key={tab}
-            href={buildListPath("/panel/products", tab === "all" ? undefined : tab, { q, category }, PRODUCT_DEFAULT_PAGE_SIZE)}
+            href={buildListPath("/panel/products", tab === "all" ? undefined : tab, { q, category }, DEFAULT_PAGE_SIZE)}
             aria-current={active ? "page" : undefined}
             className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${
               active ? "bg-secondary text-foreground font-medium" : "text-muted-foreground hover:bg-secondary hover:text-foreground"

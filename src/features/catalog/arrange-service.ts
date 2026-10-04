@@ -19,6 +19,7 @@ import {
   type ArrangeRow,
 } from "./products-staff-repo";
 import type { StaffActionResult } from "./staff-service";
+import { StaffActionError } from "@/features/shared/staff-result";
 
 export type { StaffActionResult };
 
@@ -45,8 +46,6 @@ export async function getFeaturedArrangeList(): Promise<ArrangeItem[]> {
   return toArrangeItems(await getOrderedFeaturedProductIds(db));
 }
 
-class ArrangeActionError extends Error {}
-
 function sameIdSet(a: number[], b: number[]): boolean {
   if (a.length !== b.length) return false;
   const set = new Set(a);
@@ -68,7 +67,7 @@ export async function saveShopOrder(input: { categoryId?: number; orderedIds: nu
   try {
     await db.transaction(async (tx) => {
       const scoped = await lockOrderedProductIds(tx, input.categoryId);
-      if (!sameIdSet(scoped, input.orderedIds)) throw new ArrangeActionError("This list changed elsewhere. Reload and try again.");
+      if (!sameIdSet(scoped, input.orderedIds)) throw new StaffActionError("This list changed elsewhere. Reload and try again.");
 
       const fullBefore = input.categoryId === undefined ? scoped : await lockOrderedProductIds(tx);
       const fullAfter = input.categoryId === undefined ? input.orderedIds : reorderScope(fullBefore, new Set(scoped), input.orderedIds);
@@ -88,7 +87,7 @@ export async function saveShopOrder(input: { categoryId?: number; orderedIds: nu
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof ArrangeActionError) return { ok: false, error: error.message };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message };
     throw error;
   }
 }
@@ -98,7 +97,7 @@ export async function saveFeaturedOrder(input: { orderedIds: number[] }, actor: 
   try {
     await db.transaction(async (tx) => {
       const existing = await lockOrderedFeaturedProductIds(tx);
-      if (!sameIdSet(existing, input.orderedIds)) throw new ArrangeActionError("This list changed elsewhere. Reload and try again.");
+      if (!sameIdSet(existing, input.orderedIds)) throw new StaffActionError("This list changed elsewhere. Reload and try again.");
 
       const now = new Date();
       const positions = renormalize(input.orderedIds);
@@ -115,7 +114,7 @@ export async function saveFeaturedOrder(input: { orderedIds: number[] }, actor: 
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof ArrangeActionError) return { ok: false, error: error.message };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message };
     throw error;
   }
 }
@@ -134,7 +133,7 @@ export async function moveShopProduct(input: { productId: number; categoryId?: n
 
       if (input.categoryId === undefined) {
         const full = await lockOrderedProductIds(tx);
-        if (!full.includes(input.productId)) throw new ArrangeActionError("That product no longer exists.");
+        if (!full.includes(input.productId)) throw new StaffActionError("That product no longer exists.");
 
         const next = moveId(full, input.productId, input.placement);
         const positions = renormalize(next);
@@ -152,7 +151,7 @@ export async function moveShopProduct(input: { productId: number; categoryId?: n
       }
 
       const scoped = await lockOrderedProductIds(tx, input.categoryId);
-      if (!scoped.includes(input.productId)) throw new ArrangeActionError("That product isn't in this category.");
+      if (!scoped.includes(input.productId)) throw new StaffActionError("That product isn't in this category.");
 
       const full = await lockOrderedProductIds(tx);
       const newScopeOrder = moveId(scoped, input.productId, input.placement);
@@ -171,7 +170,7 @@ export async function moveShopProduct(input: { productId: number; categoryId?: n
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof ArrangeActionError) return { ok: false, error: error.message };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message };
     throw error;
   }
 }
@@ -184,7 +183,7 @@ export async function moveFeaturedProduct(input: { productId: number; placement:
   try {
     await db.transaction(async (tx) => {
       const existing = await lockOrderedFeaturedProductIds(tx);
-      if (!existing.includes(input.productId)) throw new ArrangeActionError("That product isn't an active, featured product.");
+      if (!existing.includes(input.productId)) throw new StaffActionError("That product isn't an active, featured product.");
 
       const now = new Date();
       const next = moveId(existing, input.productId, input.placement);
@@ -202,7 +201,7 @@ export async function moveFeaturedProduct(input: { productId: number; placement:
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof ArrangeActionError) return { ok: false, error: error.message };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message };
     throw error;
   }
 }

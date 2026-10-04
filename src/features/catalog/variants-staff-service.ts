@@ -10,9 +10,7 @@
  * deleted; a product always keeps at least one variant; the last *active* variant of an Active
  * product can't be deactivated or deleted (archive the product instead).
  */
-import type { ZodError } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
 import { db, type DbClient } from "@/server/db/client";
 import { moveId, renormalize, type Placement } from "./ordering";
 import { lockProductById, type ProductRow } from "./products-staff-repo";
@@ -32,27 +30,14 @@ import {
   updateVariantSortOrders,
   type ProductVariantRow,
 } from "./variants-staff-repo";
+import { StaffActionError, invalidInput } from "@/features/shared/staff-result";
 
 export type { StaffActionResult };
 
 type Actor = { id: number };
 
-/** A refusal staff see; anything else thrown is a real failure and rolls the transaction back. */
-class VariantActionError extends Error {
-  constructor(
-    message: string,
-    readonly field?: string,
-  ) {
-    super(message);
-  }
-}
-
-function invalid(error: ZodError): StaffActionResult {
-  return { ok: false, error: error.issues[0]?.message ?? "Please check the form.", fieldErrors: fieldErrorsOf(error) };
-}
-
-function refusal(error: unknown): StaffActionResult {
-  if (error instanceof VariantActionError) return { ok: false, error: error.message, fieldErrors: error.field ? { [error.field]: error.message } : undefined };
+function refused(error: unknown): StaffActionResult {
+  if (error instanceof StaffActionError) return { ok: false, error: error.message, fieldErrors: error.field ? { [error.field]: error.message } : undefined };
   if (isDuplicateEntry(error)) return { ok: false, error: "That SKU is already in use. Choose another.", fieldErrors: { sku: "That SKU is already in use. Choose another." } };
   throw error;
 }
@@ -102,28 +87,28 @@ export async function getPanelVariants(productId: number): Promise<PanelVariant[
 // ── Shared checks (all under the lock) ──────────────────────────────────────────────────────
 
 async function assertSkuAvailable(sku: string, excludeId?: number): Promise<void> {
-  if (await skuInUse(sku, excludeId)) throw new VariantActionError("That SKU is already in use. Choose another.", "sku");
+  if (await skuInUse(sku, excludeId)) throw new StaffActionError("That SKU is already in use. Choose another.", "sku");
 }
 
 function assertAttributesUnique(attributes: Record<string, string>, siblings: ProductVariantRow[], excludeId?: number): void {
   const clash = siblings.find((row) => row.id !== excludeId && sameAttributes(parseVariantAttributes(row.attributes), attributes));
-  if (clash) throw new VariantActionError(`"${clash.label}" already has exactly these attributes. Change one value or edit that variant instead.`, "attributeKey0");
+  if (clash) throw new StaffActionError(`"${clash.label}" already has exactly these attributes. Change one value or edit that variant instead.`, "attributeKey0");
 }
 
 /** The last active variant of an Active product can't go inactive (or away): the product would have nothing to sell. */
 function assertNotLastActive(product: ProductRow, variants: ProductVariantRow[], variantId: number): void {
   if (product.status !== "active") return;
   const otherActive = variants.some((row) => row.id !== variantId && row.isActive);
-  if (!otherActive) throw new VariantActionError(LAST_ACTIVE_VARIANT_MESSAGE);
+  if (!otherActive) throw new StaffActionError(LAST_ACTIVE_VARIANT_MESSAGE);
 }
 
 /** Locks the product, then its variants, and resolves the one being acted on — refusing a stale id instead of silently doing nothing. */
 async function lockVariantContext(tx: DbClient, productId: number, variantId: number): Promise<{ product: ProductRow; variants: ProductVariantRow[]; variant: ProductVariantRow }> {
   const product = await lockProductById(tx, productId);
-  if (!product) throw new VariantActionError("Product not found.");
+  if (!product) throw new StaffActionError("Product not found.");
   const variants = await lockVariantsByProductId(tx, productId);
   const variant = variants.find((row) => row.id === variantId);
-  if (!variant) throw new VariantActionError("That variant no longer exists. Reload and try again.");
+  if (!variant) throw new StaffActionError("That variant no longer exists. Reload and try again.");
   return { product, variants, variant };
 }
 
@@ -149,13 +134,13 @@ function variantAudit(actor: Actor, variantId: number, action: string, oldValues
 
 export async function createVariant(productId: number, rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = variantInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input: VariantInput = parsed.data;
 
   try {
     const id = await db.transaction(async (tx) => {
       const product = await lockProductById(tx, productId);
-      if (!product) throw new VariantActionError("Product not found.");
+      if (!product) throw new StaffActionError("Product not found.");
       const siblings = await lockVariantsByProductId(tx, productId);
       await assertSkuAvailable(input.sku);
       assertAttributesUnique(input.attributes, siblings);
@@ -180,7 +165,7 @@ export async function createVariant(productId: number, rawInput: unknown, actor:
     });
     return { ok: true, id };
   } catch (error) {
-    return refusal(error);
+    return refused(error);
   }
 }
 
@@ -188,12 +173,12 @@ export async function createVariant(productId: number, rawInput: unknown, actor:
 
 export async function updateVariantById(variantId: number, rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = variantInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input: VariantInput = parsed.data;
 
   try {
     const productId = await getVariantProductId(variantId);
-    if (productId === undefined) throw new VariantActionError("That variant no longer exists. Reload and try again.");
+    if (productId === undefined) throw new StaffActionError("That variant no longer exists. Reload and try again.");
 
     await db.transaction(async (tx) => {
       const { product, variants, variant } = await lockVariantContext(tx, productId, variantId);
@@ -228,7 +213,7 @@ export async function updateVariantById(variantId: number, rawInput: unknown, ac
     });
     return { ok: true, id: variantId };
   } catch (error) {
-    return refusal(error);
+    return refused(error);
   }
 }
 
@@ -237,7 +222,7 @@ export async function updateVariantById(variantId: number, rawInput: unknown, ac
 export async function setVariantStock(variantId: number, stock: number, actor: Actor): Promise<StaffActionResult> {
   try {
     const productId = await getVariantProductId(variantId);
-    if (productId === undefined) throw new VariantActionError("That variant no longer exists. Reload and try again.");
+    if (productId === undefined) throw new StaffActionError("That variant no longer exists. Reload and try again.");
 
     await db.transaction(async (tx) => {
       const { variant } = await lockVariantContext(tx, productId, variantId);
@@ -248,18 +233,18 @@ export async function setVariantStock(variantId: number, stock: number, actor: A
     });
     return { ok: true, id: variantId };
   } catch (error) {
-    return refusal(error);
+    return refused(error);
   }
 }
 
 export async function setVariantActive(variantId: number, isActive: boolean, actor: Actor): Promise<StaffActionResult> {
   try {
     const productId = await getVariantProductId(variantId);
-    if (productId === undefined) throw new VariantActionError("That variant no longer exists. Reload and try again.");
+    if (productId === undefined) throw new StaffActionError("That variant no longer exists. Reload and try again.");
 
     await db.transaction(async (tx) => {
       const { product, variants, variant } = await lockVariantContext(tx, productId, variantId);
-      if (variant.isActive === isActive) throw new VariantActionError(`This variant is already ${isActive ? "active" : "inactive"}.`);
+      if (variant.isActive === isActive) throw new StaffActionError(`This variant is already ${isActive ? "active" : "inactive"}.`);
       if (!isActive) assertNotLastActive(product, variants, variantId);
 
       const now = new Date();
@@ -268,7 +253,7 @@ export async function setVariantActive(variantId: number, isActive: boolean, act
     });
     return { ok: true, id: variantId };
   } catch (error) {
-    return refusal(error);
+    return refused(error);
   }
 }
 
@@ -277,13 +262,13 @@ export async function setVariantActive(variantId: number, isActive: boolean, act
 export async function deleteVariantById(variantId: number, actor: Actor): Promise<StaffActionResult> {
   try {
     const productId = await getVariantProductId(variantId);
-    if (productId === undefined) throw new VariantActionError("That variant no longer exists. Reload and try again.");
+    if (productId === undefined) throw new StaffActionError("That variant no longer exists. Reload and try again.");
 
     await db.transaction(async (tx) => {
       const { product, variants, variant } = await lockVariantContext(tx, productId, variantId);
       const orderCounts = await countOrderItemsByVariantIds(tx, [variantId]);
-      if ((orderCounts.get(variantId) ?? 0) > 0) throw new VariantActionError(ORDERED_VARIANT_MESSAGE);
-      if (variants.length === 1) throw new VariantActionError(LAST_VARIANT_MESSAGE);
+      if ((orderCounts.get(variantId) ?? 0) > 0) throw new StaffActionError(ORDERED_VARIANT_MESSAGE);
+      if (variants.length === 1) throw new StaffActionError(LAST_VARIANT_MESSAGE);
       if (variant.isActive) assertNotLastActive(product, variants, variantId);
 
       const now = new Date();
@@ -295,7 +280,7 @@ export async function deleteVariantById(variantId: number, actor: Actor): Promis
     });
     return { ok: true };
   } catch (error) {
-    return refusal(error);
+    return refused(error);
   }
 }
 
@@ -326,14 +311,14 @@ export async function saveVariantOrder(input: { productId: number; orderedIds: n
   try {
     await db.transaction(async (tx) => {
       const product = await lockProductById(tx, input.productId);
-      if (!product) throw new VariantActionError("Product not found.");
+      if (!product) throw new StaffActionError("Product not found.");
       const existing = (await lockVariantsByProductId(tx, input.productId)).map((row) => row.id);
-      if (!sameIdSet(existing, input.orderedIds)) throw new VariantActionError("This list changed elsewhere. Reload and try again.");
+      if (!sameIdSet(existing, input.orderedIds)) throw new StaffActionError("This list changed elsewhere. Reload and try again.");
       await writeVariantOrder(tx, input.productId, existing, input.orderedIds, actor);
     });
     return { ok: true };
   } catch (error) {
-    return refusal(error);
+    return refused(error);
   }
 }
 
@@ -341,7 +326,7 @@ export async function saveVariantOrder(input: { productId: number; orderedIds: n
 export async function moveVariant(input: { variantId: number; placement: Placement }, actor: Actor): Promise<StaffActionResult> {
   try {
     const productId = await getVariantProductId(input.variantId);
-    if (productId === undefined) throw new VariantActionError("That variant no longer exists. Reload and try again.");
+    if (productId === undefined) throw new StaffActionError("That variant no longer exists. Reload and try again.");
 
     await db.transaction(async (tx) => {
       const { variants } = await lockVariantContext(tx, productId, input.variantId);
@@ -350,6 +335,6 @@ export async function moveVariant(input: { variantId: number; placement: Placeme
     });
     return { ok: true };
   } catch (error) {
-    return refusal(error);
+    return refused(error);
   }
 }

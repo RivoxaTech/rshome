@@ -1,5 +1,5 @@
 import { features } from "@/config/features";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
+import { fieldErrorsOf } from "@/lib/field-errors";
 import { consumeRateLimit } from "@/server/rate-limit";
 import { createInquiry } from "./repo";
 import { wholesaleInquiryInputSchema } from "./schemas";

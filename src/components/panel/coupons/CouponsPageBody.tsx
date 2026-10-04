@@ -10,14 +10,15 @@ import { CouponTabs } from "@/components/panel/coupons/CouponTabs";
 import { CouponsTable } from "@/components/panel/coupons/CouponsTable";
 import { CouponsTableSkeleton } from "@/components/panel/coupons/CouponsTableSkeleton";
 import { PERMISSIONS } from "@/features/auth/permissions";
-import { COUPON_DEFAULT_PAGE_SIZE, COUPON_PAGE_SIZE_OPTIONS, couponListQuerySchema, type CouponListQuery } from "@/features/coupons/schemas";
+import { couponListQuerySchema, type CouponListQuery } from "@/features/coupons/schemas";
 import { listStaffCoupons } from "@/features/coupons/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
+import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";
 
 const BASE_PATH = "/panel/coupons";
 
 function couponsPath(query: { tab?: string; q?: string; page?: number; pageSize?: number }): string {
-  return buildListPath(BASE_PATH, query.tab === "all" ? undefined : query.tab, query, COUPON_DEFAULT_PAGE_SIZE);
+  return buildListPath(BASE_PATH, query.tab === "all" ? undefined : query.tab, query, DEFAULT_PAGE_SIZE);
 }
 
 /** The tabs, table and pagination in one Suspense boundary (the counts come from the same in-memory status pass as the rows). */
@@ -38,7 +39,7 @@ async function CouponsListSection({ query, backHref }: { query: CouponListQuery;
         pageCount={pageCount}
         total={total}
         pageSize={pageSize}
-        defaultPageSize={COUPON_DEFAULT_PAGE_SIZE}
+        defaultPageSize={DEFAULT_PAGE_SIZE}
       />
     </>
   );
@@ -60,7 +61,7 @@ export async function CouponsPageBody({ searchParams }: { searchParams: Record<s
               basePath={BASE_PATH}
               tabSlug={query.tab === "all" ? undefined : query.tab}
               pageSize={query.pageSize}
-              defaultPageSize={COUPON_DEFAULT_PAGE_SIZE}
+              defaultPageSize={DEFAULT_PAGE_SIZE}
               placeholder="Search by code"
               ariaLabel="Search coupons by code"
             />
@@ -71,8 +72,8 @@ export async function CouponsPageBody({ searchParams }: { searchParams: Record<s
               tabSlug={query.tab === "all" ? undefined : query.tab}
               q={query.q}
               pageSize={query.pageSize}
-              options={COUPON_PAGE_SIZE_OPTIONS}
-              defaultPageSize={COUPON_DEFAULT_PAGE_SIZE}
+              options={PAGE_SIZE_OPTIONS}
+              defaultPageSize={DEFAULT_PAGE_SIZE}
             />
             <Link
               href={`/panel/coupons/new?back=${encodeURIComponent(backHref)}`}

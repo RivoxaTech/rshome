@@ -3,11 +3,10 @@
  * audit row. Column formatting only — the BOM/CRLF/quoting/formula-injection rules live once in
  * `features/csv/writer.ts`.
  */
-import { siteConfig } from "@/config/site.config";
 import { insertAuditLog } from "@/features/audit/repo";
 import { buildCsv } from "@/features/csv/writer";
 import { karachiDayIndex, karachiMidnightUtc, parseKarachiDateString } from "@/features/dashboard/ranges";
-import { KARACHI_OFFSET_MS } from "@/lib/karachi-datetime";
+import { KARACHI_OFFSET_MS, karachiFormatter } from "@/lib/karachi-datetime";
 import { formatPhone } from "@/lib/phone";
 import { db } from "@/server/db/client";
 import { listOrdersForExport, type OrderExportRow } from "./staff-repo";
@@ -35,7 +34,7 @@ export const ORDER_EXPORT_HEADERS = [
   "Coupon code",
 ];
 
-const dateTime = new Intl.DateTimeFormat("en-GB", { timeZone: siteConfig.timezone, day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const dateTime = karachiFormatter({ day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export function orderExportRowValues(row: OrderExportRow): string[] {
   return [

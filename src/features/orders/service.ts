@@ -1,5 +1,4 @@
 import { features } from "@/config/features";
-import { siteConfig } from "@/config/site.config";
 import { trackInputSchema } from "@/features/checkout/schemas";
 import { getProofSummaries } from "@/features/payments/repo";
 import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
@@ -18,6 +17,7 @@ import {
   type ProofPurpose,
   type TimelineStep,
 } from "./status";
+import { karachiFormatter } from "@/lib/karachi-datetime";
 
 const TRACK_RATE_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 };
 const TRACK_NOT_FOUND = "We couldn't find an order with that order number and phone number.";
@@ -39,14 +39,7 @@ export async function trackOrder(rawInput: unknown, ctx: { ip: string }): Promis
   return orderNumber ? { ok: true, orderNumber } : { ok: false, error: TRACK_NOT_FOUND };
 }
 
-const placedAtFormat = new Intl.DateTimeFormat("en-GB", {
-  timeZone: siteConfig.timezone,
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
+const placedAtFormat = karachiFormatter({ day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
 /** The order page's data, every amount already formatted (CLAUDE.md #5). */
 export type CustomerOrderView = {

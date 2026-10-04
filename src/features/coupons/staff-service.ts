@@ -4,10 +4,8 @@
  * values (CLAUDE.md #10), mirroring `features/discounts/staff-service.ts`. Usage is always the
  * live `coupon_usages` count; the status pill is the pricing module's own `resolveCoupon` verdict.
  */
-import type { ZodError } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
 import type { StaffActionResult } from "@/features/catalog/staff-service";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
 import { dateWindowRefusal, type WriteOptions } from "@/features/discounts/staff-service";
 import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
 import type { PricingCoupon } from "@/features/pricing/pricing";
@@ -30,31 +28,15 @@ import {
 } from "./staff-repo";
 import { couponStatus, couponValueText, usageText, type CouponStatus } from "./status";
 import { isDuplicateEntry } from "@/server/db/errors";
+import { pageCountOf } from "@/features/shared/pagination";
+import { StaffActionError, invalidInput, refusal } from "@/features/shared/staff-result";
 
 export type { StaffActionResult, WriteOptions };
 
 type Actor = { id: number };
 
-/** A refusal staff see; anything else thrown is a real failure and rolls the transaction back. */
-class CouponActionError extends Error {
-  constructor(
-    message: string,
-    readonly field?: string,
-  ) {
-    super(message);
-  }
-}
-
 const CODE_IN_USE = "That code is already in use. Choose another.";
 const RECENT_USAGES_SHOWN = 10;
-
-function invalid(error: ZodError): StaffActionResult {
-  return { ok: false, error: error.issues[0]?.message ?? "Please check the form.", fieldErrors: fieldErrorsOf(error) };
-}
-
-function refused(error: CouponActionError): StaffActionResult {
-  return error.field ? { ok: false, error: error.message, fieldErrors: { [error.field]: error.message } } : { ok: false, error: error.message };
-}
 
 /** The pricing module's shape for a stored row, with the live usage count in place of `used_count`. */
 function toPricingCoupon(row: CouponRow, usageCount: number): PricingCoupon {
@@ -114,7 +96,7 @@ export async function listStaffCoupons(query: {
 
   const filtered = query.tab === "all" ? withStatus : withStatus.filter((entry) => entry.status === query.tab);
   const total = filtered.length;
-  const pageCount = Math.max(1, Math.ceil(total / query.pageSize));
+  const pageCount = pageCountOf(total, query.pageSize);
   const offset = (query.page - 1) * query.pageSize;
 
   const items = filtered.slice(offset, offset + query.pageSize).map((entry, index) => ({
@@ -167,7 +149,7 @@ export async function getCouponForEdit(id: number, viewer: { canViewOrders: bool
 // ── Shared validation and audit ─────────────────────────────────────────────────────────────────
 
 async function assertCodeAvailable(code: string, excludeId?: number): Promise<void> {
-  if (await codeInUse(code, excludeId)) throw new CouponActionError(CODE_IN_USE, "code");
+  if (await codeInUse(code, excludeId)) throw new StaffActionError(CODE_IN_USE, "code");
 }
 
 type CouponAuditFields = Pick<CouponRow, "code" | "type" | "value" | "minOrder" | "maxDiscount" | "usageLimit" | "perCustomerLimit" | "startsAt" | "endsAt" | "isActive">;
@@ -206,7 +188,7 @@ function toRow(input: CouponInput) {
 
 export async function createCoupon(rawInput: unknown, actor: Actor, options: WriteOptions = {}): Promise<StaffActionResult> {
   const parsed = couponInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
   const dateRefusal = dateWindowRefusal(input, null, options);
   if (dateRefusal) return dateRefusal;
@@ -221,7 +203,7 @@ export async function createCoupon(rawInput: unknown, actor: Actor, options: Wri
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof CouponActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     // The unique index is the backstop for two creates racing past `assertCodeAvailable`.
     if (isDuplicateEntry(error)) return { ok: false, error: CODE_IN_USE, fieldErrors: { code: CODE_IN_USE } };
     throw error;
@@ -232,23 +214,23 @@ export async function createCoupon(rawInput: unknown, actor: Actor, options: Wri
 
 export async function updateCouponById(id: number, rawInput: unknown, actor: Actor, options: WriteOptions = {}): Promise<StaffActionResult> {
   const parsed = couponInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   try {
     await db.transaction(async (tx) => {
       const current = await lockCouponById(tx, id);
-      if (!current) throw new CouponActionError("Coupon not found.");
+      if (!current) throw new StaffActionError("Coupon not found.");
       // Only a bound the Developer changed (vs the locked row) is checked, so a running coupon's past start never blocks a save.
       const dateRefusal = dateWindowRefusal(input, current, options);
-      if (dateRefusal && !dateRefusal.ok) throw new CouponActionError(dateRefusal.error, Object.keys(dateRefusal.fieldErrors ?? {})[0]);
+      if (dateRefusal && !dateRefusal.ok) throw new StaffActionError(dateRefusal.error, Object.keys(dateRefusal.fieldErrors ?? {})[0]);
       await assertCodeAvailable(input.code, id);
 
       // Lowering the total limit below what's already been used would strand a coupon in "used up"
       // with no way back but raising it again — refused outright, with the live count in the message.
       const usageCount = await countUsagesByCouponId(id, tx);
       if (input.usageLimit !== null && input.usageLimit < usageCount) {
-        throw new CouponActionError(`This coupon has already been used ${usageCount} ${usageCount === 1 ? "time" : "times"}; the limit can't go below that.`, "usageLimit");
+        throw new StaffActionError(`This coupon has already been used ${usageCount} ${usageCount === 1 ? "time" : "times"}; the limit can't go below that.`, "usageLimit");
       }
 
       // A type/value change on a used coupon is allowed: past orders keep their own snapshots
@@ -270,7 +252,7 @@ export async function updateCouponById(id: number, rawInput: unknown, actor: Act
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof CouponActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     if (isDuplicateEntry(error)) return { ok: false, error: CODE_IN_USE, fieldErrors: { code: CODE_IN_USE } };
     throw error;
   }
@@ -282,8 +264,8 @@ export async function setCouponActive(id: number, isActive: boolean, actor: Acto
   try {
     await db.transaction(async (tx) => {
       const current = await lockCouponById(tx, id);
-      if (!current) throw new CouponActionError("Coupon not found.");
-      if (current.isActive === isActive) throw new CouponActionError(`This coupon is already ${isActive ? "active" : "inactive"}.`);
+      if (!current) throw new StaffActionError("Coupon not found.");
+      if (current.isActive === isActive) throw new StaffActionError(`This coupon is already ${isActive ? "active" : "inactive"}.`);
 
       const now = new Date();
       await updateCoupon(tx, id, { isActive, updatedAt: now });
@@ -299,7 +281,7 @@ export async function setCouponActive(id: number, isActive: boolean, actor: Acto
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof CouponActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
@@ -324,10 +306,10 @@ export async function deleteCouponById(id: number, actor: Actor): Promise<StaffA
   try {
     await db.transaction(async (tx) => {
       const current = await lockCouponById(tx, id);
-      if (!current) throw new CouponActionError("Coupon not found.");
+      if (!current) throw new StaffActionError("Coupon not found.");
 
       const [usageCount, orderCount] = await Promise.all([countUsagesByCouponId(id, tx), countOrdersByCouponId(id, tx)]);
-      if (usageCount > 0 || orderCount > 0) throw new CouponActionError(usedMessage(usageCount, orderCount));
+      if (usageCount > 0 || orderCount > 0) throw new StaffActionError(usedMessage(usageCount, orderCount));
 
       const now = new Date();
       await deleteCoupon(tx, id);
@@ -335,7 +317,7 @@ export async function deleteCouponById(id: number, actor: Actor): Promise<StaffA
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof CouponActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }

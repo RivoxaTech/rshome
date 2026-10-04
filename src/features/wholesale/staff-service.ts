@@ -8,7 +8,7 @@ import { siteConfig } from "@/config/site.config";
 import { insertAuditLog } from "@/features/audit/repo";
 import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 import { getStoreIdentity } from "@/features/settings/service";
-import { KARACHI_OFFSET_MS } from "@/lib/karachi-datetime";
+import { KARACHI_OFFSET_MS, karachiFormatter } from "@/lib/karachi-datetime";
 import { formatPhone } from "@/lib/phone";
 import { db } from "@/server/db/client";
 import { buildWholesaleCsv, type WholesaleCsvRow } from "./csv";
@@ -23,11 +23,11 @@ import {
   listNotes,
   listStatusHistory,
 } from "./staff-repo";
-import { DEFAULT_PAGE_SIZE, STATUS_LABELS, WHOLESALE_STATUSES, canChangeStatus, type WholesaleStatus } from "./transitions";
+import { STATUS_LABELS, WHOLESALE_STATUSES, canChangeStatus, type WholesaleStatus } from "./transitions";
+import { DEFAULT_PAGE_SIZE, pageCountOf } from "@/features/shared/pagination";
 
-const zoned = (options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", { timeZone: siteConfig.timezone, ...options });
-const dateTime = zoned({ day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-const dateOnly = zoned({ day: "numeric", month: "short", year: "numeric" });
+const dateTime = karachiFormatter({ day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const dateOnly = karachiFormatter({ day: "numeric", month: "short", year: "numeric" });
 
 function businessTypeLabel(value: string): string {
   return siteConfig.wholesaleBusinessTypes.find((option) => option.value === value)?.label ?? value;
@@ -86,7 +86,7 @@ export async function listStaffWholesaleInquiries(
     itemCount: itemCounts.get(row.id) ?? 0,
     control: inquiryControl(row.status, permissions),
   }));
-  return { items, total, page: query.page, pageSize, pageCount: Math.max(1, Math.ceil(total / pageSize)) };
+  return { items, total, page: query.page, pageSize, pageCount: pageCountOf(total, pageSize) };
 }
 
 export type StaffWholesaleListItem = Awaited<ReturnType<typeof listStaffWholesaleInquiries>>["items"][number];

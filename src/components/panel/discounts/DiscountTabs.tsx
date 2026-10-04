@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { buildListPath } from "@/components/panel/list-path";
-import { DISCOUNT_DEFAULT_PAGE_SIZE, DISCOUNT_TABS, type DiscountTab } from "@/features/discounts/schemas";
+import { DISCOUNT_TABS, type DiscountTab } from "@/features/discounts/schemas";
 import type { DiscountTabCounts } from "@/features/discounts/staff-service";
 import { DISCOUNT_TAB_LABELS } from "@/features/discounts/status";
+import { DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";
 
 /** All / Active now / Scheduled / Expired / Inactive, one count each (mirrors `ProductTabs`). */
 export function DiscountTabs({ currentTab, counts, q }: { currentTab: DiscountTab; counts: DiscountTabCounts; q?: string }) {
@@ -13,7 +14,7 @@ export function DiscountTabs({ currentTab, counts, q }: { currentTab: DiscountTa
         return (
           <Link
             key={tab}
-            href={buildListPath("/panel/discounts", tab === "all" ? undefined : tab, { q }, DISCOUNT_DEFAULT_PAGE_SIZE)}
+            href={buildListPath("/panel/discounts", tab === "all" ? undefined : tab, { q }, DEFAULT_PAGE_SIZE)}
             aria-current={active ? "page" : undefined}
             className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${
               active ? "bg-secondary text-foreground font-medium" : "text-muted-foreground hover:bg-secondary hover:text-foreground"

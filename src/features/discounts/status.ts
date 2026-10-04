@@ -6,6 +6,7 @@
 import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
 import { isDiscountActive, type PricingDiscount } from "@/features/pricing/pricing";
 import type { DiscountTab, DiscountTargetType, DiscountType } from "./schemas";
+import { PILL_COLORS } from "@/lib/pill-colors";
 
 export type DiscountStatus = Exclude<DiscountTab, "all">;
 
@@ -31,10 +32,10 @@ export const DISCOUNT_TAB_LABELS: Record<DiscountTab, string> = { all: "All", ..
 
 /** One colour per status, readable in light and dark: dot, pill background and pill text. */
 export const DISCOUNT_STATUS_COLORS: Record<DiscountStatus, { dot: string; bg: string; text: string }> = {
-  active: { dot: "bg-emerald-500", bg: "bg-emerald-500/15", text: "text-emerald-700 dark:text-emerald-400" },
-  scheduled: { dot: "bg-blue-500", bg: "bg-blue-500/15", text: "text-blue-700 dark:text-blue-400" },
-  expired: { dot: "bg-amber-500", bg: "bg-amber-500/15", text: "text-amber-700 dark:text-amber-400" },
-  inactive: { dot: "bg-muted-foreground/60", bg: "bg-muted", text: "text-muted-foreground" },
+  active: PILL_COLORS.emerald,
+  scheduled: PILL_COLORS.blue,
+  expired: PILL_COLORS.amber,
+  inactive: PILL_COLORS.muted,
 };
 
 /** "10%" for a percentage, "PKR 500 off" for a fixed amount (both from the DECIMAL string). */

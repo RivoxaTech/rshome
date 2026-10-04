@@ -1,14 +1,12 @@
 import "@/lib/zod-config";
 import { z } from "zod";
 import { AUDIT_ACTIONS, AUDIT_ENTITIES } from "./actions";
+import { pageSizeField } from "@/features/shared/pagination";
 
 // The audit viewer's URL query (S20): every filter is optional and a bad value falls back to
 // "no filter" rather than a 400, since these only ever come from the page's own links.
 
 const firstQueryValue = (value: unknown) => (Array.isArray(value) ? value[0] : value);
-
-export const AUDIT_PAGE_SIZE_OPTIONS = [25, 50, 75, 100] as const;
-export const AUDIT_DEFAULT_PAGE_SIZE: (typeof AUDIT_PAGE_SIZE_OPTIONS)[number] = 25;
 
 const actionKeys = AUDIT_ACTIONS.map((action) => action.key);
 const entityKeys = AUDIT_ENTITIES.map((entity) => entity.key);
@@ -25,10 +23,7 @@ export const auditListQuerySchema = z.object({
   from: dateField,
   to: dateField,
   page: z.preprocess(firstQueryValue, z.coerce.number().int().min(1).max(10_000)).catch(1),
-  pageSize: z
-    .preprocess(firstQueryValue, z.coerce.number().int())
-    .refine((value): value is (typeof AUDIT_PAGE_SIZE_OPTIONS)[number] => (AUDIT_PAGE_SIZE_OPTIONS as readonly number[]).includes(value))
-    .catch(AUDIT_DEFAULT_PAGE_SIZE),
+  pageSize: pageSizeField,
 });
 export type AuditListQuery = z.infer<typeof auditListQuerySchema>;
 

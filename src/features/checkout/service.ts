@@ -25,8 +25,9 @@ import {
   type CheckoutProductRow,
   type LockedVariantRow,
 } from "./repo";
-import { checkoutInputSchema, fieldErrorsOf, type CheckoutInput } from "./schemas";
+import { checkoutInputSchema, type CheckoutInput } from "./schemas";
 import { isDuplicateEntry, mysqlErrorOf } from "@/server/db/errors";
+import { fieldErrorsOf } from "@/lib/field-errors";
 
 const CHECKOUT_RATE_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 };
 const ORDER_NUMBER_ATTEMPTS = 5;

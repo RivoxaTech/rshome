@@ -10,14 +10,15 @@ import { DiscountTabs } from "@/components/panel/discounts/DiscountTabs";
 import { DiscountsTable } from "@/components/panel/discounts/DiscountsTable";
 import { DiscountsTableSkeleton } from "@/components/panel/discounts/DiscountsTableSkeleton";
 import { PERMISSIONS } from "@/features/auth/permissions";
-import { DISCOUNT_DEFAULT_PAGE_SIZE, DISCOUNT_PAGE_SIZE_OPTIONS, discountListQuerySchema, type DiscountListQuery } from "@/features/discounts/schemas";
+import { discountListQuerySchema, type DiscountListQuery } from "@/features/discounts/schemas";
 import { listStaffDiscounts } from "@/features/discounts/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
+import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";
 
 const BASE_PATH = "/panel/discounts";
 
 function discountsPath(query: { tab?: string; q?: string; page?: number; pageSize?: number }): string {
-  return buildListPath(BASE_PATH, query.tab === "all" ? undefined : query.tab, query, DISCOUNT_DEFAULT_PAGE_SIZE);
+  return buildListPath(BASE_PATH, query.tab === "all" ? undefined : query.tab, query, DEFAULT_PAGE_SIZE);
 }
 
 /**
@@ -42,7 +43,7 @@ async function DiscountsListSection({ query, backHref }: { query: DiscountListQu
         pageCount={pageCount}
         total={total}
         pageSize={pageSize}
-        defaultPageSize={DISCOUNT_DEFAULT_PAGE_SIZE}
+        defaultPageSize={DEFAULT_PAGE_SIZE}
       />
     </>
   );
@@ -64,7 +65,7 @@ export async function DiscountsPageBody({ searchParams }: { searchParams: Record
               basePath={BASE_PATH}
               tabSlug={query.tab === "all" ? undefined : query.tab}
               pageSize={query.pageSize}
-              defaultPageSize={DISCOUNT_DEFAULT_PAGE_SIZE}
+              defaultPageSize={DEFAULT_PAGE_SIZE}
               placeholder="Search discounts"
               ariaLabel="Search discounts"
             />
@@ -75,8 +76,8 @@ export async function DiscountsPageBody({ searchParams }: { searchParams: Record
               tabSlug={query.tab === "all" ? undefined : query.tab}
               q={query.q}
               pageSize={query.pageSize}
-              options={DISCOUNT_PAGE_SIZE_OPTIONS}
-              defaultPageSize={DISCOUNT_DEFAULT_PAGE_SIZE}
+              options={PAGE_SIZE_OPTIONS}
+              defaultPageSize={DEFAULT_PAGE_SIZE}
             />
             <Link
               href={`/panel/discounts/new?back=${encodeURIComponent(backHref)}`}

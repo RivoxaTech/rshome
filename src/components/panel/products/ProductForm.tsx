@@ -6,10 +6,11 @@ import { generateSlug } from "@/features/catalog/slug";
 import { PLACEMENT_CREATE, PLACEMENT_EDIT, PRODUCT_STATUSES, type PlacementCreate, type PlacementEdit, type ProductStatus } from "@/features/catalog/schemas";
 import type { CategoryGroup } from "@/features/catalog/products-staff-repo";
 import type { StaffActionResult } from "@/features/catalog/staff-service";
-import { decimalToPaisa, percentPriceChange } from "@/features/pricing/money";
+import { decimalToPaisa, formatMoney, percentPriceChange } from "@/features/pricing/money";
 import { Listbox, type ListboxItem } from "@/components/panel/Listbox";
 import { MediaImageField } from "@/components/panel/MediaImageField";
 import { Switch } from "@/components/panel/Switch";
+import { inputClass } from "@/components/panel/FormField";
 
 type ProductFormValues = {
   id: number | null;
@@ -43,9 +44,6 @@ function Field({ id, label, error, children }: { id: string; label: string; erro
     </div>
   );
 }
-
-const inputClass =
-  "border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none";
 
 /** The product's current position in the relevant order; `current` is null on create, and on edit while not yet featured. */
 type PlacementPosition = { current: number | null; total: number };
@@ -278,8 +276,8 @@ export function ProductForm({
           <div className="border-amber-500/40 bg-amber-500/10 flex flex-col gap-2 rounded-md border p-3 text-sm">
             <p>
               That&apos;s a {Math.abs(priceConfirm.percent).toFixed(0)}% {priceConfirm.percent > 0 ? "increase" : "decrease"} — from{" "}
-              <span className="font-medium">{(priceConfirm.oldPaisa / 100).toLocaleString("en-PK")}</span> to{" "}
-              <span className="font-medium">{(priceConfirm.newPaisa / 100).toLocaleString("en-PK")}</span> PKR. Is that right?
+              <span className="font-medium">{formatMoney(priceConfirm.oldPaisa)}</span> to{" "}
+              <span className="font-medium">{formatMoney(priceConfirm.newPaisa)}</span>. Is that right?
             </p>
             <div className="flex gap-2">
               <button type="button" onClick={confirmPriceChange} className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-xs font-medium">

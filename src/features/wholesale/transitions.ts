@@ -4,6 +4,9 @@
  * so any status may move to any other one — there's no correctness reason to forbid reopening a
  * closed lead or jumping straight from New to Closed.
  */
+import { PILL_COLORS } from "@/lib/pill-colors";
+import { DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";
+
 export const WHOLESALE_STATUSES = ["new", "contacted", "closed"] as const;
 export type WholesaleStatus = (typeof WHOLESALE_STATUSES)[number];
 
@@ -15,14 +18,10 @@ export const STATUS_LABELS: Record<WholesaleStatus, string> = {
 
 /** One colour per status, readable in light and dark: dot, pill background and pill text. */
 export const STATUS_COLORS: Record<WholesaleStatus, { dot: string; bg: string; text: string }> = {
-  new: { dot: "bg-blue-500", bg: "bg-blue-500/15", text: "text-blue-700 dark:text-blue-400" },
-  contacted: { dot: "bg-amber-500", bg: "bg-amber-500/15", text: "text-amber-700 dark:text-amber-400" },
-  closed: { dot: "bg-gray-400", bg: "bg-gray-400/15", text: "text-gray-600 dark:text-gray-400" },
+  new: PILL_COLORS.blue,
+  contacted: PILL_COLORS.amber,
+  closed: PILL_COLORS.gray,
 };
-
-/** Rows per page, chosen by the viewer; carried in the URL like the tab and search. */
-export const PAGE_SIZE_OPTIONS = [25, 50, 75, 100] as const;
-export const DEFAULT_PAGE_SIZE: (typeof PAGE_SIZE_OPTIONS)[number] = 25;
 
 export function canChangeStatus(from: WholesaleStatus, to: WholesaleStatus): boolean {
   return from !== to;

@@ -7,6 +7,7 @@ import type { ParentOption, StaffActionResult } from "@/features/catalog/staff-s
 import { Listbox } from "@/components/panel/Listbox";
 import { MediaImageField } from "@/components/panel/MediaImageField";
 import { Switch } from "@/components/panel/Switch";
+import { inputClass } from "@/components/panel/FormField";
 
 type CategoryFormValues = {
   id: number | null;
@@ -40,9 +41,6 @@ function Field({
     </div>
   );
 }
-
-const inputClass =
-  "border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none";
 
 export function CategoryForm({
   mode,

@@ -5,9 +5,7 @@
  * level of nesting only: a category with a parent can't itself be a parent, and a category with
  * children can't be given one (owner decision, S10 follow-up).
  */
-import type { z } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
 import { deleteMediaImage } from "@/server/storage/images";
 import { db, type DbClient } from "@/server/db/client";
 import { categoryInputSchema, type CategoryInput } from "./schemas";
@@ -26,17 +24,13 @@ import {
   updateCategory,
   type CategoryRow,
 } from "./staff-repo";
+import { pageCountOf } from "@/features/shared/pagination";
+import { StaffActionError, invalidInput } from "@/features/shared/staff-result";
+import type { StaffResult } from "@/features/shared/staff-result";
 
-export type StaffActionResult = { ok: true; id?: number } | { ok: false; error: string; fieldErrors?: Record<string, string> };
+export type StaffActionResult = StaffResult<{ id?: number }>;
 
 type Actor = { id: number };
-
-/** A refusal staff see; anything else thrown is a real failure and rolls the transaction back. */
-class CategoryActionError extends Error {}
-
-function invalid(error: z.ZodError): StaffActionResult {
-  return { ok: false, error: error.issues[0]?.message ?? "Please check the form.", fieldErrors: fieldErrorsOf(error) };
-}
 
 // ── The list ────────────────────────────────────────────────────────────────────────────────
 
@@ -77,7 +71,7 @@ export async function listStaffCategories(query: {
     isActive: row.isActive,
   }));
 
-  return { items, total, page: query.page, pageSize: query.pageSize, pageCount: Math.max(1, Math.ceil(total / query.pageSize)) };
+  return { items, total, page: query.page, pageSize: query.pageSize, pageCount: pageCountOf(total, query.pageSize) };
 }
 
 /** Every category in sort order, as the products list's filter and the arrange page offer them. */
@@ -117,30 +111,30 @@ export async function getCategoryFormDataForCreate(): Promise<{ parentOptions: P
 // ── Shared validation ───────────────────────────────────────────────────────────────────────
 
 /**
- * Parent-related rules that no single column constraint can express. Throws `CategoryActionError`
+ * Parent-related rules that no single column constraint can express. Throws `StaffActionError`
  * (caught by the caller, inside the transaction) on the first violation.
  */
 async function assertParentRules(tx: DbClient, input: CategoryInput, options: { selfId?: number; hasChildren: boolean }): Promise<void> {
   if (input.parentId === null) return;
 
   if (options.selfId !== undefined && input.parentId === options.selfId) {
-    throw new CategoryActionError("A category can't be its own parent.");
+    throw new StaffActionError("A category can't be its own parent.");
   }
   if (options.hasChildren) {
-    throw new CategoryActionError("This category has sub-categories, so it can't be given a parent. Move or delete them first.");
+    throw new StaffActionError("This category has sub-categories, so it can't be given a parent. Move or delete them first.");
   }
   const parent = await getCategoryById(input.parentId, tx);
   if (!parent) {
-    throw new CategoryActionError("Choose a valid parent category.");
+    throw new StaffActionError("Choose a valid parent category.");
   }
   if (parent.parentId !== null) {
-    throw new CategoryActionError("That category already has a parent, so it can't be a parent itself (one level of nesting only).");
+    throw new StaffActionError("That category already has a parent, so it can't be a parent itself (one level of nesting only).");
   }
 }
 
 async function assertSlugAvailable(slug: string, excludeId?: number): Promise<void> {
   if (await slugInUse(slug, excludeId)) {
-    throw new CategoryActionError("That slug is already in use. Choose another.");
+    throw new StaffActionError("That slug is already in use. Choose another.");
   }
 }
 
@@ -162,7 +156,7 @@ function auditValues(category: CategoryAuditFields) {
 
 export async function createCategory(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = categoryInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   try {
@@ -195,7 +189,7 @@ export async function createCategory(rawInput: unknown, actor: Actor): Promise<S
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof CategoryActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
     if (isDuplicateEntry(error)) return { ok: false, error: "That slug is already in use. Choose another.", fieldErrors: { slug: "Already in use." } };
     throw error;
   }
@@ -212,14 +206,14 @@ function fieldErrorFor(message: string): Record<string, string> | undefined {
 
 export async function updateCategoryById(id: number, rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = categoryInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   let replacedImagePath: string | null = null;
   try {
     await db.transaction(async (tx) => {
       const category = await lockCategoryById(tx, id);
-      if (!category) throw new CategoryActionError("Category not found.");
+      if (!category) throw new StaffActionError("Category not found.");
 
       await assertSlugAvailable(input.slug, id);
       // Read inside the locked transaction, so two concurrent edits can't build two-level nesting (S22 BUG-27).
@@ -250,7 +244,7 @@ export async function updateCategoryById(id: number, rawInput: unknown, actor: A
       if (category.imagePath && category.imagePath !== input.imagePath) replacedImagePath = category.imagePath;
     });
   } catch (error) {
-    if (error instanceof CategoryActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
     if (isDuplicateEntry(error)) return { ok: false, error: "That slug is already in use. Choose another.", fieldErrors: { slug: "Already in use." } };
     throw error;
   }
@@ -266,9 +260,9 @@ export async function setCategoryActive(id: number, isActive: boolean, actor: Ac
   try {
     await db.transaction(async (tx) => {
       const category = await lockCategoryById(tx, id);
-      if (!category) throw new CategoryActionError("Category not found.");
+      if (!category) throw new StaffActionError("Category not found.");
       if (category.isActive === isActive) {
-        throw new CategoryActionError(`This category is already ${isActive ? "active" : "hidden"}.`);
+        throw new StaffActionError(`This category is already ${isActive ? "active" : "hidden"}.`);
       }
 
       const now = new Date();
@@ -285,7 +279,7 @@ export async function setCategoryActive(id: number, isActive: boolean, actor: Ac
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof CategoryActionError) return { ok: false, error: error.message };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message };
     throw error;
   }
 }
@@ -307,15 +301,15 @@ export async function deleteCategoryById(id: number, actor: Actor): Promise<Staf
   try {
     await db.transaction(async (tx) => {
       const category = await lockCategoryById(tx, id);
-      if (!category) throw new CategoryActionError("Category not found.");
+      if (!category) throw new StaffActionError("Category not found.");
 
       const childrenCount = await countChildren(category.id);
       if (childrenCount > 0) {
-        throw new CategoryActionError(`This category has ${childrenCount} sub-${childrenCount === 1 ? "category" : "categories"}. Move or delete them first.`);
+        throw new StaffActionError(`This category has ${childrenCount} sub-${childrenCount === 1 ? "category" : "categories"}. Move or delete them first.`);
       }
       const productCount = await countProductsByCategoryId(category.id);
       if (productCount > 0) {
-        throw new CategoryActionError(`${productCount} ${productCount === 1 ? "product uses" : "products use"} this category. Hide it instead of deleting it.`);
+        throw new StaffActionError(`${productCount} ${productCount === 1 ? "product uses" : "products use"} this category. Hide it instead of deleting it.`);
       }
 
       const now = new Date();
@@ -332,7 +326,7 @@ export async function deleteCategoryById(id: number, actor: Actor): Promise<Staf
       imagePathToDelete = category.imagePath;
     });
   } catch (error) {
-    if (error instanceof CategoryActionError) return { ok: false, error: error.message };
+    if (error instanceof StaffActionError) return { ok: false, error: error.message };
     throw error;
   }
 

@@ -7,6 +7,14 @@
 
 export const KARACHI_OFFSET_MS = 5 * 60 * 60 * 1000;
 
+/** The store's zone (`siteConfig.timezone` is this constant, so the two cannot drift). */
+export const KARACHI_TIMEZONE = "Asia/Karachi";
+
+/** An `en-GB` formatter in Karachi time, for list columns, exports and the order page (S22 QA-09: one factory, not one per feature). */
+export function karachiFormatter(options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: KARACHI_TIMEZONE, ...options });
+}
+
 const LOCAL_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 
 /** "2026-10-03T14:30" (Karachi) -> the UTC instant; null for anything that isn't a real date-time. */

@@ -8,6 +8,7 @@ import { ArchiveRestoreButton, FeaturedStarButton } from "@/components/panel/pro
 import type { StaffProductListItem } from "@/features/catalog/products-staff-service";
 import { formatMoney, decimalToPaisa } from "@/features/pricing/money";
 import type { ProductStatus } from "@/features/catalog/schemas";
+import { PILL_COLORS } from "@/lib/pill-colors";
 
 const THUMB_SIZE = 40;
 
@@ -23,9 +24,9 @@ function Thumbnail({ imagePath, name }: { imagePath: string | null; name: string
 }
 
 const STATUS_STYLES: Record<ProductStatus, { bg: string; text: string; dot: string; label: string }> = {
-  active: { bg: "bg-emerald-500/15", text: "text-emerald-700 dark:text-emerald-400", dot: "bg-emerald-500", label: "Active" },
-  draft: { bg: "bg-amber-500/15", text: "text-amber-700 dark:text-amber-400", dot: "bg-amber-500", label: "Draft" },
-  archived: { bg: "bg-muted", text: "text-muted-foreground", dot: "bg-muted-foreground/60", label: "Archived" },
+  active: { ...PILL_COLORS.emerald, label: "Active" },
+  draft: { ...PILL_COLORS.amber, label: "Draft" },
+  archived: { ...PILL_COLORS.muted, label: "Archived" },
 };
 
 function StatusPill({ status }: { status: ProductStatus }) {

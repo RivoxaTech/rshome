@@ -2,8 +2,9 @@ import "@/lib/zod-config";
 import { z } from "zod";
 import { phoneSchema } from "@/features/checkout/schemas";
 import { siteConfig } from "@/config/site.config";
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, WHOLESALE_STATUSES } from "./transitions";
+import { WHOLESALE_STATUSES } from "./transitions";
 import { isValidIsoDate } from "@/lib/karachi-datetime";
+import { pageSizeField } from "@/features/shared/pagination";
 
 // Matches `wholesale_inquiries.business_type` (DATABASE.md) — the DB truth, not the UI copy
 // (`siteConfig.wholesaleBusinessTypes` holds the select's labels, kept in sync by hand).
@@ -34,7 +35,6 @@ export function todayInKarachi(): string {
     day: "2-digit",
   }).format(new Date());
 }
-
 
 /** `""`/missing become `null`; otherwise a valid calendar date that hasn't already passed. */
 const neededByDateSchema = z
@@ -87,10 +87,7 @@ export const wholesaleListQuerySchema = z.object({
     .catch("all" as const),
   q: z.preprocess(firstValue, z.string().trim().max(100).optional()).catch(undefined),
   page: z.preprocess(firstValue, z.coerce.number().int().min(1).max(10_000)).catch(1),
-  pageSize: z
-    .preprocess(firstValue, z.coerce.number().int())
-    .refine((value): value is (typeof PAGE_SIZE_OPTIONS)[number] => (PAGE_SIZE_OPTIONS as readonly number[]).includes(value))
-    .catch(DEFAULT_PAGE_SIZE),
+  pageSize: pageSizeField,
 });
 
 export type WholesaleListQuery = z.infer<typeof wholesaleListQuerySchema>;

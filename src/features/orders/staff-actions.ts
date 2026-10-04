@@ -5,10 +5,8 @@
  * `audit_logs` for approvals, which set the delivery charge, and screenshot reviews) in the same
  * transaction.
  */
-import type { z } from "zod";
 import { features } from "@/config/features";
 import { insertAuditLog } from "@/features/audit/repo";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
 import { insertStatusHistory } from "@/features/checkout/repo";
 import { getProofSummaries } from "@/features/payments/repo";
 import { decimalToPaisa, formatMoney, paisaToDecimal } from "@/features/pricing/money";
@@ -43,20 +41,15 @@ import {
   statusAfterPaymentReview,
   type CloseAction,
 } from "./transitions";
+import { StaffActionError, invalidInput } from "@/features/shared/staff-result";
+import type { StaffResult } from "@/features/shared/staff-result";
 
 /** `orderNumber` comes back from `reviewProof` so the action can send the right email without a second lookup. */
-export type StaffActionResult = { ok: true; orderNumber?: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };
+export type StaffActionResult = StaffResult<{ orderNumber?: string }>;
 
 /** The signed-in staff member, from `requirePermission`. */
 type Actor = { id: number };
 type LockedOrder = NonNullable<Awaited<ReturnType<typeof lockOrderByNumber>>>;
-
-/** A refusal staff see; anything else thrown is a real failure and rolls the transaction back. */
-class StaffActionError extends Error {}
-
-function invalid(error: z.ZodError): StaffActionResult {
-  return { ok: false, error: error.issues[0]?.message ?? "Please check the form.", fieldErrors: fieldErrorsOf(error) };
-}
 
 async function withLockedOrder(
   orderNumber: string,
@@ -123,7 +116,7 @@ async function closeOrderTx(tx: DbClient, order: LockedOrder, action: CloseActio
  */
 export async function approveOrder(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = approveOrderSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   return withLockedOrder(input.orderNumber, async (tx, order, now) => {
@@ -185,7 +178,7 @@ export async function approveOrder(rawInput: unknown, actor: Actor): Promise<Sta
  */
 export async function reviewProof(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = reviewProofSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   const orderNumber = await getProofOrderNumber(input.proofId);
@@ -252,7 +245,7 @@ export async function reviewProof(rawInput: unknown, actor: Actor): Promise<Staf
 /** The fulfilment dropdown (C20): Sent (courier and tracking note optional) or Delivered, forward only. */
 export async function updateFulfilment(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = fulfilmentSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   return withLockedOrder(input.orderNumber, async (tx, order, now) => {
@@ -278,7 +271,7 @@ export async function updateFulfilment(rawInput: unknown, actor: Actor): Promise
  */
 export async function closeOrder(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = closeOrderSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   return withLockedOrder(input.orderNumber, async (tx, order, now) => {
@@ -291,7 +284,7 @@ export async function closeOrder(rawInput: unknown, actor: Actor): Promise<Staff
 /** An internal note: a staff-only history row (`kind = 'note'`), never shown to the customer. */
 export async function addOrderNote(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = orderNoteSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   return withLockedOrder(input.orderNumber, async (tx, order, now) => {
@@ -308,7 +301,7 @@ export async function addOrderNote(rawInput: unknown, actor: Actor): Promise<Sta
  */
 export async function deleteOrder(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = deleteOrderSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   let proofFilePaths: string[] = [];

@@ -7,10 +7,11 @@ import { buildListPath } from "@/components/panel/list-path";
 import { AuditFilters } from "@/components/panel/audit/AuditFilters";
 import { AuditSkeletonBoundary } from "@/components/panel/audit/AuditSkeletonBoundary";
 import { AuditTable } from "@/components/panel/audit/AuditTable";
-import { AUDIT_DEFAULT_PAGE_SIZE, AUDIT_PAGE_SIZE_OPTIONS, auditFilterParams, auditListQuerySchema, type AuditListQuery } from "@/features/audit/schemas";
+import { auditFilterParams, auditListQuerySchema, type AuditListQuery } from "@/features/audit/schemas";
 import { listAuditActorOptions, listAuditLog } from "@/features/audit/staff-service";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { requirePermission } from "@/server/auth/permissions";
+import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";
 
 const BASE_PATH = "/panel/audit";
 
@@ -19,12 +20,12 @@ async function AuditTableSection({ query }: { query: AuditListQuery }) {
   await requirePermission(PERMISSIONS.AUDIT_VIEW);
   const extra = auditFilterParams(query);
   const { items, page, pageCount, total, pageSize } = await listAuditLog(query);
-  if (query.page > 1 && query.page > pageCount) redirect(buildListPath(BASE_PATH, undefined, { page: pageCount, pageSize: query.pageSize, extra }, AUDIT_DEFAULT_PAGE_SIZE));
+  if (query.page > 1 && query.page > pageCount) redirect(buildListPath(BASE_PATH, undefined, { page: pageCount, pageSize: query.pageSize, extra }, DEFAULT_PAGE_SIZE));
 
   return (
     <>
       <AuditTable items={items} />
-      <Pagination basePath={BASE_PATH} page={page} pageCount={pageCount} total={total} pageSize={pageSize} defaultPageSize={AUDIT_DEFAULT_PAGE_SIZE} extra={extra} />
+      <Pagination basePath={BASE_PATH} page={page} pageCount={pageCount} total={total} pageSize={pageSize} defaultPageSize={DEFAULT_PAGE_SIZE} extra={extra} />
     </>
   );
 }
@@ -41,7 +42,7 @@ export async function AuditPageBody({ searchParams }: { searchParams: Record<str
       <div className="flex flex-col gap-2.5">
         <AuditFilters query={query} actors={actors} />
         <div className="flex items-center justify-end">
-          <RowsPerPageSelect basePath={BASE_PATH} pageSize={query.pageSize} options={AUDIT_PAGE_SIZE_OPTIONS} defaultPageSize={AUDIT_DEFAULT_PAGE_SIZE} extra={extra} />
+          <RowsPerPageSelect basePath={BASE_PATH} pageSize={query.pageSize} options={PAGE_SIZE_OPTIONS} defaultPageSize={DEFAULT_PAGE_SIZE} extra={extra} />
         </div>
         <Suspense key={JSON.stringify([extra, query.page, query.pageSize])} fallback={<AuditSkeletonBoundary />}>
           <AuditTableSection query={query} />

@@ -8,10 +8,11 @@ import { ZoneActiveToggle } from "@/components/panel/shipping/ZoneRowActions";
 import { ZONE_MODE_LABELS } from "@/features/shipping/schemas";
 import type { StaffZoneListItem } from "@/features/shipping/staff-service";
 import { moveZoneAction } from "@/app/panel/(protected)/shipping/actions";
+import { PILL_COLORS } from "@/lib/pill-colors";
 
-const ACTIVE_COLORS = { dot: "bg-emerald-500", bg: "bg-emerald-500/15", text: "text-emerald-700 dark:text-emerald-400" };
-const INACTIVE_COLORS = { dot: "bg-muted-foreground/60", bg: "bg-muted", text: "text-muted-foreground" };
-const FALLBACK_COLORS = { dot: "bg-sky-500", bg: "bg-sky-500/15", text: "text-sky-700 dark:text-sky-400" };
+const ACTIVE_COLORS = PILL_COLORS.emerald;
+const INACTIVE_COLORS = PILL_COLORS.muted;
+const FALLBACK_COLORS = PILL_COLORS.sky;
 
 function detailHref(id: number, backHref: string): string {
   return `/panel/shipping/${id}?back=${encodeURIComponent(backHref)}`;

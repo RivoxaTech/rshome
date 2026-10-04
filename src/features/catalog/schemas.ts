@@ -5,6 +5,7 @@ import { CATEGORY_MEDIA_PATH_PATTERN, PRODUCT_MEDIA_PATH_PATTERN } from "@/serve
 import { DEFAULT_SORT, SHOP_SORTS } from "./listing";
 import { SLUG_PATTERN } from "./slug";
 import { ATTRIBUTE_SLOTS, generateVariantLabel, validateAttributePairs } from "./variants";
+import { pageSizeField } from "@/features/shared/pagination";
 
 // Next hands repeated query keys over as arrays (?sort=a&sort=b); only the first counts.
 const firstValue = (value: unknown) => (Array.isArray(value) ? value[0] : value);
@@ -16,7 +17,6 @@ export const listingQuerySchema = z.object({
   sort: z.preprocess(firstValue, z.enum(SHOP_SORTS)).catch(DEFAULT_SORT),
   page: z.preprocess(firstValue, z.coerce.number().int().min(1).max(10_000)).catch(1),
 });
-
 
 export const slugSchema = z.string().min(1).max(191);
 
@@ -97,16 +97,10 @@ export type CategoryInput = z.infer<typeof categoryInputSchema>;
 // Next hands repeated query keys over as arrays (?q=a&q=b); only the first counts.
 const firstQueryValue = (value: unknown) => (Array.isArray(value) ? value[0] : value);
 
-export const CATEGORY_PAGE_SIZE_OPTIONS = [25, 50, 75, 100] as const;
-export const CATEGORY_DEFAULT_PAGE_SIZE: (typeof CATEGORY_PAGE_SIZE_OPTIONS)[number] = 25;
-
 export const categoryListQuerySchema = z.object({
   q: z.preprocess(firstQueryValue, z.string().trim().max(100).optional()).catch(undefined),
   page: z.preprocess(firstQueryValue, z.coerce.number().int().min(1).max(10_000)).catch(1),
-  pageSize: z
-    .preprocess(firstQueryValue, z.coerce.number().int())
-    .refine((value): value is (typeof CATEGORY_PAGE_SIZE_OPTIONS)[number] => (CATEGORY_PAGE_SIZE_OPTIONS as readonly number[]).includes(value))
-    .catch(CATEGORY_DEFAULT_PAGE_SIZE),
+  pageSize: pageSizeField,
 });
 
 export type CategoryListQuery = z.infer<typeof categoryListQuerySchema>;
@@ -164,7 +158,6 @@ export const stockField = z.coerce.number().int("Enter a whole number.").min(0, 
 
 /** The create form's one "Default" variant (SKU + stock); every later variant goes through `variantInputSchema`. */
 export const defaultVariantCreateSchema = z.object({ sku: skuField, stock: stockField });
-
 
 // ── Panel: variant CRUD (S10) ──────────────────────────────────────────────────────────
 
@@ -240,18 +233,12 @@ export const saveVariantOrderSchema = z.object({
 export const PRODUCT_TABS = ["all", ...PRODUCT_STATUSES] as const;
 export type ProductTab = (typeof PRODUCT_TABS)[number];
 
-export const PRODUCT_PAGE_SIZE_OPTIONS = [25, 50, 75, 100] as const;
-export const PRODUCT_DEFAULT_PAGE_SIZE: (typeof PRODUCT_PAGE_SIZE_OPTIONS)[number] = 25;
-
 export const productListQuerySchema = z.object({
   tab: z.preprocess(firstQueryValue, z.enum(PRODUCT_TABS)).catch("all"),
   q: z.preprocess(firstQueryValue, z.string().trim().max(100).optional()).catch(undefined),
   category: z.preprocess(firstQueryValue, z.coerce.number().int().positive().optional()).catch(undefined),
   page: z.preprocess(firstQueryValue, z.coerce.number().int().min(1).max(10_000)).catch(1),
-  pageSize: z
-    .preprocess(firstQueryValue, z.coerce.number().int())
-    .refine((value): value is (typeof PRODUCT_PAGE_SIZE_OPTIONS)[number] => (PRODUCT_PAGE_SIZE_OPTIONS as readonly number[]).includes(value))
-    .catch(PRODUCT_DEFAULT_PAGE_SIZE),
+  pageSize: pageSizeField,
 });
 
 export type ProductListQuery = z.infer<typeof productListQuerySchema>;

@@ -1,15 +1,11 @@
 import { siteConfig } from "@/config/site.config";
+import { karachiFormatter } from "@/lib/karachi-datetime";
 
 /** No 0/O, 1/I/L: an order number read out on WhatsApp can't be misheard (ARCHITECTURE.md D14). */
 export const ORDER_NUMBER_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const SUFFIX_LENGTH = 4;
 
-const dateStamp = new Intl.DateTimeFormat("en-GB", {
-  timeZone: siteConfig.timezone,
-  year: "2-digit",
-  month: "2-digit",
-  day: "2-digit",
-});
+const dateStamp = karachiFormatter({ year: "2-digit", month: "2-digit", day: "2-digit" });
 
 /** YYMMDD in the store's timezone: "today" means Karachi time (ARCHITECTURE.md D12). */
 export function orderDateStamp(now: Date): string {

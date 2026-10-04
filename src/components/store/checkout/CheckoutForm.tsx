@@ -9,10 +9,11 @@ import { BankDetails } from "@/components/store/orders/BankDetails";
 import { ProofUpload } from "@/components/store/orders/ProofUpload";
 import { CopyButton } from "@/components/ui/CopyButton";
 import type { CountryOption } from "@/config/countries";
-import { checkoutInputSchema, fieldErrorsOf } from "@/features/checkout/schemas";
+import { checkoutInputSchema } from "@/features/checkout/schemas";
 import type { BankAccount } from "@/features/settings/schemas";
 import { CheckoutSummary } from "./CheckoutSummary";
 import { clearCheckoutToken, getCheckoutToken } from "./checkout-token";
+import { fieldErrorsOf } from "@/lib/field-errors";
 
 const FORM_ID = "checkout-form";
 const PAKISTAN = "PK";

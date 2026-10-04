@@ -12,12 +12,13 @@ import { zoneBackHrefSchema } from "@/features/shipping/schemas";
 import { checkZoneDeletable, getZoneForEdit } from "@/features/shipping/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 import { updateZoneAction } from "@/app/panel/(protected)/shipping/actions";
+import { PILL_COLORS } from "@/lib/pill-colors";
 
 export const metadata: Metadata = { title: "Edit zone" };
 
-const ACTIVE_COLORS = { dot: "bg-emerald-500", bg: "bg-emerald-500/15", text: "text-emerald-700 dark:text-emerald-400" };
-const INACTIVE_COLORS = { dot: "bg-muted-foreground/60", bg: "bg-muted", text: "text-muted-foreground" };
-const FALLBACK_COLORS = { dot: "bg-sky-500", bg: "bg-sky-500/15", text: "text-sky-700 dark:text-sky-400" };
+const ACTIVE_COLORS = PILL_COLORS.emerald;
+const INACTIVE_COLORS = PILL_COLORS.muted;
+const FALLBACK_COLORS = PILL_COLORS.sky;
 
 export default async function EditZonePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ back?: string }> }) {
   await requirePermission(PERMISSIONS.SHIPPING_MANAGE);

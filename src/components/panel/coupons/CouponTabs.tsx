@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { buildListPath } from "@/components/panel/list-path";
-import { COUPON_DEFAULT_PAGE_SIZE, COUPON_TABS, type CouponTab } from "@/features/coupons/schemas";
+import { COUPON_TABS, type CouponTab } from "@/features/coupons/schemas";
 import type { CouponTabCounts } from "@/features/coupons/staff-service";
 import { COUPON_TAB_LABELS } from "@/features/coupons/status";
+import { DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";
 
 /** All / Active / Scheduled / Expired / Used up / Inactive, one count each (mirrors `DiscountTabs`). */
 export function CouponTabs({ currentTab, counts, q }: { currentTab: CouponTab; counts: CouponTabCounts; q?: string }) {
@@ -13,7 +14,7 @@ export function CouponTabs({ currentTab, counts, q }: { currentTab: CouponTab; c
         return (
           <Link
             key={tab}
-            href={buildListPath("/panel/coupons", tab === "all" ? undefined : tab, { q }, COUPON_DEFAULT_PAGE_SIZE)}
+            href={buildListPath("/panel/coupons", tab === "all" ? undefined : tab, { q }, DEFAULT_PAGE_SIZE)}
             aria-current={active ? "page" : undefined}
             className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${
               active ? "bg-secondary text-foreground font-medium" : "text-muted-foreground hover:bg-secondary hover:text-foreground"

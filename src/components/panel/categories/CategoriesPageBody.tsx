@@ -9,14 +9,15 @@ import { buildListPath } from "@/components/panel/list-path";
 import { CategoriesTable } from "@/components/panel/categories/CategoriesTable";
 import { CategoriesTableSkeleton } from "@/components/panel/categories/CategoriesTableSkeleton";
 import { PERMISSIONS } from "@/features/auth/permissions";
-import { CATEGORY_DEFAULT_PAGE_SIZE, CATEGORY_PAGE_SIZE_OPTIONS, categoryListQuerySchema, type CategoryListQuery } from "@/features/catalog/schemas";
+import { categoryListQuerySchema, type CategoryListQuery } from "@/features/catalog/schemas";
 import { listStaffCategories } from "@/features/catalog/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
+import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";
 
 const BASE_PATH = "/panel/categories";
 
 function categoriesPath(query: { q?: string; page?: number; pageSize?: number }): string {
-  return buildListPath(BASE_PATH, undefined, query, CATEGORY_DEFAULT_PAGE_SIZE);
+  return buildListPath(BASE_PATH, undefined, query, DEFAULT_PAGE_SIZE);
 }
 
 /**
@@ -38,7 +39,7 @@ async function CategoriesTableSection({ query, backHref }: { query: CategoryList
         pageCount={pageCount}
         total={total}
         pageSize={pageSize}
-        defaultPageSize={CATEGORY_DEFAULT_PAGE_SIZE}
+        defaultPageSize={DEFAULT_PAGE_SIZE}
       />
     </>
   );
@@ -59,7 +60,7 @@ export async function CategoriesPageBody({ searchParams }: { searchParams: Recor
               initialQ={query.q ?? ""}
               basePath={BASE_PATH}
               pageSize={query.pageSize}
-              defaultPageSize={CATEGORY_DEFAULT_PAGE_SIZE}
+              defaultPageSize={DEFAULT_PAGE_SIZE}
               placeholder="Search categories"
               ariaLabel="Search categories"
             />
@@ -69,8 +70,8 @@ export async function CategoriesPageBody({ searchParams }: { searchParams: Recor
               basePath={BASE_PATH}
               q={query.q}
               pageSize={query.pageSize}
-              options={CATEGORY_PAGE_SIZE_OPTIONS}
-              defaultPageSize={CATEGORY_DEFAULT_PAGE_SIZE}
+              options={PAGE_SIZE_OPTIONS}
+              defaultPageSize={DEFAULT_PAGE_SIZE}
             />
             <Link
               href={`/panel/categories/new?back=${encodeURIComponent(backHref)}`}

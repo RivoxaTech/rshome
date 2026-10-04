@@ -5,10 +5,8 @@
  * "active now" status and the overlap hint both come from `features/pricing/pricing.ts`'s own
  * `isDiscountActive`/`discountMatchesProduct` — no second implementation of either rule.
  */
-import type { ZodError } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
 import type { StaffActionResult } from "@/features/catalog/staff-service";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
 import { decimalToPaisa } from "@/features/pricing/money";
 import { discountMatchesProduct, isDiscountActive, type PricingDiscount } from "@/features/pricing/pricing";
 import { db } from "@/server/db/client";
@@ -34,6 +32,8 @@ import {
   type ProductOption,
 } from "./staff-repo";
 import { discountStatus, discountValueText, targetSummary, type DiscountStatus } from "./status";
+import { pageCountOf } from "@/features/shared/pagination";
+import { StaffActionError, invalidInput, refusal } from "@/features/shared/staff-result";
 
 export type { StaffActionResult };
 
@@ -45,24 +45,6 @@ type Actor = { id: number };
  * `now` is injectable so tests are deterministic.
  */
 export type WriteOptions = { allowPastDates?: boolean; now?: Date };
-
-/** A refusal staff see; anything else thrown is a real failure and rolls the transaction back. */
-class DiscountActionError extends Error {
-  constructor(
-    message: string,
-    readonly field?: string,
-  ) {
-    super(message);
-  }
-}
-
-function invalid(error: ZodError): StaffActionResult {
-  return { ok: false, error: error.issues[0]?.message ?? "Please check the form.", fieldErrors: fieldErrorsOf(error) };
-}
-
-function refused(error: DiscountActionError): StaffActionResult {
-  return error.field ? { ok: false, error: error.message, fieldErrors: { [error.field]: error.message } } : { ok: false, error: error.message };
-}
 
 /** The no-past-dates rule as a refusal; `previous` is the locked row on edit, null on create. */
 export function dateWindowRefusal(input: DateWindow, previous: DateWindow | null, options: WriteOptions): StaffActionResult | null {
@@ -120,7 +102,7 @@ export async function listStaffDiscounts(query: {
 
   const filtered = query.tab === "all" ? withStatus : withStatus.filter((entry) => entry.status === query.tab);
   const total = filtered.length;
-  const pageCount = Math.max(1, Math.ceil(total / query.pageSize));
+  const pageCount = pageCountOf(total, query.pageSize);
   const offset = (query.page - 1) * query.pageSize;
   const pageRows = filtered.slice(offset, offset + query.pageSize);
 
@@ -168,11 +150,11 @@ export async function getDiscountForEdit(id: number): Promise<DiscountEditFormDa
 async function assertTargetsExist(input: DiscountInput): Promise<void> {
   if (input.targetType === "category") {
     const names = await getCategoryNamesByIds(input.targetIds);
-    if (names.size !== input.targetIds.length) throw new DiscountActionError("Choose a valid category.", "categoryId");
+    if (names.size !== input.targetIds.length) throw new StaffActionError("Choose a valid category.", "categoryId");
   }
   if (input.targetType === "product") {
     const names = await getProductNamesByIds(input.targetIds);
-    if (names.size !== input.targetIds.length) throw new DiscountActionError("One of the chosen products no longer exists. Remove it and try again.", "productIds");
+    if (names.size !== input.targetIds.length) throw new StaffActionError("One of the chosen products no longer exists. Remove it and try again.", "productIds");
   }
 }
 
@@ -195,7 +177,7 @@ function auditValues(discount: DiscountAuditFields, targetIds: number[]) {
 
 export async function createDiscount(rawInput: unknown, actor: Actor, options: WriteOptions = {}): Promise<StaffActionResult> {
   const parsed = discountInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
   const dateRefusal = dateWindowRefusal(input, null, options);
   if (dateRefusal) return dateRefusal;
@@ -229,7 +211,7 @@ export async function createDiscount(rawInput: unknown, actor: Actor, options: W
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof DiscountActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
@@ -238,16 +220,16 @@ export async function createDiscount(rawInput: unknown, actor: Actor, options: W
 
 export async function updateDiscountById(id: number, rawInput: unknown, actor: Actor, options: WriteOptions = {}): Promise<StaffActionResult> {
   const parsed = discountInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   try {
     await db.transaction(async (tx) => {
       const current = await lockDiscountById(tx, id);
-      if (!current) throw new DiscountActionError("Discount not found.");
+      if (!current) throw new StaffActionError("Discount not found.");
       // Only a bound the Developer changed (vs the locked row) is checked, so a live discount's past start never blocks a save.
       const dateRefusal = dateWindowRefusal(input, current.discount, options);
-      if (dateRefusal && !dateRefusal.ok) throw new DiscountActionError(dateRefusal.error, Object.keys(dateRefusal.fieldErrors ?? {})[0]);
+      if (dateRefusal && !dateRefusal.ok) throw new StaffActionError(dateRefusal.error, Object.keys(dateRefusal.fieldErrors ?? {})[0]);
       await assertTargetsExist(input);
 
       const now = new Date();
@@ -285,7 +267,7 @@ export async function updateDiscountById(id: number, rawInput: unknown, actor: A
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof DiscountActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
@@ -296,8 +278,8 @@ export async function setDiscountActive(id: number, isActive: boolean, actor: Ac
   try {
     await db.transaction(async (tx) => {
       const current = await lockDiscountById(tx, id);
-      if (!current) throw new DiscountActionError("Discount not found.");
-      if (current.discount.isActive === isActive) throw new DiscountActionError(`This discount is already ${isActive ? "active" : "inactive"}.`);
+      if (!current) throw new StaffActionError("Discount not found.");
+      if (current.discount.isActive === isActive) throw new StaffActionError(`This discount is already ${isActive ? "active" : "inactive"}.`);
 
       const now = new Date();
       await updateDiscount(tx, id, { isActive, updatedAt: now });
@@ -313,7 +295,7 @@ export async function setDiscountActive(id: number, isActive: boolean, actor: Ac
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof DiscountActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
@@ -328,7 +310,7 @@ export async function deleteDiscountById(id: number, actor: Actor): Promise<Staf
   try {
     await db.transaction(async (tx) => {
       const current = await lockDiscountById(tx, id);
-      if (!current) throw new DiscountActionError("Discount not found.");
+      if (!current) throw new StaffActionError("Discount not found.");
 
       const now = new Date();
       await deleteDiscount(tx, id);
@@ -344,7 +326,7 @@ export async function deleteDiscountById(id: number, actor: Actor): Promise<Staf
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof DiscountActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }

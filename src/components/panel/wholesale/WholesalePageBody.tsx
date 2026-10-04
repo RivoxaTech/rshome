@@ -10,8 +10,9 @@ import { WholesaleTabs } from "@/components/panel/wholesale/WholesaleTabs";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { wholesaleListQuerySchema, type WholesaleListQuery } from "@/features/wholesale/schemas";
 import { getWholesaleInquiryCounts, listStaffWholesaleInquiries } from "@/features/wholesale/staff-service";
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, WHOLESALE_STATUSES, wholesalePath, type WholesaleStatus } from "@/features/wholesale/transitions";
+import { WHOLESALE_STATUSES, wholesalePath, type WholesaleStatus } from "@/features/wholesale/transitions";
 import { requirePermission } from "@/server/auth/permissions";
+import { PAGE_SIZE_OPTIONS, DEFAULT_PAGE_SIZE } from "@/features/shared/pagination";
 
 /**
  * The table and its pagination, in their own Suspense boundary (mirrors the orders list, S9): the

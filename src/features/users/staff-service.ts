@@ -17,11 +17,9 @@
  * - Delete only when nothing references the user (never logged in, no sessions, audit rows,
  *   order history, screenshot reviews, notes or push subscriptions); otherwise "Deactivate instead".
  */
-import type { ZodError } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
 import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 import type { StaffActionResult } from "@/features/catalog/staff-service";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
 import { fingerprint } from "@/lib/fingerprint";
 import { formatKarachiDateTime } from "@/lib/karachi-datetime";
 import { hashPassword } from "@/server/auth/password";
@@ -46,20 +44,12 @@ import {
   type UserReferenceCounts,
   type UserStaffRow,
 } from "./staff-repo";
+import { pageCountOf } from "@/features/shared/pagination";
+import { StaffActionError, invalidInput, refusal } from "@/features/shared/staff-result";
 
 export type { StaffActionResult };
 
 type Actor = { id: number };
-
-/** A refusal staff see; anything else thrown is a real failure and rolls the transaction back. */
-class UserActionError extends Error {
-  constructor(
-    message: string,
-    readonly field?: string,
-  ) {
-    super(message);
-  }
-}
 
 const EMAIL_IN_USE = "Another user already has this email address.";
 export const STALE_USER_MESSAGE = "Someone else changed this user after you opened the page. Reload to see their changes, then make yours again.";
@@ -70,14 +60,6 @@ const LAST_MANAGER_DEACTIVATE = "This is the last active user who can manage use
 const LAST_MANAGER_ROLE_CHANGE = "This is the last active user who can manage users or roles, so it must keep a role with that permission.";
 const LAST_MANAGER_DELETE = "This is the last active user who can manage users or roles, so it can't be deleted.";
 const PASSWORD_RESET_RATE_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 };
-
-function invalid(error: ZodError): StaffActionResult {
-  return { ok: false, error: error.issues[0]?.message ?? "Please check the form.", fieldErrors: fieldErrorsOf(error) };
-}
-
-function refused(error: UserActionError): StaffActionResult {
-  return error.field ? { ok: false, error: error.message, fieldErrors: { [error.field]: error.message } } : { ok: false, error: error.message };
-}
 
 // ── Audit values and the version token ──────────────────────────────────────────────────────────
 
@@ -112,7 +94,7 @@ export type StaffUserListItem = {
 
 export async function listStaffUsers(query: { q?: string; page: number; pageSize: number }): Promise<{ items: StaffUserListItem[]; total: number; page: number; pageSize: number; pageCount: number }> {
   const total = await countUsers(query.q);
-  const pageCount = Math.max(1, Math.ceil(total / query.pageSize));
+  const pageCount = pageCountOf(total, query.pageSize);
   const page = Math.min(query.page, pageCount);
   const rows = await listUsersPage(query.q, page, query.pageSize);
   const offset = (page - 1) * query.pageSize;
@@ -174,14 +156,14 @@ async function isLastActiveManager(tx: DbClient, user: UserStaffRow): Promise<bo
 }
 
 async function assertEmailAvailable(tx: DbClient, email: string, excludeId?: number): Promise<void> {
-  if (await emailInUse(email, excludeId, tx)) throw new UserActionError(EMAIL_IN_USE, "email");
+  if (await emailInUse(email, excludeId, tx)) throw new StaffActionError(EMAIL_IN_USE, "email");
 }
 
 // ── Create ──────────────────────────────────────────────────────────────────────────────────────
 
 export async function createUser(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = createUserInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input: CreateUserInput = parsed.data;
 
   // Hashed before the transaction: scrypt takes real CPU time and nothing needs the lock for it.
@@ -191,7 +173,7 @@ export async function createUser(rawInput: unknown, actor: Actor): Promise<Staff
     const id = await db.transaction(async (tx) => {
       await assertEmailAvailable(tx, input.email);
       const role = (await listRoleOptions(tx)).find((option) => option.id === input.roleId);
-      if (!role) throw new UserActionError("Choose a role.", "roleId");
+      if (!role) throw new StaffActionError("Choose a role.", "roleId");
 
       const now = new Date();
       const id = await insertUser(tx, { name: input.name, email: input.email, passwordHash, roleId: input.roleId, isActive: input.isActive, createdAt: now, updatedAt: now });
@@ -208,7 +190,7 @@ export async function createUser(rawInput: unknown, actor: Actor): Promise<Staff
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof UserActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     // The unique index is the backstop for two creates racing past `assertEmailAvailable`.
     if (isDuplicateEntry(error)) return { ok: false, error: EMAIL_IN_USE, fieldErrors: { email: EMAIL_IN_USE } };
     throw error;
@@ -219,31 +201,31 @@ export async function createUser(rawInput: unknown, actor: Actor): Promise<Staff
 
 export async function updateUserById(id: number, rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = updateUserInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input: UpdateUserInput = parsed.data;
 
   try {
     await db.transaction(async (tx) => {
       const current = await lockUserById(tx, id);
-      if (!current) throw new UserActionError("User not found.");
-      if (userVersion(current) !== input.version) throw new UserActionError(STALE_USER_MESSAGE);
+      if (!current) throw new StaffActionError("User not found.");
+      if (userVersion(current) !== input.version) throw new StaffActionError(STALE_USER_MESSAGE);
       await assertEmailAvailable(tx, input.email, id);
 
       const role = (await listRoleOptions(tx)).find((option) => option.id === input.roleId);
-      if (!role) throw new UserActionError("Choose a role.", "roleId");
+      if (!role) throw new StaffActionError("Choose a role.", "roleId");
 
       const roleChanged = input.roleId !== current.roleId;
       const deactivating = current.isActive && !input.isActive;
       const isSelf = id === actor.id;
-      if (isSelf && deactivating) throw new UserActionError(SELF_DEACTIVATE, "isActive");
-      if (isSelf && roleChanged) throw new UserActionError(SELF_ROLE_CHANGE, "roleId");
+      if (isSelf && deactivating) throw new StaffActionError(SELF_DEACTIVATE, "isActive");
+      if (isSelf && roleChanged) throw new StaffActionError(SELF_ROLE_CHANGE, "roleId");
 
       const lastHeld = deactivating || roleChanged ? await lastHeldManagementKeys(tx, current) : [];
       if (lastHeld.length > 0) {
-        if (deactivating) throw new UserActionError(LAST_MANAGER_DEACTIVATE, "isActive");
+        if (deactivating) throw new StaffActionError(LAST_MANAGER_DEACTIVATE, "isActive");
         // The new role must carry every key this user is the last holder of.
         for (const key of lastHeld) {
-          if (!(await roleIdsHolding(key, tx)).includes(input.roleId)) throw new UserActionError(LAST_MANAGER_ROLE_CHANGE, "roleId");
+          if (!(await roleIdsHolding(key, tx)).includes(input.roleId)) throw new StaffActionError(LAST_MANAGER_ROLE_CHANGE, "roleId");
         }
       }
 
@@ -279,7 +261,7 @@ export async function updateUserById(id: number, rawInput: unknown, actor: Actor
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof UserActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     if (isDuplicateEntry(error)) return { ok: false, error: EMAIL_IN_USE, fieldErrors: { email: EMAIL_IN_USE } };
     throw error;
   }
@@ -291,10 +273,10 @@ export async function setUserActive(id: number, isActive: boolean, actor: Actor)
   try {
     await db.transaction(async (tx) => {
       const current = await lockUserById(tx, id);
-      if (!current) throw new UserActionError("User not found.");
-      if (current.isActive === isActive) throw new UserActionError(`This user is already ${isActive ? "active" : "inactive"}.`);
-      if (!isActive && id === actor.id) throw new UserActionError(SELF_DEACTIVATE);
-      if (!isActive && (await isLastActiveManager(tx, current))) throw new UserActionError(LAST_MANAGER_DEACTIVATE);
+      if (!current) throw new StaffActionError("User not found.");
+      if (current.isActive === isActive) throw new StaffActionError(`This user is already ${isActive ? "active" : "inactive"}.`);
+      if (!isActive && id === actor.id) throw new StaffActionError(SELF_DEACTIVATE);
+      if (!isActive && (await isLastActiveManager(tx, current))) throw new StaffActionError(LAST_MANAGER_DEACTIVATE);
 
       const now = new Date();
       await updateUser(tx, id, { isActive, updatedAt: now });
@@ -311,7 +293,7 @@ export async function setUserActive(id: number, isActive: boolean, actor: Actor)
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof UserActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
@@ -325,7 +307,7 @@ export async function setUserActive(id: number, isActive: boolean, actor: Actor)
  */
 export async function resetUserPassword(id: number, rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = resetPasswordInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
 
   const rate = await consumeRateLimit(`user-password-reset:${actor.id}`, PASSWORD_RESET_RATE_LIMIT);
   if (!rate.allowed) return { ok: false, error: "Too many password resets. Please try again later." };
@@ -334,7 +316,7 @@ export async function resetUserPassword(id: number, rawInput: unknown, actor: Ac
   try {
     await db.transaction(async (tx) => {
       const current = await lockUserById(tx, id);
-      if (!current) throw new UserActionError("User not found.");
+      if (!current) throw new StaffActionError("User not found.");
       const now = new Date();
       await updateUser(tx, id, { passwordHash, updatedAt: now });
       await deleteAllSessions(tx, id);
@@ -350,7 +332,7 @@ export async function resetUserPassword(id: number, rawInput: unknown, actor: Ac
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof UserActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
@@ -375,11 +357,11 @@ export async function deleteUserById(id: number, actor: Actor): Promise<StaffAct
   try {
     await db.transaction(async (tx) => {
       const current = await lockUserById(tx, id);
-      if (!current) throw new UserActionError("User not found.");
-      if (id === actor.id) throw new UserActionError(SELF_DELETE);
-      if (await isLastActiveManager(tx, current)) throw new UserActionError(LAST_MANAGER_DELETE);
+      if (!current) throw new StaffActionError("User not found.");
+      if (id === actor.id) throw new StaffActionError(SELF_DELETE);
+      if (await isLastActiveManager(tx, current)) throw new StaffActionError(LAST_MANAGER_DELETE);
       const guard = deleteGuardFor(current, await countUserReferences(id, tx));
-      if (!guard.allowed) throw new UserActionError(guard.reason);
+      if (!guard.allowed) throw new StaffActionError(guard.reason);
 
       const now = new Date();
       await deleteUser(tx, id);
@@ -387,7 +369,7 @@ export async function deleteUserById(id: number, actor: Actor): Promise<StaffAct
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof UserActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }

@@ -15,7 +15,6 @@
  * at the day-level granularity these periods resolve to.
  */
 import { cache } from "react";
-import { siteConfig } from "@/config/site.config";
 import { getPrimaryImagesByProductId } from "@/features/catalog/repo";
 import { decimalToPaisa, formatMoney } from "@/features/pricing/money";
 import { orderTab, PAYMENT_METHOD_LABELS, type OrderTab } from "@/features/orders/transitions";
@@ -40,6 +39,7 @@ import {
   getRecentOrders,
   getWholesaleLeadsCount,
 } from "./repo";
+import { karachiFormatter } from "@/lib/karachi-datetime";
 
 function currentRange(rangeKey: RangeKey): ResolvedRange {
   return resolveRange(rangeKey, new Date());
@@ -192,7 +192,7 @@ export const getMostSellingProductsView = cache(async (rangeKey: RangeKey): Prom
 
 // ── Recent orders ───────────────────────────────────────────────────────────────────────────
 
-const dateOnly = new Intl.DateTimeFormat("en-GB", { timeZone: siteConfig.timezone, day: "numeric", month: "short" });
+const dateOnly = karachiFormatter({ day: "numeric", month: "short" });
 
 export type RecentOrderView = {
   orderNumber: string;

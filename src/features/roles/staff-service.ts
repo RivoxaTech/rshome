@@ -24,12 +24,10 @@
  *   applied through a fresh login — permissions are re-read from `role_id` on every request anyway,
  *   so the change would apply on their next click regardless.
  */
-import type { ZodError } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
 import { ACCESS_CONTROL_PERMISSIONS } from "@/features/auth/permission-groups";
 import { PERMISSION_DESCRIPTIONS, PERMISSIONS, SYSTEM_ROLE_DEFAULTS, sensitiveGrants, type PermissionKey } from "@/features/auth/permissions";
 import type { StaffActionResult } from "@/features/catalog/staff-service";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
 import { deleteSessionsForUsers } from "@/features/users/staff-repo";
 import { fingerprint } from "@/lib/fingerprint";
 import { db, type DbClient } from "@/server/db/client";
@@ -52,34 +50,18 @@ import {
   updateRole,
   type RoleRow,
 } from "./staff-repo";
+import { StaffActionError, invalidInput, refusal } from "@/features/shared/staff-result";
 
 export type { StaffActionResult };
 
 /** Who is editing: their id (for the audit row) and their own session (kept when their role is saved). */
 type Actor = { id: number; sessionId: string | null };
 
-class RoleActionError extends Error {
-  constructor(
-    message: string,
-    readonly field?: string,
-  ) {
-    super(message);
-  }
-}
-
 const KEY_IN_USE = "Another role already uses this key.";
 export const SYSTEM_ROLE_DELETE_MESSAGE = "This is a system role: the seed and the users page rely on it existing, so it can't be deleted. Change its permissions instead.";
 export const STALE_ROLE_MESSAGE = "Someone else changed this role after you opened the page. Reload to see their changes, then make yours again.";
 export const CONFIRM_SENSITIVE_MESSAGE = "This change gives the role access outside its side of the store. Confirm the warning to save it.";
 const EMPTY_WITH_MEMBERS = "This role has users, so it must keep at least one permission.";
-
-function invalid(error: ZodError): StaffActionResult {
-  return { ok: false, error: error.issues[0]?.message ?? "Please check the form.", fieldErrors: fieldErrorsOf(error) };
-}
-
-function refused(error: RoleActionError): StaffActionResult {
-  return error.field ? { ok: false, error: error.message, fieldErrors: { [error.field]: error.message } } : { ok: false, error: error.message };
-}
 
 const ORDERED_KEYS = Object.values(PERMISSIONS) as PermissionKey[];
 /** Keys in `PERMISSIONS` order, so two sets compare and audit identically whatever order they came in. */
@@ -157,7 +139,7 @@ async function assertNoLockOut(tx: DbClient, roleId: number, current: readonly P
   for (const key of ACCESS_CONTROL_PERMISSIONS) {
     if (!current.includes(key) || next.includes(key)) continue;
     if ((await countActiveHoldersOutsideRole(key, roleId, tx)) === 0) {
-      throw new RoleActionError(`"${key}" can't be removed: no other active user holds it, so nobody could manage ${key === PERMISSIONS.USER_MANAGE ? "users" : "roles"} any more.`, "permissions");
+      throw new StaffActionError(`"${key}" can't be removed: no other active user holds it, so nobody could manage ${key === PERMISSIONS.USER_MANAGE ? "users" : "roles"} any more.`, "permissions");
     }
   }
 }
@@ -174,15 +156,15 @@ async function writePermissions(
   actor: Actor,
   audit: { action: string; extra?: Record<string, unknown> },
 ): Promise<void> {
-  if (roleVersion(current, currentKeys) !== input.version) throw new RoleActionError(STALE_ROLE_MESSAGE);
+  if (roleVersion(current, currentKeys) !== input.version) throw new StaffActionError(STALE_ROLE_MESSAGE);
   const nextKeys = sortKeys(input.permissions);
 
   const members = await memberIds(current.id, tx);
-  if (members.length > 0 && nextKeys.length === 0) throw new RoleActionError(EMPTY_WITH_MEMBERS, "permissions");
+  if (members.length > 0 && nextKeys.length === 0) throw new StaffActionError(EMPTY_WITH_MEMBERS, "permissions");
   await assertNoLockOut(tx, current.id, currentKeys, nextKeys);
 
   const sensitive = sensitiveGrants(current.key, currentKeys, nextKeys);
-  if (sensitive.length > 0 && !input.confirmSensitive) throw new RoleActionError(CONFIRM_SENSITIVE_MESSAGE, "confirmSensitive");
+  if (sensitive.length > 0 && !input.confirmSensitive) throw new StaffActionError(CONFIRM_SENSITIVE_MESSAGE, "confirmSensitive");
 
   const now = new Date();
   await updateRole(tx, current.id, { name: input.name, updatedAt: now });
@@ -215,12 +197,12 @@ async function writePermissions(
 
 export async function createRole(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = createRoleInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   try {
     const id = await db.transaction(async (tx) => {
-      if (await keyInUse(input.key, tx)) throw new RoleActionError(KEY_IN_USE, "key");
+      if (await keyInUse(input.key, tx)) throw new StaffActionError(KEY_IN_USE, "key");
       const keys = sortKeys(input.permissions);
 
       const now = new Date();
@@ -239,7 +221,7 @@ export async function createRole(rawInput: unknown, actor: Actor): Promise<Staff
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof RoleActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     if (isDuplicateEntry(error)) return { ok: false, error: KEY_IN_USE, fieldErrors: { key: KEY_IN_USE } };
     throw error;
   }
@@ -249,38 +231,38 @@ export async function createRole(rawInput: unknown, actor: Actor): Promise<Staff
 
 export async function updateRoleById(id: number, rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = updateRoleInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   try {
     await db.transaction(async (tx) => {
       const current = await lockRoleById(tx, id);
-      if (!current) throw new RoleActionError("Role not found.");
+      if (!current) throw new StaffActionError("Role not found.");
       const currentKeys = sortKeys(await permissionKeysForRole(id, tx));
       await writePermissions(tx, current, currentKeys, input, actor, { action: "role.update" });
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof RoleActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
 
 export async function saveRolePermissions(id: number, rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = savePermissionsInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   try {
     await db.transaction(async (tx) => {
       const current = await lockRoleById(tx, id);
-      if (!current) throw new RoleActionError("Role not found.");
+      if (!current) throw new StaffActionError("Role not found.");
       const currentKeys = sortKeys(await permissionKeysForRole(id, tx));
       await writePermissions(tx, current, currentKeys, { ...input, name: current.name }, actor, { action: "role.update" });
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof RoleActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
@@ -288,14 +270,14 @@ export async function saveRolePermissions(id: number, rawInput: unknown, actor: 
 /** Restores a system role's code defaults (`SYSTEM_ROLE_DEFAULTS`); the same rules apply, so a reset can't lock anyone out either. */
 export async function resetRoleToDefaults(id: number, rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = resetRoleInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
 
   try {
     await db.transaction(async (tx) => {
       const current = await lockRoleById(tx, id);
-      if (!current) throw new RoleActionError("Role not found.");
+      if (!current) throw new StaffActionError("Role not found.");
       const defaults = current.isSystem ? SYSTEM_ROLE_DEFAULTS[current.key]?.permissions : undefined;
-      if (!defaults) throw new RoleActionError("Only a system role has code defaults to reset to.");
+      if (!defaults) throw new StaffActionError("Only a system role has code defaults to reset to.");
       const currentKeys = sortKeys(await permissionKeysForRole(id, tx));
       // Resetting only ever moves a role back to its own side, so it's never a sensitive grant; the flag is set for form.
       await writePermissions(
@@ -309,7 +291,7 @@ export async function resetRoleToDefaults(id: number, rawInput: unknown, actor: 
     });
     return { ok: true, id };
   } catch (error) {
-    if (error instanceof RoleActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }
@@ -331,10 +313,10 @@ export async function deleteRoleById(id: number, actor: Actor): Promise<StaffAct
   try {
     await db.transaction(async (tx) => {
       const current = await lockRoleById(tx, id);
-      if (!current) throw new RoleActionError("Role not found.");
-      if (current.isSystem) throw new RoleActionError(SYSTEM_ROLE_DELETE_MESSAGE);
+      if (!current) throw new StaffActionError("Role not found.");
+      if (current.isSystem) throw new StaffActionError(SYSTEM_ROLE_DELETE_MESSAGE);
       const members = await countMembers(id, tx);
-      if (members > 0) throw new RoleActionError(`${members} ${members === 1 ? "user holds" : "users hold"} this role. Move them to another role first.`);
+      if (members > 0) throw new StaffActionError(`${members} ${members === 1 ? "user holds" : "users hold"} this role. Move them to another role first.`);
 
       const keys = await permissionKeysForRole(id, tx);
       const now = new Date();
@@ -343,7 +325,7 @@ export async function deleteRoleById(id: number, actor: Actor): Promise<StaffAct
     });
     return { ok: true };
   } catch (error) {
-    if (error instanceof RoleActionError) return refused(error);
+    if (error instanceof StaffActionError) return refusal(error);
     throw error;
   }
 }

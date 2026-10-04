@@ -9,7 +9,6 @@
 import type { ZodError } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
 import type { StaffActionResult } from "@/features/catalog/staff-service";
-import { fieldErrorsOf } from "@/features/checkout/schemas";
 import { loadStore } from "@/features/mail/service";
 import { buildTestEmail } from "@/features/mail/templates";
 import { fingerprint } from "@/lib/fingerprint";
@@ -41,6 +40,7 @@ import {
   getSocialLinks,
   getStoreIdentity,
 } from "./service";
+import { invalidInput } from "@/features/shared/staff-result";
 
 export type { StaffActionResult };
 
@@ -49,10 +49,6 @@ type Actor = { id: number; name: string };
 export const STALE_EDIT_MESSAGE = "Someone else saved these settings after you opened this page. Reload to see their changes, then make yours again.";
 
 const AUDIT_ACTION = "settings.update";
-
-function invalid(error: ZodError): StaffActionResult {
-  return { ok: false, error: error.issues[0]?.message ?? "Please check the form.", fieldErrors: fieldErrorsOf(error) };
-}
 
 /**
  * The optimistic-concurrency token for a set of keys (pure): each existing row's `updated_at` and
@@ -161,7 +157,7 @@ export async function getStoreSettingsForEdit(): Promise<StoreSettingsFormData> 
 
 export async function saveStoreSettings(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = storeSettingsInputSchema.safeParse(rawInput);
-  if (!parsed.success) return invalid(parsed.error);
+  if (!parsed.success) return invalidInput(parsed.error);
   const input = parsed.data;
 
   // The two recipient lists are one posted field each; a bad address is reported against its own field.

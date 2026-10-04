@@ -18,7 +18,6 @@ import { getOrderByNumber, getOrderItems } from "./repo";
 import { latestProofStates, type LatestProofs, type PaymentMethod, type ProofPurpose, type TimelineOrder } from "./status";
 import { countOrdersByState, getOrderHistory, getProofsForStaff, listOrders } from "./staff-repo";
 import {
-  DEFAULT_PAGE_SIZE,
   ORDER_STATUS_LABELS,
   ORDER_TABS,
   PAYMENT_METHOD_LABELS,
@@ -39,6 +38,8 @@ import {
   type QueueOrder,
   type StatusAction,
 } from "./transitions";
+import { DEFAULT_PAGE_SIZE, pageCountOf } from "@/features/shared/pagination";
+import { karachiFormatter } from "@/lib/karachi-datetime";
 
 /** What each status step needs; the Server Actions in app/panel/(protected)/orders/actions.ts check the same. */
 export const ACTION_PERMISSIONS: Record<StatusAction, PermissionKey[]> = {
@@ -51,10 +52,9 @@ export const ACTION_PERMISSIONS: Record<StatusAction, PermissionKey[]> = {
   reject: [PERMISSIONS.ORDER_UPDATE_STATUS],
 };
 
-const zoned = (options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", { timeZone: siteConfig.timezone, ...options });
-const dateTime = zoned({ day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-const dateOnly = zoned({ day: "numeric", month: "short", year: "numeric" });
-const timeOnly = zoned({ hour: "2-digit", minute: "2-digit" });
+const dateTime = karachiFormatter({ day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const dateOnly = karachiFormatter({ day: "numeric", month: "short", year: "numeric" });
+const timeOnly = karachiFormatter({ hour: "2-digit", minute: "2-digit" });
 
 const money = (decimal: string) => formatMoney(decimalToPaisa(decimal));
 
@@ -238,7 +238,7 @@ export async function listStaffOrders(
       control,
     };
   });
-  return { items, total, page: query.page, pageSize, pageCount: Math.max(1, Math.ceil(total / pageSize)) };
+  return { items, total, page: query.page, pageSize, pageCount: pageCountOf(total, pageSize) };
 }
 
 export type StaffOrderListItem = Awaited<ReturnType<typeof listStaffOrders>>["items"][number];

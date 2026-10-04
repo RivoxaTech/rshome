@@ -7,6 +7,7 @@ import { Switch } from "@/components/panel/Switch";
 import { COUPON_TYPES, type CouponType } from "@/features/coupons/schemas";
 import type { StaffActionResult } from "@/features/coupons/staff-service";
 import { dateInputMin } from "@/features/discounts/dates";
+import { inputClass } from "@/components/panel/FormField";
 
 type CouponFormValues = {
   id: number | null;
@@ -24,9 +25,6 @@ type CouponFormValues = {
 };
 
 const TYPE_LABELS: Record<CouponType, string> = { percent: "Percentage off the order", fixed: "Fixed amount off the order (PKR)" };
-
-const inputClass =
-  "border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-ring rounded-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none";
 
 function Field({ id, label, error, hint, children }: { id: string; label: string; error?: string; hint?: string; children: React.ReactNode }) {
   return (
