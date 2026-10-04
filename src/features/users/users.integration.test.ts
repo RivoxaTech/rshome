@@ -264,6 +264,31 @@ describe.skipIf(!TEST_DATABASE_URL)("users CRUD (integration)", () => {
       expect(second.ok).toBe(true);
       expect(await staffService.setUserActive(target, false, outsider)).toEqual({ ok: true });
     });
+
+    // S22 SEC-14: the same guard covers role.manage, or the roles page could be locked out through the users page.
+    it("protects the last active user who can manage roles, too", async () => {
+      const roleManagersId = await roleWith([PERMISSIONS.ROLE_MANAGE], "role-managers");
+      const target = await createViaAction({ roleId: roleManagersId, email: "roles@example.com" });
+      // The actor's own role carries role.manage as well, so first move the actor off it.
+      await db.update(users).set({ roleId: staffRoleId }).where(eq(users.id, actorId));
+      const outsider = { id: actorId };
+
+      expect(await staffService.setUserActive(target, false, outsider)).toMatchObject({ ok: false, error: expect.stringContaining("manage users or roles") });
+      const data = await staffService.getUserForEdit(target);
+      expect(await staffService.updateUserById(target, { name: "Roles", email: "roles@example.com", roleId: managerRoleId, isActive: "true", version: data!.version }, outsider)).toMatchObject({
+        ok: false,
+        fieldErrors: { roleId: expect.stringContaining("manage users or roles") },
+      });
+      expect(await staffService.deleteUserById(target, outsider)).toMatchObject({ ok: false, error: expect.stringContaining("manage users or roles") });
+    });
+
+    // S22 SEC-07: a tampered hidden id answers "not found" instead of handing NaN to the database.
+    it("quick actions refuse a tampered id without touching the database", async () => {
+      for (const id of ["abc", "", "0", "-1", "1.5"]) {
+        expect(await panelActions.setUserActiveAction(null, form({ id, isActive: "false" })), id).toEqual({ ok: false, error: "User not found." });
+        expect(await panelActions.deleteUserAction(null, form({ id })), id).toEqual({ ok: false, error: "User not found." });
+      }
+    });
   });
 
   describe("quick activate/deactivate", () => {

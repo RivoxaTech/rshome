@@ -195,7 +195,9 @@ function auditValues(zone: ZoneAuditFields, areas: ZoneAreaInput[]) {
     codEnabled: zone.codEnabled,
     isActive: zone.isActive,
     isFallback: zone.isFallback,
-    areas: areas.map(areaToken),
+    // Sorted, so the version fingerprint (and the audit row) read the same whatever order the rows
+    // came back in — the edit page sorts by country and city, the locked save reads insertion order (S22 BUG-02).
+    areas: areas.map(areaToken).sort(),
   };
 }
 

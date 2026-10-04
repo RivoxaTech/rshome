@@ -50,7 +50,12 @@ export function VariantsSection({ product, variants }: { product: VariantsProduc
     setOrder(next);
     setSaving(true);
     setError(null);
-    const result = await saveVariantOrderAction({ productId: product.id, orderedIds: next.map((variant) => variant.id) });
+    let result: Awaited<ReturnType<typeof saveVariantOrderAction>>;
+    try {
+      result = await saveVariantOrderAction({ productId: product.id, orderedIds: next.map((variant) => variant.id) });
+    } catch {
+      result = { ok: false, error: "Could not save the new order. Check your connection and try again." };
+    }
     setSaving(false);
     if (!result.ok) {
       setOrder(order);

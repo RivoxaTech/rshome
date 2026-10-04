@@ -5,6 +5,7 @@ import { Button } from "@/components/store/Button";
 import { useCart } from "@/components/store/cart/CartProvider";
 import { DiscountBadge, PriceTag } from "@/components/store/catalog/PriceTag";
 import { QuantityStepper } from "@/components/store/QuantityStepper";
+import { MAX_LINE_QUANTITY } from "@/features/cart/schemas";
 import type { VariantOption } from "@/features/catalog/service";
 
 /**
@@ -20,7 +21,8 @@ export function ProductPurchase({ optionName, variants }: { optionName: string; 
 
   const selected = variants.find((variant) => variant.id === selectedId) ?? variants[0];
   const soldOut = selected.stockState === "sold_out";
-  const maxQuantity = Math.max(1, selected.stock);
+  // The cart caps a line at MAX_LINE_QUANTITY, so the stepper must too (S22 BUG-19).
+  const maxQuantity = Math.max(1, Math.min(MAX_LINE_QUANTITY, selected.stock));
   // Switching to a variant with less stock caps the quantity instead of resetting it.
   const shownQuantity = Math.min(quantity, maxQuantity);
 

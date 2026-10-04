@@ -1,3 +1,4 @@
+import "@/lib/zod-config";
 import { z } from "zod";
 import { checkDateOrder, checkValueRange, karachiDateTimeField } from "@/features/discounts/schemas";
 import { decimalToPaisa } from "@/features/pricing/money";

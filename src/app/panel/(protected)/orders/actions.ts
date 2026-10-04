@@ -13,7 +13,6 @@ import {
   updateFulfilment,
   type StaffActionResult,
 } from "@/features/orders/staff-actions";
-import { getProofOrderNumber } from "@/features/orders/staff-repo";
 import { ACTION_PERMISSIONS } from "@/features/orders/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 
@@ -42,12 +41,11 @@ export async function approveOrderAction(_state: StaffActionResult | null, formD
 export async function reviewProofAction(_state: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
   const decision = formData.get("decision");
   const permissions = decision === "reject" ? [PERMISSIONS.ORDER_VERIFY_PAYMENT, PERMISSIONS.ORDER_UPDATE_STATUS] : [PERMISSIONS.ORDER_VERIFY_PAYMENT];
-  // Resolved before the change in case the proof (and its order) were somehow gone afterwards.
-  const orderNumber = decision === "reject" ? await getProofOrderNumber(Number(formData.get("proofId"))) : null;
-
   const result = await run(permissions, formData, reviewProof);
-  // D37: rejecting a screenshot rejects the whole order, same as "Cancel/Reject" below.
-  if (result.ok && decision === "reject" && orderNumber) after(() => sendOrderClosedEmail(orderNumber));
+  // D37: rejecting a screenshot rejects the whole order, same as "Cancel/Reject" below. The
+  // service hands back the order number (S22 SEC-07: nothing is looked up before the permission check).
+  const orderNumber = result.ok ? result.orderNumber : undefined;
+  if (orderNumber && decision === "reject") after(() => sendOrderClosedEmail(orderNumber));
   return result;
 }
 

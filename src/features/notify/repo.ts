@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import type { PermissionKey } from "@/features/auth/permissions";
 import { db } from "@/server/db/client";
 import { permissions, rolePermissions, users } from "@/server/db/schema/access-control";
@@ -19,7 +19,10 @@ const SELECT_SUBSCRIPTION = {
   auth: pushSubscriptions.auth,
 };
 
-/** Subscribing again from the same browser (the same endpoint) updates the row instead of duplicating it. */
+/** A staff member has a handful of devices; anything beyond this is a stuck re-subscribe loop or a crafted request (S22 SEC-04). */
+export const MAX_SUBSCRIPTIONS_PER_USER = 10;
+
+/** Subscribing again from the same browser (the same endpoint) updates the row instead of duplicating it; the oldest rows go once a user has more than `MAX_SUBSCRIPTIONS_PER_USER`. */
 export async function upsertSubscription(input: {
   userId: number;
   endpoint: string;
@@ -43,6 +46,15 @@ export async function upsertSubscription(input: {
     .onDuplicateKeyUpdate({
       set: { userId: input.userId, endpoint: input.endpoint, p256dh: input.p256dh, auth: input.auth, userAgent: input.userAgent, lastUsedAt: now },
     });
+
+  // Newest first; a user has a handful of rows, so the surplus is sliced here (MySQL has no bare OFFSET).
+  const rows = await db
+    .select({ id: pushSubscriptions.id })
+    .from(pushSubscriptions)
+    .where(eq(pushSubscriptions.userId, input.userId))
+    .orderBy(desc(pushSubscriptions.createdAt), desc(pushSubscriptions.id));
+  const surplus = rows.slice(MAX_SUBSCRIPTIONS_PER_USER).map((row) => row.id);
+  if (surplus.length > 0) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, surplus));
 }
 
 /** Scoped to `userId` so one signed-in user can never remove another's subscription. */

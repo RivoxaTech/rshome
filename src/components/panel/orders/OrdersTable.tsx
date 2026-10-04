@@ -113,7 +113,11 @@ function OrderCard({ item, method, backHref }: { item: StaffOrderListItem; metho
         <StatusMenu control={item.control} setOpenDialog={setOpenDialog} />
         <span className="font-medium">{item.total}</span>
       </div>
-      <OrderDialogs orderNumber={item.orderNumber} control={item.control} openDialog={openDialog} onClose={() => setOpenDialog(null)} />
+      {/* The dialog renders inline, inside this card: without `stop` every click in it (Confirm, the
+          backdrop, the reason box) bubbled to the card and navigated to the order mid-action (S22 BUG-04). */}
+      <div onClick={stop}>
+        <OrderDialogs orderNumber={item.orderNumber} control={item.control} openDialog={openDialog} onClose={() => setOpenDialog(null)} />
+      </div>
     </li>
   );
 }

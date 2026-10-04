@@ -27,17 +27,26 @@ export function SearchBox({
 }) {
   const router = useRouter();
   const [value, setValue] = useState(initialQ);
-  // Adjusting state during render (not an effect) when the URL's own q changes underneath us,
-  // e.g. the back button: react.dev/learn/you-might-not-need-an-effect#adjusting-state-based-on-props.
+  // The last query this box itself put in the URL. When the server answers with it, the box keeps
+  // whatever the user has typed since; only a change from elsewhere (the back button) replaces
+  // the field. Without this, every round trip overwrote the keystrokes made while it was in
+  // flight (S22 BUG-08).
+  const [pushedQ, setPushedQ] = useState(initialQ);
+  // Adjusting state during render (not an effect) when the URL's own q changes underneath us:
+  // react.dev/learn/you-might-not-need-an-effect#adjusting-state-based-on-props.
   const [syncedQ, setSyncedQ] = useState(initialQ);
   if (initialQ !== syncedQ) {
     setSyncedQ(initialQ);
-    setValue(initialQ);
+    if (initialQ !== pushedQ) {
+      setPushedQ(initialQ);
+      setValue(initialQ);
+    }
   }
 
   useEffect(() => {
     if (value === initialQ) return;
     const timer = setTimeout(() => {
+      setPushedQ(value);
       router.replace(buildListPath(basePath, tabSlug, { q: value || undefined, category, pageSize }, defaultPageSize), { scroll: false });
     }, 300);
     return () => clearTimeout(timer);

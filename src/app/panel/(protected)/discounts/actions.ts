@@ -11,7 +11,10 @@ import {
   type DiscountOverlapResult,
   type StaffActionResult,
 } from "@/features/discounts/staff-service";
+import { parseFormId } from "@/lib/form-id";
 import { requirePermission } from "@/server/auth/permissions";
+
+const NOT_FOUND: StaffActionResult = { ok: false, error: "Discount not found." };
 
 export async function createDiscountAction(_prevState: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
   const session = await requirePermission(PERMISSIONS.DISCOUNT_MANAGE);
@@ -22,7 +25,8 @@ export async function createDiscountAction(_prevState: StaffActionResult | null,
 
 export async function updateDiscountAction(_prevState: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
   const session = await requirePermission(PERMISSIONS.DISCOUNT_MANAGE);
-  const id = Number(formData.get("id"));
+  const id = parseFormId(formData.get("id"));
+  if (id === null) return NOT_FOUND;
   const result = await updateDiscountById(id, Object.fromEntries(formData), { id: session.id });
   if (result.ok) redirect("/panel/discounts");
   return result;
@@ -31,14 +35,16 @@ export async function updateDiscountAction(_prevState: StaffActionResult | null,
 /** The list row's / edit page's one-click Activate/Deactivate: never redirects, the caller refreshes in place. */
 export async function setDiscountActiveAction(_prevState: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
   const session = await requirePermission(PERMISSIONS.DISCOUNT_MANAGE);
-  const id = Number(formData.get("id"));
+  const id = parseFormId(formData.get("id"));
+  if (id === null) return NOT_FOUND;
   const isActive = formData.get("isActive") === "true";
   return setDiscountActive(id, isActive, { id: session.id });
 }
 
 export async function deleteDiscountAction(_prevState: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
   const session = await requirePermission(PERMISSIONS.DISCOUNT_MANAGE);
-  const id = Number(formData.get("id"));
+  const id = parseFormId(formData.get("id"));
+  if (id === null) return NOT_FOUND;
   const result = await deleteDiscountById(id, { id: session.id });
   if (result.ok) redirect("/panel/discounts");
   return result;

@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, gte, inArray, isNull, like, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNull, like, lt, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/mysql-core";
 import { normalizePhone } from "@/lib/phone";
 import { db, type DbClient } from "@/server/db/client";
@@ -8,12 +8,12 @@ import { orderItems, orderStatusHistory, orders, paymentProofs } from "@/server/
 import { couponUsages, coupons } from "@/server/db/schema/promotions";
 import type { PaymentMethod } from "./status";
 import type { OrderTab } from "./transitions";
+import { likeContains } from "@/lib/sql-like";
 
 export type OrderUpdate = Partial<typeof orders.$inferInsert>;
 export type ProofRow = typeof paymentProofs.$inferSelect;
 
-/** LIKE treats `%` and `_` as wildcards and `\` as its escape: a search is matched literally. */
-const contains = (text: string) => `%${text.replace(/[\%_]/g, "\$&")}%`;
+const contains = likeContains;
 
 /**
  * Each tab in SQL, within one payment method's page: the same rules as `orderTab` in
@@ -299,7 +299,8 @@ export async function listOrdersForExport(filter: {
     filter.method === "all" ? undefined : eq(orders.paymentMethod, filter.method),
     filter.tab === "all" ? undefined : TAB_CONDITIONS[filter.tab],
     gte(orders.createdAt, filter.from),
-    lte(orders.createdAt, filter.to),
+    // `[from, to)`, like every other range in the app (S22 BUG-16).
+    lt(orders.createdAt, filter.to),
   ].filter((condition): condition is SQL => condition !== undefined);
   const where = and(...conditions);
 

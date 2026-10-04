@@ -5,7 +5,7 @@
  * MariaDB timezone tables (which the host's MariaDB may not have loaded).
  */
 
-import { KARACHI_OFFSET_MS } from "@/lib/karachi-datetime";
+import { KARACHI_OFFSET_MS, isValidIsoDate } from "@/lib/karachi-datetime";
 
 export { KARACHI_OFFSET_MS };
 export const DAY_MS = 24 * 60 * 60 * 1000;
@@ -24,6 +24,11 @@ export function karachiMidnightUtc(dayIndex: number): Date {
 export function dayIndexFromKarachiDateString(value: string): number {
   const [year, month, day] = value.split("-").map(Number);
   return Date.UTC(year, month - 1, day) / DAY_MS;
+}
+
+/** A user-supplied "YYYY-MM-DD" Karachi date as a day index, or null when it isn't a real date (S22 BUG-16). */
+export function parseKarachiDateString(value: string | null | undefined): number | null {
+  return value && isValidIsoDate(value) ? dayIndexFromKarachiDateString(value) : null;
 }
 
 export const RANGE_KEYS = ["today", "7d", "30d", "this_month", "all"] as const;

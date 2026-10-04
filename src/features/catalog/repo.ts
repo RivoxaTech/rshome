@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, like, type SQL } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { categories, productImages, products, productVariants } from "@/server/db/schema/catalog";
+import { likeContains } from "@/lib/sql-like";
 
 export type CategoryRow = typeof categories.$inferSelect;
 export type ProductImageRow = typeof productImages.$inferSelect;
@@ -47,11 +48,6 @@ export function getFeaturedActiveProducts(): Promise<ListingProductRow[]> {
   );
 }
 
-/** MySQL's LIKE escape character is a backslash; escape it and the two wildcards. */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
-}
-
 /**
  * Every active product matching the filter, unsorted and unpaginated: the caller sorts by the
  * discounted price (computed in features/pricing, not SQL) and then slices a page. Uses the
@@ -63,7 +59,7 @@ export function getActiveListingProducts(filter: {
 }): Promise<ListingProductRow[]> {
   const conditions: SQL[] = [];
   if (filter.categoryIds) conditions.push(inArray(products.categoryId, filter.categoryIds));
-  if (filter.nameQuery) conditions.push(like(products.name, `%${escapeLike(filter.nameQuery)}%`));
+  if (filter.nameQuery) conditions.push(like(products.name, likeContains(filter.nameQuery)));
   return selectActiveListingProducts(...conditions);
 }
 

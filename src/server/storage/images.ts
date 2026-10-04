@@ -23,6 +23,22 @@ export type ProcessedMediaImage = {
   height: number;
 };
 
+/**
+ * Catalogue photos (S22 SEC-03): a 24 MP camera photo fits; anything larger is refused from its
+ * header before a pixel is decoded, since an 8 MB PNG can legitimately unpack to a gigabyte.
+ */
+export const MEDIA_MAX_INPUT_PIXELS = 40_000_000;
+const MEDIA_FORMATS: ReadonlySet<string> = new Set(["jpeg", "png", "webp"]);
+
+export type MediaImageRefusal = "unsupported_type" | "too_many_pixels" | "unreadable";
+
+/** Why an upload was refused; the route turns the reason into the staff member's message. */
+export class MediaImageError extends Error {
+  constructor(readonly reason: MediaImageRefusal) {
+    super(`Media image refused: ${reason}`);
+  }
+}
+
 async function fileExists(filePath: string): Promise<boolean> {
   try {
     await stat(filePath);
@@ -43,17 +59,24 @@ export async function processMediaImage(
   subdir: string,
   basename: string = randomBytes(16).toString("hex"),
 ): Promise<ProcessedMediaImage> {
-  const mediaDir = path.join(env.UPLOAD_DIR, "media", subdir);
-  await mkdir(mediaDir, { recursive: true });
-
-  const source = sharp(buffer, { limitInputPixels: 268402689 }).rotate();
-  const metadata = await source.metadata();
+  // The real type and size come from the file's own header (never its name or the browser's claim).
+  let metadata: Metadata;
+  try {
+    metadata = await sharp(buffer).metadata();
+  } catch {
+    throw new MediaImageError("unsupported_type");
+  }
+  if (!metadata.format || !MEDIA_FORMATS.has(metadata.format)) throw new MediaImageError("unsupported_type");
   const swapped = SWAPPED_ORIENTATIONS.has(metadata.orientation ?? 1);
   const width = (swapped ? metadata.height : metadata.width) ?? 0;
   const height = (swapped ? metadata.width : metadata.height) ?? 0;
-  if (!width || !height) {
-    throw new Error("Could not read image dimensions");
-  }
+  if (!width || !height) throw new MediaImageError("unreadable");
+  if (width * height > MEDIA_MAX_INPUT_PIXELS) throw new MediaImageError("too_many_pixels");
+
+  const mediaDir = path.join(env.UPLOAD_DIR, "media", subdir);
+  await mkdir(mediaDir, { recursive: true });
+
+  const source = sharp(buffer, { limitInputPixels: MEDIA_MAX_INPUT_PIXELS }).rotate();
 
   const targets = WIDTHS.map((targetWidth) => ({
     targetWidth,

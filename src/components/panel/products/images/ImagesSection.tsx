@@ -49,7 +49,12 @@ export function ImagesSection({ productId, images }: { productId: number; images
     setOrder(next);
     setSaving(true);
     setError(null);
-    const result = await saveImageOrderAction({ productId, orderedIds: next.map((image) => image.id) });
+    let result: Awaited<ReturnType<typeof saveImageOrderAction>>;
+    try {
+      result = await saveImageOrderAction({ productId, orderedIds: next.map((image) => image.id) });
+    } catch {
+      result = { ok: false, error: "Could not save the new order. Check your connection and try again." };
+    }
     setSaving(false);
     if (!result.ok) {
       setOrder(order);

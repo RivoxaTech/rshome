@@ -134,8 +134,8 @@ export default async function OrderPage({ params }: PageProps<"/order/[orderNumb
             <p className="eyebrow">Delivery to</p>
             <p className="mt-4 text-sm">{order.customer.name}</p>
             <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-              {order.address.map((line) => (
-                <span key={line} className="block">
+              {order.address.map((line, index) => (
+                <span key={`${index}-${line}`} className="block">
                   {line}
                 </span>
               ))}

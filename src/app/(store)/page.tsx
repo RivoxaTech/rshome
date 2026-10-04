@@ -22,13 +22,14 @@ const HERO_IMAGE_SIZE = { width: 1920, height: 1280 };
 const HERO_ACCENT_IMAGE_SIZE = { width: 1408, height: 1008 };
 
 export async function generateMetadata(): Promise<Metadata> {
-  const categories = await getStoreCategories();
+  const [categories, identity] = await Promise.all([getStoreCategories(), getStoreIdentity()]);
   const heroImagePath = categories.find((category) => category.slug === HERO_CATEGORY_SLUG)?.imagePath;
 
   return buildStorefrontMetadata({
     appUrl: env.APP_URL,
     path: "/",
-    title: siteConfig.storeName,
+    // The panel-editable name (D56), not the build-time default (S22 BUG-28).
+    title: identity.storeName,
     description: siteConfig.tagline,
     image: heroImagePath ? mediaImageUrl(env.APP_URL, heroImagePath) : undefined,
   });

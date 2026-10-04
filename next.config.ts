@@ -1,15 +1,21 @@
 import type { NextConfig } from "next";
+import { SECURITY_HEADERS } from "./src/config/security-headers";
 
-// Extra hosts (e.g. a demo tunnel) allowed to invoke Server Actions, beyond APP_URL's own origin
-// which Next always allows. `serverActions.allowedOrigins` wants bare hosts, not full URLs.
+// Extra hosts (e.g. a reverse proxy or a second domain) allowed to invoke Server Actions, beyond
+// APP_URL's own origin which Next always allows. `serverActions.allowedOrigins` wants bare hosts.
 const extraServerActionOrigins = (process.env.ALLOWED_ORIGINS ?? "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean)
   .map((origin) => new URL(origin).host);
 
+// The security headers are production-only (S22, D61): the dev server's HMR and React's dev
+// tooling need eval and websockets the CSP would block, and nothing in development is exposed.
+const isProduction = process.env.NODE_ENV === "production";
+
 const nextConfig: NextConfig = {
   output: "standalone",
+  poweredByHeader: false,
   // The panel's profile block sits bottom-left; keep the dev indicator out of its way.
   devIndicators: {
     position: "bottom-right",
@@ -22,6 +28,9 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions:
       extraServerActionOrigins.length > 0 ? { allowedOrigins: extraServerActionOrigins } : undefined,
+  },
+  async headers() {
+    return isProduction ? [{ source: "/:path*", headers: [...SECURITY_HEADERS] }] : [];
   },
 };
 

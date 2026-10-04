@@ -7,6 +7,7 @@ import { and, count, desc, eq, gte, isNull, like, lt, sql, type SQL } from "driz
 import { db } from "@/server/db/client";
 import { users } from "@/server/db/schema/access-control";
 import { auditLogs } from "@/server/db/schema/audit";
+import { likeContains } from "@/lib/sql-like";
 
 export type AuditFilter = {
   /** A user id, "system" for rows with no acting user, or undefined for everyone. */
@@ -33,8 +34,7 @@ export type AuditRow = {
   createdAt: Date;
 };
 
-/** LIKE treats `%` and `_` as wildcards and `\` as its escape: a search is matched literally. */
-const contains = (text: string) => `%${text.replace(/[%_\\]/g, "\\$&")}%`;
+const contains = likeContains;
 
 function whereFor(filter: AuditFilter): SQL | undefined {
   const conditions: SQL[] = [];

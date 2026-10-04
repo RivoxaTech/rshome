@@ -118,7 +118,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
 
   const approve = (orderNumber: string, amount?: string, note = "") =>
     actions.approveOrderAction(null, form(amount === undefined ? { orderNumber, note } : { orderNumber, amount, note }));
-  const review = (proofId: number, decision: "approve" | "reject", reason?: string) =>
+  const review = (proofId: number | string, decision: "approve" | "reject", reason?: string) =>
     actions.reviewProofAction(null, form(reason === undefined ? { proofId, decision } : { proofId, decision, reason }));
   const fulfil = (orderNumber: string, status: string, extra: Record<string, string> = {}) =>
     actions.updateFulfilmentAction(null, form({ orderNumber, status, ...extra }));
@@ -213,7 +213,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     expect(await tabOf(order.orderNumber, "bank_transfer")).toBe("pending_delivery");
     expect((await rowOf(order.orderNumber, "bank_transfer")).screenshotToCheck).toBe(true);
     expect(await stepsOf(order.orderNumber, "bank_transfer")).toEqual(["check_screenshot", "cancel", "reject"]);
-    expect(await review(await latestProofId(order.id, "delivery"), "approve")).toEqual({ ok: true });
+    expect(await review(await latestProofId(order.id, "delivery"), "approve")).toMatchObject({ ok: true });
     expect(await orderRow(order.orderNumber)).toMatchObject({ orderStatus: "processing", paymentStatus: "verified" });
     expect(await tabOf(order.orderNumber, "bank_transfer")).toBe("processing");
     expect(await stepsOf(order.orderNumber, "bank_transfer")).toEqual(["ship", "complete", "cancel", "reject"]);
@@ -274,7 +274,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     const goodsId = await latestProofId(order.id, "goods");
 
     expect(await review(goodsId, "reject", " ")).toMatchObject({ ok: false, fieldErrors: { reason: "Enter a reason." } });
-    expect(await review(goodsId, "reject", "Amount does not match")).toEqual({ ok: true });
+    expect(await review(goodsId, "reject", "Amount does not match")).toMatchObject({ ok: true });
 
     const row = await orderRow(order.orderNumber);
     expect(row).toMatchObject({ orderStatus: "rejected", paymentStatus: "rejected", rejectionReason: "Amount does not match" });
@@ -302,7 +302,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     await customerUploads(order.orderNumber, "delivery");
     const deliveryId = await latestProofId(order.id, "delivery");
 
-    expect(await review(deliveryId, "reject", "Wrong account")).toEqual({ ok: true });
+    expect(await review(deliveryId, "reject", "Wrong account")).toMatchObject({ ok: true });
 
     const row = await orderRow(order.orderNumber);
     expect(row).toMatchObject({ orderStatus: "rejected", paymentStatus: "rejected", rejectionReason: "Wrong account" });
@@ -337,7 +337,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     expect(await stepsOf(order.orderNumber, "bank_transfer")).toEqual(["check_screenshot", "cancel", "reject"]);
 
     // The delivery charge first: the products are still waiting, so the order stays.
-    expect(await review(deliveryId, "approve")).toEqual({ ok: true });
+    expect(await review(deliveryId, "approve")).toMatchObject({ ok: true });
     expect(await orderRow(order.orderNumber)).toMatchObject({ orderStatus: "pending", paymentStatus: "proof_submitted" });
     row = await rowOf(order.orderNumber, "bank_transfer");
     expect(row.control.toCheck.map((proof) => proof.id)).toEqual([goodsId]);
@@ -345,7 +345,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     expect((await staff.getOrderCounts()).bank_transfer.toCheck.pending_delivery).toBeGreaterThan(0);
 
     // The products screenshot on its own, past Need review: both payments are in, on to Processing.
-    expect(await review(goodsId, "approve")).toEqual({ ok: true });
+    expect(await review(goodsId, "approve")).toMatchObject({ ok: true });
     expect(await orderRow(order.orderNumber)).toMatchObject({ orderStatus: "processing", paymentStatus: "verified" });
     expect(await tabOf(order.orderNumber, "bank_transfer")).toBe("processing");
     expect((await rowOf(order.orderNumber, "bank_transfer")).screenshotToCheck).toBe(false);
@@ -376,7 +376,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     // No delivery charge screenshot yet, so the menu doesn't offer Processing.
     expect(await stepsOf(order.orderNumber, "bank_transfer")).toEqual(["cancel", "reject"]);
 
-    expect(await review(secondGoods, "approve")).toEqual({ ok: true });
+    expect(await review(secondGoods, "approve")).toMatchObject({ ok: true });
     expect(await orderRow(order.orderNumber)).toMatchObject({ orderStatus: "pending", paymentStatus: "unpaid" });
     expect((await rowOf(order.orderNumber, "bank_transfer")).control.waiting).toBe("Waiting for the delivery charge");
 
@@ -447,7 +447,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     expect(await deleteOrder(order.orderNumber)).toEqual({ ok: false, error: "Only a cancelled or rejected order can be deleted." });
     expect(await orderRow(order.orderNumber)).toBeDefined();
 
-    expect(await review(goodsId, "reject", "Amount does not match")).toEqual({ ok: true });
+    expect(await review(goodsId, "reject", "Amount does not match")).toMatchObject({ ok: true });
     expect(await orderRow(order.orderNumber)).toMatchObject({ orderStatus: "rejected" });
 
     expect(await deleteOrder(order.orderNumber)).toEqual({ ok: true });
@@ -615,6 +615,16 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     expect(await db.select().from(auditLogs).where(and(eq(auditLogs.entityId, order.orderNumber), eq(auditLogs.action, "order.approve")))).toEqual([]);
   });
 
+  // S22 BUG-06: the list search escapes LIKE's wildcards, so "_" and "%" match literally, not everything.
+  it("searches the list literally: a lone underscore or percent sign matches no order", async () => {
+    await placeOrder({ paymentMethod: "cod", name: "Wildcard One" });
+    await placeOrder({ paymentMethod: "cod", name: "Wildcard Two" });
+    expect((await staff.listStaffOrders("cod", "all", { q: "Wildcard", page: 1 }, adminPermissions)).items).toHaveLength(2);
+    expect((await staff.listStaffOrders("cod", "all", { q: "_", page: 1 }, adminPermissions)).items).toHaveLength(0);
+    expect((await staff.listStaffOrders("cod", "all", { q: "%", page: 1 }, adminPermissions)).items).toHaveLength(0);
+    expect((await staff.listStaffOrders("cod", "all", { q: "Wild_ard", page: 1 }, adminPermissions)).items).toHaveLength(0);
+  });
+
   it("lets order.verify_payment approve a screenshot alone, but needs order.update_status too to reject it (owner decision, S9)", async () => {
     const order = await placeBankOrder();
     const goodsId = await latestProofId(order.id, "goods");
@@ -624,7 +634,19 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     expect((await proofsOf(order.id))[0].status).toBe("submitted");
 
     current.cookies.set("panel_session", (await createStaffSession(db, hashToken, ["order.view", "order.verify_payment", "order.update_status"])).token);
-    expect(await review(goodsId, "reject", "Wrong amount")).toEqual({ ok: true });
+    expect(await review(goodsId, "reject", "Wrong amount")).toMatchObject({ ok: true });
     expect(await orderRow(order.orderNumber)).toMatchObject({ orderStatus: "rejected" });
+  });
+  // S22 SEC-07: nothing is looked up before the permission check, and a tampered proof id is a plain refusal.
+  it("a tampered proofId is refused after the permission check, never sent to the database", async () => {
+    current.cookies.clear();
+    await expect(review("abc", "reject", "x")).rejects.toMatchObject({ digest: expect.stringContaining(";/panel/login;") });
+
+    current.cookies.set("panel_session", adminToken);
+    for (const proofId of ["abc", "", "0", "1.5"]) {
+      expect(await review(proofId, "reject", "x"), proofId).toMatchObject({ ok: false });
+      expect(await review(proofId, "approve"), proofId).toMatchObject({ ok: false });
+    }
+    expect(await review(999999, "approve")).toEqual({ ok: false, error: "Screenshot not found." });
   });
 });

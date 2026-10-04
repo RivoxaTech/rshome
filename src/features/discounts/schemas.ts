@@ -1,3 +1,4 @@
+import "@/lib/zod-config";
 import { z } from "zod";
 import { decimalToPaisa } from "@/features/pricing/money";
 import { moneyField } from "@/features/pricing/schemas";

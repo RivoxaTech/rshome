@@ -82,12 +82,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const quoteRemote = useCallback((cart: CartInput) => {
     const requestId = ++requestRef.current;
     startTransition(async () => {
-      const result = await quoteCartAction({ ...cart, phone: phoneRef.current, destination: destinationRef.current });
+      let result: Awaited<ReturnType<typeof quoteCartAction>>;
+      try {
+        result = await quoteCartAction({ ...cart, phone: phoneRef.current, destination: destinationRef.current });
+      } catch {
+        // A transient server error keeps the last good quote and the stored cart (S22 BUG-07).
+        return;
+      }
       if (requestId !== requestRef.current) return; // a newer change is already in flight
       if (result.ok) {
         cartStore.set({ lines: result.quote.storedLines, couponCode: result.quote.storedCouponCode });
         setQuote(result.quote);
-      } else {
+      } else if (result.reason === "cart_unreadable") {
+        // Only corrupt storage is reset (S22 BUG-01); any other refusal keeps the last good quote.
         cartStore.set(EMPTY_CART);
         setQuote(null);
       }

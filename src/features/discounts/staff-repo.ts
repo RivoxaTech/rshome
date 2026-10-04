@@ -7,13 +7,13 @@ import { asc, desc, eq, inArray, like } from "drizzle-orm";
 import { db, type DbClient } from "@/server/db/client";
 import { categories, products } from "@/server/db/schema/catalog";
 import { discounts, discountTargets } from "@/server/db/schema/promotions";
+import { likeContains } from "@/lib/sql-like";
 
 export type DiscountRow = typeof discounts.$inferSelect;
 export type DiscountUpdate = Partial<typeof discounts.$inferInsert>;
 export type DiscountWithTargets = { discount: DiscountRow; targetIds: number[] };
 
-/** LIKE treats `%` and `_` as wildcards and `\` as its escape: a search is matched literally. */
-const contains = (text: string) => `%${text.replace(/[%_]/g, "\\$&")}%`;
+const contains = likeContains;
 
 async function targetsFor(rows: DiscountRow[], client: DbClient = db): Promise<Map<number, number[]>> {
   const map = new Map<number, number[]>(rows.map((row) => [row.id, []]));

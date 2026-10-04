@@ -3,6 +3,8 @@ import type { Paisa } from "@/features/pricing/money";
 
 export const SHOP_SORTS = ["recommended", "newest", "price_asc", "price_desc"] as const;
 export type ShopSort = (typeof SHOP_SORTS)[number];
+/** The staff-controlled order (S10 phase 2b); the one value the listing URL leaves out. */
+export const DEFAULT_SORT: ShopSort = "recommended";
 
 export type SortableProduct = {
   id: number;

@@ -1,7 +1,9 @@
+import "@/lib/zod-config";
 import { z } from "zod";
 import { phoneSchema } from "@/features/checkout/schemas";
 import { siteConfig } from "@/config/site.config";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS, WHOLESALE_STATUSES } from "./transitions";
+import { isValidIsoDate } from "@/lib/karachi-datetime";
 
 // Matches `wholesale_inquiries.business_type` (DATABASE.md) — the DB truth, not the UI copy
 // (`siteConfig.wholesaleBusinessTypes` holds the select's labels, kept in sync by hand).
@@ -33,7 +35,6 @@ export function todayInKarachi(): string {
   }).format(new Date());
 }
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** `""`/missing become `null`; otherwise a valid calendar date that hasn't already passed. */
 const neededByDateSchema = z
@@ -41,7 +42,7 @@ const neededByDateSchema = z
   .trim()
   .optional()
   .transform((value) => (value ? value : null))
-  .refine((value) => value === null || (ISO_DATE.test(value) && !Number.isNaN(Date.parse(value))), "Enter a valid date.")
+  .refine((value) => value === null || isValidIsoDate(value), "Enter a valid date.")
   .refine((value) => value === null || value >= todayInKarachi(), "Choose a date that hasn't already passed.");
 
 export const wholesaleItemSchema = z.object({

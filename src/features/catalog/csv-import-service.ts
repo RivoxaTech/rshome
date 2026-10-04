@@ -14,7 +14,7 @@ import { env } from "@/server/env";
 import { db } from "@/server/db/client";
 import { PRODUCT_IMPORT_HEADERS, validateImportRow, type ProductImportRow, type RowIssue } from "./csv-import-schema";
 import { decodeImportCheckToken, encodeImportCheckToken, hashFile, IMPORT_CHECK_TOKEN_TTL_MS } from "./import-token";
-import { getCategoryBySlugActive, getProductBySlug, insertProduct, lockProductById, updateProduct, type ProductRow } from "./products-staff-repo";
+import { getCategoryBySlugActive, getMaxSortOrders, getProductBySlug, insertProduct, lockProductById, updateProduct, type ProductRow } from "./products-staff-repo";
 import { getVariantBySku, getVariantsByProductId, insertVariant, lockVariantsByProductId, updateVariant } from "./variants-staff-repo";
 import { sameAttributes } from "./variants";
 
@@ -105,8 +105,9 @@ async function runChecks(text: string): Promise<CheckedFile> {
   });
 
   // SKU uniqueness within the file (every variant's SKU is unique store-wide).
+  // Case-insensitively, like the unique index under utf8mb4_unicode_ci (S22 BUG-11).
   const skuRows = new Map<string, number[]>();
-  for (const entry of valid) skuRows.set(entry.value.sku, [...(skuRows.get(entry.value.sku) ?? []), entry.rowNumber]);
+  for (const entry of valid) skuRows.set(skuKey(entry.value.sku), [...(skuRows.get(skuKey(entry.value.sku)) ?? []), entry.rowNumber]);
   for (const [sku, rowNumbers] of skuRows) {
     if (rowNumbers.length > 1) {
       for (const rowNumber of rowNumbers) rowErrors.push({ row: rowNumber, column: "Variant SKU", message: `Duplicate SKU "${sku}" in this file (rows ${rowNumbers.join(", ")}).` });
@@ -155,8 +156,8 @@ async function runChecks(text: string): Promise<CheckedFile> {
     else toCreateProducts++;
 
     const existingVariants = existingProduct ? await getVariantsByProductId(db, existingProduct.id) : [];
-    const fileSkus = new Set(group.rows.map((entry) => entry.value.sku));
-    const untouchedActiveRemains = existingVariants.some((row) => !fileSkus.has(row.sku) && row.isActive);
+    const fileSkus = new Set(group.rows.map((entry) => skuKey(entry.value.sku)));
+    const untouchedActiveRemains = existingVariants.some((row) => !fileSkus.has(skuKey(row.sku)) && row.isActive);
 
     let anyFileRowActive = false;
     for (const entry of group.rows) {
@@ -184,6 +185,9 @@ async function runChecks(text: string): Promise<CheckedFile> {
   };
 }
 
+/** The unique index compares SKUs case-insensitively, so every in-memory comparison does too (S22 BUG-11). */
+const skuKey = (sku: string) => sku.toUpperCase();
+
 export type CheckResult = { ok: true; report: ImportReport; token: string } | { ok: false; error: string };
 
 export async function checkProductImport(buffer: Buffer): Promise<CheckResult> {
@@ -196,6 +200,9 @@ export async function checkProductImport(buffer: Buffer): Promise<CheckResult> {
 }
 
 export type CommitResult = { ok: true; created: number; updated: number } | { ok: false; error: string; report?: ImportReport };
+
+/** The uploaded file's name is kept for the audit row's `new_values` only, capped here (S22 BUG-03). */
+export const MAX_IMPORT_FILE_NAME_LENGTH = 200;
 
 export async function commitProductImport(buffer: Buffer, token: string, actor: { id: number }, fileName: string): Promise<CommitResult> {
   if (buffer.byteLength > MAX_IMPORT_FILE_BYTES) return { ok: false, error: "The file is larger than 2 MB." };
@@ -213,6 +220,9 @@ export async function commitProductImport(buffer: Buffer, token: string, actor: 
 
   await db.transaction(async (tx) => {
     const now = new Date();
+    // New products join the end of the shop (and featured) order instead of the default 0, which
+    // would have put every import ahead of the catalogue (S22 BUG-10).
+    const positions = await getMaxSortOrders(tx);
 
     for (const group of result.groups.values()) {
       const first = group.rows[0].value;
@@ -235,6 +245,8 @@ export async function commitProductImport(buffer: Buffer, token: string, actor: 
           description: first.description,
           price: first.price,
           isFeatured: first.isFeatured,
+          // Newly featured by this import: the end of the featured strip, not its front.
+          ...(first.isFeatured && !locked.isFeatured ? { featuredSortOrder: ++positions.featured } : {}),
           status: first.status,
           updatedAt: now,
         });
@@ -250,6 +262,8 @@ export async function commitProductImport(buffer: Buffer, token: string, actor: 
           weightGrams: null,
           isFeatured: first.isFeatured,
           status: first.status,
+          sortOrder: ++positions.shop,
+          featuredSortOrder: first.isFeatured ? ++positions.featured : 0,
           createdAt: now,
           updatedAt: now,
         });
@@ -260,7 +274,7 @@ export async function commitProductImport(buffer: Buffer, token: string, actor: 
       let nextSortOrder = siblings.length > 0 ? Math.max(...siblings.map((row) => row.sortOrder)) + 1 : 0;
 
       for (const entry of group.rows) {
-        const existingVariant = siblings.find((row) => row.sku === entry.value.sku);
+        const existingVariant = siblings.find((row) => skuKey(row.sku) === skuKey(entry.value.sku));
         if (existingVariant) {
           await updateVariant(tx, existingVariant.id, {
             label: entry.value.label,
@@ -299,13 +313,15 @@ export async function commitProductImport(buffer: Buffer, token: string, actor: 
       });
     }
 
+    // `entity_id` is VARCHAR(50) and the file name is the operator's own text (S22 BUG-03), so the
+    // id is the checked file's hash prefix and the name only ever appears in `new_values`.
     await insertAuditLog(tx, {
       userId: actor.id,
       action: "product.bulk_import",
       entity: "product_import",
-      entityId: fileName,
+      entityId: `import:${expectedHash.slice(0, 16)}`,
       oldValues: null,
-      newValues: { fileName, products: result.groups.size, created: createdCount, updated: updatedCount, rows: result.report.totalRows },
+      newValues: { fileName: fileName.slice(0, MAX_IMPORT_FILE_NAME_LENGTH), products: result.groups.size, created: createdCount, updated: updatedCount, rows: result.report.totalRows },
       createdAt: now,
     });
   });

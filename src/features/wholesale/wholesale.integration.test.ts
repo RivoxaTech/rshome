@@ -278,6 +278,11 @@ describe.skipIf(!TEST_DATABASE_URL)("wholesale inquiries (integration)", () => {
     const exported = await exportRoute.GET(new Request(`${ORIGIN}/api/panel/wholesale/export`));
     expect(exported.status).toBe(200);
     expect(await exported.text()).toContain("Ayesha Raza");
+    // S22 BUG-24: the export is audited and a capped file is marked in its name (this one is not capped).
+    expect(exported.headers.get("content-disposition")).toMatch(/filename="wholesale-inquiries-\d{4}-\d{2}-\d{2}\.csv"/);
+    const exportAudit = await db.select().from(auditLogs).where(eq(auditLogs.action, "wholesale.export"));
+    expect(exportAudit).toHaveLength(1);
+    expect(JSON.parse(exportAudit[0].newValues!)).toMatchObject({ tab: "all", rowCount: 1, truncated: false });
   });
 
   it("refuses a Developer session on the pages, every Server Action, the export route and the counts", async () => {

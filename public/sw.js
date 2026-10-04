@@ -11,6 +11,17 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Only this origin's own pages are ever opened from a notification: a payload URL pointing
+// anywhere else (which would take a compromised server to produce) falls back to the panel.
+function panelUrl(candidate) {
+  try {
+    const url = new URL(candidate, self.location.origin);
+    return url.origin === self.location.origin ? url.href : new URL("/panel", self.location.origin).href;
+  } catch {
+    return new URL("/panel", self.location.origin).href;
+  }
+}
+
 self.addEventListener("push", (event) => {
   let payload = {};
   try {
@@ -25,14 +36,14 @@ self.addEventListener("push", (event) => {
     // A repeat of a tag already shown (e.g. a second wholesale inquiry while the first
     // notification is still up) still alerts the user instead of silently replacing it.
     renotify: true,
-    data: { url: payload.url || "/panel" },
+    data: { url: panelUrl(payload.url || "/panel") },
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data && event.notification.data.url ? event.notification.data.url : "/panel";
+  const targetUrl = panelUrl(event.notification.data && event.notification.data.url ? event.notification.data.url : "/panel");
 
   event.waitUntil(
     (async () => {

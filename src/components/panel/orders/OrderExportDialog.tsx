@@ -5,12 +5,12 @@ import { Dialog } from "@/components/panel/Dialog";
 import { Field, inputClass } from "@/components/panel/FormField";
 import { Listbox, type ListboxItem } from "@/components/panel/Listbox";
 import type { PaymentMethod } from "@/features/orders/status";
+import { KARACHI_OFFSET_MS } from "@/lib/karachi-datetime";
 import { TAB_INFO, tabsFor, type OrderTab } from "@/features/orders/transitions";
 
+/** Today minus `daysAgo` as a Karachi calendar date — the server reads these as Karachi days too (S22 BUG-16). */
 function defaultDate(daysAgo: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() - daysAgo);
-  return date.toISOString().slice(0, 10);
+  return new Date(Date.now() + KARACHI_OFFSET_MS - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 /**

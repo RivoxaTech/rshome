@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_DEFAULT_PERMISSIONS, DEVELOPER_DEFAULT_PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 import { auditLogs } from "@/server/db/schema/audit";
+import { orders } from "@/server/db/schema/orders";
 import { assertTestDatabase, checkoutInput, createStaffSession, resetTables, seedFixtures, type FixtureIds } from "@/test/integration-fixtures";
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -91,6 +92,18 @@ describe.skipIf(!TEST_DATABASE_URL)("order CSV export and printable slip (integr
 
       const auditRows = await db.select().from(auditLogs).where(eq(auditLogs.action, "order.export"));
       expect(auditRows.length).toBe(1);
+    });
+
+    // S22 BUG-16: the range is [from, to) like every other range in the app; an order placed exactly
+    // at the next Karachi midnight belongs to the next day's export, not this one's.
+    it("excludes an order placed exactly at the midnight that ends the range", async () => {
+      await signInAs(ADMIN_DEFAULT_PERMISSIONS);
+      // 2 Jan 2000 00:00 Karachi = 1 Jan 2000 19:00 UTC.
+      await db.update(orders).set({ createdAt: new Date("2000-01-01T19:00:00Z") }).where(eq(orders.orderNumber, orderNumber));
+      const sameDay = await exportRoute.GET(new Request(`${ORIGIN}/api/panel/orders/export?method=cod&from=2000-01-01&to=2000-01-01`));
+      expect(await sameDay.text()).not.toContain(orderNumber);
+      const nextDay = await exportRoute.GET(new Request(`${ORIGIN}/api/panel/orders/export?method=cod&from=2000-01-02&to=2000-01-02`));
+      expect(await nextDay.text()).toContain(orderNumber);
     });
 
     it("excludes the order when the date range doesn't cover it", async () => {

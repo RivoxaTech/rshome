@@ -11,6 +11,7 @@ import { auditLogs } from "@/server/db/schema/audit";
 import { pushSubscriptions } from "@/server/db/schema/notify";
 import { orderStatusHistory, paymentProofs } from "@/server/db/schema/orders";
 import { wholesaleInquiryNotes } from "@/server/db/schema/wholesale";
+import { likeContains } from "@/lib/sql-like";
 
 /** A user row without its password hash — the shape every page and audit row works from. */
 export type UserStaffRow = {
@@ -39,8 +40,7 @@ const staffColumns = {
   updatedAt: users.updatedAt,
 };
 
-/** LIKE treats `%` and `_` as wildcards and `\` as its escape: a search is matched literally. */
-const contains = (text: string) => `%${text.replace(/[%_\\]/g, "\\$&")}%`;
+const contains = likeContains;
 
 const searchWhere = (search?: string) => (search ? or(like(users.name, contains(search)), like(users.email, contains(search))) : undefined);
 

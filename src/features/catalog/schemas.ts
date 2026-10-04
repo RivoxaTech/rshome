@@ -1,7 +1,8 @@
+import "@/lib/zod-config";
 import { z } from "zod";
 import { moneyField, optionalMoneyField } from "@/features/pricing/schemas";
 import { CATEGORY_MEDIA_PATH_PATTERN, PRODUCT_MEDIA_PATH_PATTERN } from "@/server/storage/media-paths";
-import { SHOP_SORTS } from "./listing";
+import { DEFAULT_SORT, SHOP_SORTS } from "./listing";
 import { SLUG_PATTERN } from "./slug";
 import { ATTRIBUTE_SLOTS, generateVariantLabel, validateAttributePairs } from "./variants";
 
@@ -14,7 +15,7 @@ const firstValue = (value: unknown) => (Array.isArray(value) ? value[0] : value)
 export const listingQuerySchema = z.object({
   q: z.preprocess(firstValue, z.string().trim().max(100).optional()).catch(undefined),
   category: z.preprocess(firstValue, z.string().max(191).optional()).catch(undefined),
-  sort: z.preprocess(firstValue, z.enum(SHOP_SORTS)).catch("recommended"),
+  sort: z.preprocess(firstValue, z.enum(SHOP_SORTS)).catch(DEFAULT_SORT),
   page: z.preprocess(firstValue, z.coerce.number().int().min(1).max(10_000)).catch(1),
 });
 

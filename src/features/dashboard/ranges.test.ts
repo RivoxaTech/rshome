@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  parseKarachiDateString,
   KARACHI_OFFSET_MS,
   chooseBucket,
   computeChange,
@@ -145,5 +146,14 @@ describe("computeChange", () => {
 describe("KARACHI_OFFSET_MS", () => {
   it("is exactly five hours", () => {
     expect(KARACHI_OFFSET_MS).toBe(5 * 60 * 60 * 1000);
+  });
+});
+
+describe("parseKarachiDateString (S22 BUG-16)", () => {
+  it("accepts a real calendar date and refuses impossible or malformed ones", () => {
+    expect(parseKarachiDateString("2026-10-04")).toBe(dayIndexFromKarachiDateString("2026-10-04"));
+    for (const bad of ["2026-13-45", "2026-02-30", "2026-04-31", "26-10-04", "2026/10/04", "", null, undefined]) {
+      expect(parseKarachiDateString(bad), String(bad)).toBeNull();
+    }
   });
 });

@@ -84,12 +84,14 @@ async function dispatchPush(subscriptions: StoredSubscription[], payload: unknow
 
 /** The event senders below are what the app layer fires with `after()` — they must never throw. */
 async function sendEvent(event: NotifyEvent, permission: (typeof PERMISSIONS)[keyof typeof PERMISSIONS], entityId: string): Promise<void> {
-  const payload = buildPushPayload(event);
+  let payload: ReturnType<typeof buildPushPayload>;
   try {
+    payload = buildPushPayload(event);
     const subscriptions = await listSubscriptionsForPermission(permission);
     await dispatchPush(subscriptions, payload, entityId);
   } catch (error) {
     await logNotifyFailure(entityId, error instanceof Error ? error.message : "Unknown error");
+    return;
   }
   // Push is always attempted; the owner's email is an opt-in backup (ARCHITECTURE.md §4.2 step 10).
   await dispatchOwnerEmail(event, payload.title, payload.url, entityId);

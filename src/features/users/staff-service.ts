@@ -19,7 +19,7 @@
  */
 import type { ZodError } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
-import { PERMISSIONS } from "@/features/auth/permissions";
+import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 import type { StaffActionResult } from "@/features/catalog/staff-service";
 import { fieldErrorsOf } from "@/features/checkout/schemas";
 import { fingerprint } from "@/lib/fingerprint";
@@ -28,6 +28,7 @@ import { hashPassword } from "@/server/auth/password";
 import { db, type DbClient } from "@/server/db/client";
 import { consumeRateLimit } from "@/server/rate-limit";
 import { createUserInputSchema, resetPasswordInputSchema, updateUserInputSchema, type CreateUserInput, type UpdateUserInput } from "./schemas";
+import { isDuplicateEntry } from "@/server/db/errors";
 import {
   countActiveUsersInRoles,
   countUserReferences,
@@ -60,15 +61,14 @@ class UserActionError extends Error {
   }
 }
 
-const DUPLICATE_ENTRY = 1062;
 const EMAIL_IN_USE = "Another user already has this email address.";
 export const STALE_USER_MESSAGE = "Someone else changed this user after you opened the page. Reload to see their changes, then make yours again.";
 const SELF_DEACTIVATE = "You can't deactivate your own account.";
 const SELF_ROLE_CHANGE = "You can't change your own role.";
 const SELF_DELETE = "You can't delete your own account.";
-const LAST_MANAGER_DEACTIVATE = "This is the last active user who can manage users, so it can't be deactivated.";
-const LAST_MANAGER_ROLE_CHANGE = "This is the last active user who can manage users, so it must keep a role with that permission.";
-const LAST_MANAGER_DELETE = "This is the last active user who can manage users, so it can't be deleted.";
+const LAST_MANAGER_DEACTIVATE = "This is the last active user who can manage users or roles, so it can't be deactivated.";
+const LAST_MANAGER_ROLE_CHANGE = "This is the last active user who can manage users or roles, so it must keep a role with that permission.";
+const LAST_MANAGER_DELETE = "This is the last active user who can manage users or roles, so it can't be deleted.";
 const PASSWORD_RESET_RATE_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 };
 
 function invalid(error: ZodError): StaffActionResult {
@@ -77,13 +77,6 @@ function invalid(error: ZodError): StaffActionResult {
 
 function refused(error: UserActionError): StaffActionResult {
   return error.field ? { ok: false, error: error.message, fieldErrors: { [error.field]: error.message } } : { ok: false, error: error.message };
-}
-
-/** Drizzle wraps driver errors (`DrizzleQueryError.cause`); the mysql2 error carries `errno`. */
-function isDuplicateEntry(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const candidate = "cause" in error && typeof error.cause === "object" && error.cause !== null ? error.cause : error;
-  return (candidate as { errno?: number }).errno === DUPLICATE_ENTRY;
 }
 
 // ── Audit values and the version token ──────────────────────────────────────────────────────────
@@ -161,11 +154,23 @@ export async function getUserForEdit(id: number): Promise<UserEditFormData | nul
 
 // ── Shared rule checks (inside the transaction, after the lock) ─────────────────────────────────
 
-/** True when `user` is the only active user whose role grants `user.manage` — others' roles are read fresh under the caller's transaction. */
+/** Losing the last active holder of either key locks the panel's administration out (S22 SEC-14 added `role.manage`). */
+const MANAGEMENT_KEYS = [PERMISSIONS.USER_MANAGE, PERMISSIONS.ROLE_MANAGE] as const;
+
+/** The management keys `user` is the only active holder of — others' roles are read fresh under the caller's transaction. */
+async function lastHeldManagementKeys(tx: DbClient, user: UserStaffRow): Promise<PermissionKey[]> {
+  if (!user.isActive) return [];
+  const held: PermissionKey[] = [];
+  for (const key of MANAGEMENT_KEYS) {
+    const roleIds = await roleIdsHolding(key, tx);
+    if (roleIds.includes(user.roleId) && (await countActiveUsersInRoles(roleIds, user.id, tx)) === 0) held.push(key);
+  }
+  return held;
+}
+
+/** True when `user` is the only active user whose role grants `user.manage` or `role.manage`. */
 async function isLastActiveManager(tx: DbClient, user: UserStaffRow): Promise<boolean> {
-  const managerRoleIds = await roleIdsHolding(PERMISSIONS.USER_MANAGE, tx);
-  if (!user.isActive || !managerRoleIds.includes(user.roleId)) return false;
-  return (await countActiveUsersInRoles(managerRoleIds, user.id, tx)) === 0;
+  return (await lastHeldManagementKeys(tx, user)).length > 0;
 }
 
 async function assertEmailAvailable(tx: DbClient, email: string, excludeId?: number): Promise<void> {
@@ -233,10 +238,13 @@ export async function updateUserById(id: number, rawInput: unknown, actor: Actor
       if (isSelf && deactivating) throw new UserActionError(SELF_DEACTIVATE, "isActive");
       if (isSelf && roleChanged) throw new UserActionError(SELF_ROLE_CHANGE, "roleId");
 
-      if ((deactivating || roleChanged) && (await isLastActiveManager(tx, current))) {
+      const lastHeld = deactivating || roleChanged ? await lastHeldManagementKeys(tx, current) : [];
+      if (lastHeld.length > 0) {
         if (deactivating) throw new UserActionError(LAST_MANAGER_DEACTIVATE, "isActive");
-        const managerRoleIds = await roleIdsHolding(PERMISSIONS.USER_MANAGE, tx);
-        if (!managerRoleIds.includes(input.roleId)) throw new UserActionError(LAST_MANAGER_ROLE_CHANGE, "roleId");
+        // The new role must carry every key this user is the last holder of.
+        for (const key of lastHeld) {
+          if (!(await roleIdsHolding(key, tx)).includes(input.roleId)) throw new UserActionError(LAST_MANAGER_ROLE_CHANGE, "roleId");
+        }
       }
 
       const now = new Date();

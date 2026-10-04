@@ -26,14 +26,15 @@ import {
   type LockedVariantRow,
 } from "./repo";
 import { checkoutInputSchema, fieldErrorsOf, type CheckoutInput } from "./schemas";
+import { isDuplicateEntry, mysqlErrorOf } from "@/server/db/errors";
 
 const CHECKOUT_RATE_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 };
 const ORDER_NUMBER_ATTEMPTS = 5;
-const MYSQL_DUPLICATE_ENTRY = 1062;
 const MYSQL_DEADLOCK = 1213;
 
 export const PRICES_CHANGED_MESSAGE = "Prices changed, please review your order before placing it.";
 export const COD_PAKISTAN_ONLY_MESSAGE = "Cash on delivery is available in Pakistan only. Please choose bank transfer.";
+export const COD_NOT_AVAILABLE_MESSAGE = "Cash on delivery isn't available for this delivery address. Please choose bank transfer.";
 export const PROOF_REQUIRED_MESSAGE = "Please upload your payment screenshot to place a bank transfer order.";
 export const PROOF_EXPIRED_MESSAGE = "Your payment screenshot upload has expired. Please upload it again.";
 
@@ -58,23 +59,15 @@ function refused(error: CheckoutError): CreateOrderResult {
   return error.field ? { ok: false, error: error.message, fieldErrors: { [error.field]: error.message } } : { ok: false, error: error.message };
 }
 
-/** Drizzle wraps driver errors (`DrizzleQueryError.cause`); the mysql2 error carries `errno`. */
-function mysqlError(error: unknown): { errno?: number; sqlMessage?: string } | null {
-  if (typeof error !== "object" || error === null) return null;
-  const candidate = "cause" in error && typeof error.cause === "object" && error.cause !== null ? error.cause : error;
-  return candidate as { errno?: number; sqlMessage?: string };
-}
-
 function isDuplicateOn(error: unknown, keyName: string): boolean {
-  const cause = mysqlError(error);
-  return cause?.errno === MYSQL_DUPLICATE_ENTRY && (cause.sqlMessage ?? "").includes(keyName);
+  return isDuplicateEntry(error) && (mysqlErrorOf(error)?.sqlMessage ?? "").includes(keyName);
 }
 
 async function withDeadlockRetry<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();
   } catch (error) {
-    if (mysqlError(error)?.errno !== MYSQL_DEADLOCK) throw error;
+    if (mysqlErrorOf(error)?.errno !== MYSQL_DEADLOCK) throw error;
     return run();
   }
 }
@@ -154,7 +147,10 @@ async function insertOrderRows(
     if (calculation.coupon.status === "rejected") {
       throw new CheckoutError(`${calculation.coupon.message} Please remove the coupon and try again.`);
     }
-    if (input.paymentMethod === "cod" && !calculation.codAvailable) throw new CheckoutError(COD_PAKISTAN_ONLY_MESSAGE);
+    // Outside Pakistan it is the hard rule; inside, the zone has COD switched off (S22 BUG-12).
+    if (input.paymentMethod === "cod" && !calculation.codAvailable) {
+      throw new CheckoutError(input.country === "PK" ? COD_NOT_AVAILABLE_MESSAGE : COD_PAKISTAN_ONLY_MESSAGE);
+    }
     if (paisaToDecimal(calculation.total) !== input.expectedTotal) throw new CheckoutError(PRICES_CHANGED_MESSAGE);
 
     const shippingPending = calculation.shipping.status === "pending";

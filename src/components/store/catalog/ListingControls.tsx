@@ -2,6 +2,7 @@ import Form from "next/form";
 import Link from "next/link";
 import { listingHref, type ListingState } from "@/components/store/catalog/listing-href";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
+import { DEFAULT_SORT } from "@/features/catalog/listing";
 
 const CHIP =
   "shrink-0 whitespace-nowrap border px-4 py-2 text-[10px] tracking-[0.28em] uppercase transition-colors duration-500";
@@ -13,7 +14,7 @@ export function SearchForm({ basePath, state }: { basePath: string; state: Listi
   return (
     <Form action={basePath} role="search" className="border-espresso/30 focus-within:border-espresso flex max-w-md items-center border-b">
       {state.category && <input type="hidden" name="category" value={state.category} />}
-      {state.sort !== "newest" && <input type="hidden" name="sort" value={state.sort} />}
+      {state.sort !== DEFAULT_SORT && <input type="hidden" name="sort" value={state.sort} />}
       <input
         type="search"
         name="q"

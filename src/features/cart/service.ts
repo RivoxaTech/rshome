@@ -19,7 +19,8 @@ import { cartQuoteRequestSchema } from "./schemas";
  */
 const COUPON_ATTEMPT_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 };
 
-export type CartQuoteResult = { ok: true; quote: CartQuote } | { ok: false; error: string };
+/** `cart_unreadable` is the one failure that means the stored cart itself is corrupt; the browser resets its storage only for that. */
+export type CartQuoteResult = { ok: true; quote: CartQuote } | { ok: false; reason: "cart_unreadable"; error: string };
 
 /** A variant with attributes shows its label ("Red / Large"); a simple product's only variant doesn't. */
 export function hasDisplayableAttributes(raw: string): boolean {
@@ -51,7 +52,7 @@ function toCartVariant(row: CartVariantRow, image: CartVariant["image"]): CartVa
  */
 export async function quoteCart(rawInput: unknown, ctx: { ip: string }): Promise<CartQuoteResult> {
   const parsed = cartQuoteRequestSchema.safeParse(rawInput);
-  if (!parsed.success) return { ok: false, error: "Your cart could not be read and was reset." };
+  if (!parsed.success) return { ok: false, reason: "cart_unreadable", error: "Your cart could not be read and was reset." };
   const input = parsed.data;
 
   const rows = await getCartVariantRows([...new Set(input.lines.map((line) => line.variantId))]);

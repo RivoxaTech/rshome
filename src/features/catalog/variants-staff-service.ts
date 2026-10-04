@@ -19,6 +19,7 @@ import { lockProductById, type ProductRow } from "./products-staff-repo";
 import { variantInputSchema, type VariantInput } from "./schemas";
 import type { StaffActionResult } from "./staff-service";
 import { parseVariantAttributes, sameAttributes } from "./variants";
+import { isDuplicateEntry } from "@/server/db/errors";
 import {
   countOrderItemsByVariantIds,
   deleteVariant,
@@ -52,11 +53,9 @@ function invalid(error: ZodError): StaffActionResult {
 
 function refusal(error: unknown): StaffActionResult {
   if (error instanceof VariantActionError) return { ok: false, error: error.message, fieldErrors: error.field ? { [error.field]: error.message } : undefined };
-  if ((error as { errno?: number }).errno === DUPLICATE_ENTRY) return { ok: false, error: "That SKU is already in use. Choose another.", fieldErrors: { sku: "That SKU is already in use. Choose another." } };
+  if (isDuplicateEntry(error)) return { ok: false, error: "That SKU is already in use. Choose another.", fieldErrors: { sku: "That SKU is already in use. Choose another." } };
   throw error;
 }
-
-const DUPLICATE_ENTRY = 1062;
 
 export const ORDERED_VARIANT_MESSAGE = "This variant appears on past orders, so it can't be deleted. Deactivate it instead to take it off the storefront.";
 export const LAST_VARIANT_MESSAGE = "A product always keeps at least one variant, so the last one can't be deleted.";

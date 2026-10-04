@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cache } from "react";
-import { eq } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import { cookies } from "next/headers";
 import type { PermissionKey } from "@/features/auth/permissions";
 import { getPermissionKeysForRole } from "@/features/auth/repo";
@@ -86,6 +86,9 @@ export async function getCurrentSessionId(): Promise<string | null> {
 export async function createSession(userId: number, ip: string, userAgent: string): Promise<void> {
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
+
+  // Expired rows only ever accumulate otherwise (S22 BUG-17); a login is rare enough to pay for the sweep.
+  await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
 
   await db.insert(sessions).values({
     id: hashToken(token),

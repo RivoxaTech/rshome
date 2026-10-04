@@ -233,6 +233,8 @@ const LIST_LABELS: Record<NotifyList, string> = { order: "order alerts", wholesa
  * reports what happened honestly: the recipients it went to, the transport's own error text, or
  * — without SMTP (development) — that it was only logged on the server.
  */
+const TEST_EMAIL_FAILED = "Sending failed. Check the SMTP settings on the server; the mail server's reply is in the server log.";
+
 export async function sendTestEmail(list: NotifyList, actor: Actor): Promise<TestEmailResult> {
   const recipients = list === "order" ? await getNotifyOwnerOrderEmails() : await getNotifyOwnerWholesaleEmails();
   if (recipients.length === 0) return { ok: false, error: `Save at least one address in the ${LIST_LABELS[list]} list first.` };
@@ -242,7 +244,9 @@ export async function sendTestEmail(list: NotifyList, actor: Actor): Promise<Tes
   try {
     await sendMail({ to: recipients.join(","), ...content });
   } catch (error) {
-    return { ok: false, error: `Sending failed: ${error instanceof Error ? error.message : "unknown error"}` };
+    // The transport's own text stays in the server log (S22 SEC-13); the page gets a fixed line.
+    console.error("Test email failed:", error instanceof Error ? error.message : error);
+    return { ok: false, error: TEST_EMAIL_FAILED };
   }
   if (!isMailConfigured()) {
     return { ok: true, message: `No SMTP is configured, so nothing was sent — the test email to ${recipients.join(", ")} was only logged on the server (development).` };

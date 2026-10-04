@@ -1,3 +1,4 @@
+import "@/lib/zod-config";
 import { z } from "zod";
 
 export const MAX_CART_LINES = 50;
@@ -17,13 +18,15 @@ export const cartInputSchema = z.object({
       }),
     )
     .max(MAX_CART_LINES),
+  // A code that can't be read is dropped, never a reason to fail the quote (S22 BUG-01).
   couponCode: z
     .string()
     .trim()
     .max(50)
     .nullable()
     .default(null)
-    .transform((code) => (code ? code : null)),
+    .transform((code) => (code ? code : null))
+    .catch(null),
 });
 
 export type CartInput = z.infer<typeof cartInputSchema>;
@@ -35,13 +38,18 @@ export type CartInputLine = CartInput["lines"][number];
  * (country and city), so the shipping zone resolves exactly as `createOrder` will resolve it (S14:
  * a `flat` zone prices its charge into the quote's total; a `quote` zone stays "to be confirmed").
  * The cart page and drawer send neither, so their shipping is always pending.
+ *
+ * Either extra being unusable (an over-long city while the customer is still typing, say) only
+ * drops that extra — the quote itself must still succeed, since the browser treats a failed quote
+ * as corrupt storage and empties the cart (S22 BUG-01). `createOrder` applies the strict rules.
  */
 export const cartQuoteRequestSchema = cartInputSchema.extend({
-  phone: z.string().trim().max(32).nullable().default(null),
+  phone: z.string().trim().max(32).nullable().default(null).catch(null),
   destination: z
     .object({ country: z.string().trim().max(2), city: z.string().trim().max(100) })
     .nullable()
-    .default(null),
+    .default(null)
+    .catch(null),
 });
 
 export type CartQuoteRequest = z.infer<typeof cartQuoteRequestSchema>;

@@ -89,7 +89,13 @@ export function WholesaleForm({
     }
 
     startSubmit(async () => {
-      const result = await createWholesaleInquiryAction(payload);
+      let result: Awaited<ReturnType<typeof createWholesaleInquiryAction>>;
+      try {
+        result = await createWholesaleInquiryAction(payload);
+      } catch {
+        setError("Something went wrong sending your inquiry. Please check your connection and try again.");
+        return;
+      }
       if (result.ok) {
         setSubmitted(true);
         return;

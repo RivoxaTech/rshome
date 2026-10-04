@@ -71,6 +71,14 @@ describe("neededByDate", () => {
     vi.useRealTimers();
   });
 
+  // S22 BUG-20: Date.parse rolled "2099-02-30" over to 2 March; a calendar check refuses it.
+  it("refuses an impossible calendar date", () => {
+    for (const bad of ["2099-02-30", "2099-04-31", "2099-13-01"]) {
+      const parsed = wholesaleInquiryInputSchema.safeParse(validInput({ neededByDate: bad }));
+      expect(parsed.success, bad).toBe(false);
+    }
+  });
+
   it("accepts today in Karachi", () => {
     const parsed = wholesaleInquiryInputSchema.safeParse(validInput({ neededByDate: todayInKarachi() }));
     expect(parsed.success).toBe(true);

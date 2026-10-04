@@ -54,7 +54,15 @@ export function ImageUploader({
           resolve(false);
           return;
         }
-        const result = await addProductImageAction(productId, { path: data.path, width: data.width, height: data.height });
+        let result: Awaited<ReturnType<typeof addProductImageAction>>;
+        try {
+          result = await addProductImageAction(productId, { path: data.path, width: data.width, height: data.height });
+        } catch {
+          // A dropped connection or an expired session: the row must not sit at "uploading" forever (S22 BUG-14).
+          setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, error: "Uploaded, but couldn't be added to the product. Reload and try again.", done: true } : f)));
+          resolve(false);
+          return;
+        }
         if (!result.ok) {
           setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, error: result.error, done: true } : f)));
           resolve(false);

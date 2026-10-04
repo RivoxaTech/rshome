@@ -9,8 +9,9 @@ import type { z } from "zod";
 import { insertAuditLog } from "@/features/audit/repo";
 import { fieldErrorsOf } from "@/features/checkout/schemas";
 import { deleteMediaImage } from "@/server/storage/images";
-import { db } from "@/server/db/client";
+import { db, type DbClient } from "@/server/db/client";
 import { categoryInputSchema, type CategoryInput } from "./schemas";
+import { isDuplicateEntry } from "@/server/db/errors";
 import {
   countChildren,
   countProductsByCategoryId,
@@ -36,8 +37,6 @@ class CategoryActionError extends Error {}
 function invalid(error: z.ZodError): StaffActionResult {
   return { ok: false, error: error.issues[0]?.message ?? "Please check the form.", fieldErrors: fieldErrorsOf(error) };
 }
-
-const DUPLICATE_ENTRY = 1062;
 
 // ── The list ────────────────────────────────────────────────────────────────────────────────
 
@@ -115,7 +114,7 @@ export async function getCategoryFormDataForCreate(): Promise<{ parentOptions: P
  * Parent-related rules that no single column constraint can express. Throws `CategoryActionError`
  * (caught by the caller, inside the transaction) on the first violation.
  */
-async function assertParentRules(input: CategoryInput, options: { selfId?: number; hasChildren: boolean }): Promise<void> {
+async function assertParentRules(tx: DbClient, input: CategoryInput, options: { selfId?: number; hasChildren: boolean }): Promise<void> {
   if (input.parentId === null) return;
 
   if (options.selfId !== undefined && input.parentId === options.selfId) {
@@ -124,7 +123,7 @@ async function assertParentRules(input: CategoryInput, options: { selfId?: numbe
   if (options.hasChildren) {
     throw new CategoryActionError("This category has sub-categories, so it can't be given a parent. Move or delete them first.");
   }
-  const parent = await getCategoryById(input.parentId);
+  const parent = await getCategoryById(input.parentId, tx);
   if (!parent) {
     throw new CategoryActionError("Choose a valid parent category.");
   }
@@ -163,7 +162,7 @@ export async function createCategory(rawInput: unknown, actor: Actor): Promise<S
   try {
     const id = await db.transaction(async (tx) => {
       await assertSlugAvailable(input.slug);
-      await assertParentRules(input, { hasChildren: false });
+      await assertParentRules(tx, input, { hasChildren: false });
 
       const now = new Date();
       const id = await insertCategory(tx, {
@@ -191,7 +190,7 @@ export async function createCategory(rawInput: unknown, actor: Actor): Promise<S
     return { ok: true, id };
   } catch (error) {
     if (error instanceof CategoryActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
-    if ((error as { errno?: number }).errno === DUPLICATE_ENTRY) return { ok: false, error: "That slug is already in use. Choose another.", fieldErrors: { slug: "Already in use." } };
+    if (isDuplicateEntry(error)) return { ok: false, error: "That slug is already in use. Choose another.", fieldErrors: { slug: "Already in use." } };
     throw error;
   }
 }
@@ -217,8 +216,9 @@ export async function updateCategoryById(id: number, rawInput: unknown, actor: A
       if (!category) throw new CategoryActionError("Category not found.");
 
       await assertSlugAvailable(input.slug, id);
-      const childrenCount = await countChildren(id);
-      await assertParentRules(input, { selfId: id, hasChildren: childrenCount > 0 });
+      // Read inside the locked transaction, so two concurrent edits can't build two-level nesting (S22 BUG-27).
+      const childrenCount = await countChildren(id, tx);
+      await assertParentRules(tx, input, { selfId: id, hasChildren: childrenCount > 0 });
 
       const now = new Date();
       await updateCategory(tx, id, {
@@ -245,7 +245,7 @@ export async function updateCategoryById(id: number, rawInput: unknown, actor: A
     });
   } catch (error) {
     if (error instanceof CategoryActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
-    if ((error as { errno?: number }).errno === DUPLICATE_ENTRY) return { ok: false, error: "That slug is already in use. Choose another.", fieldErrors: { slug: "Already in use." } };
+    if (isDuplicateEntry(error)) return { ok: false, error: "That slug is already in use. Choose another.", fieldErrors: { slug: "Already in use." } };
     throw error;
   }
 

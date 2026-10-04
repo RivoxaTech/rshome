@@ -1,4 +1,6 @@
-import "./load-env";
+// No `./load-env` import here on purpose: Next loads `.env.local` itself, and importing the dotenv
+// loader from app code made Next's file tracer copy `.env.local` into the standalone bundle
+// (S22, SEC-01). Scripts and drizzle.config.ts import `./load-env` themselves, before this module.
 import path from "node:path";
 import { z } from "zod";
 

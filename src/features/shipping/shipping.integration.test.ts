@@ -170,6 +170,17 @@ describe.skipIf(!TEST_DATABASE_URL)("shipping zone editor (integration)", () => 
       expect((await resolveShippingZone("PK", "Multan"))?.id).toBe(pakistanZone);
     });
 
+    // S22 BUG-02: the version fingerprint must not depend on the order the areas were added in
+    // (the edit page reads them sorted, the locked save reads them in insertion order).
+    it("a zone whose areas were added out of alphabetical order can still be edited", async () => {
+      const created = await staff.createZone(zoneFields({ areas: "PK:lahore,PK:islamabad" }), { id: actorId });
+      expect(created.ok).toBe(true);
+      const id = (await db.select().from(shippingZones).where(eq(shippingZones.name, "Lahore")))[0].id;
+      const saved = await staff.updateZoneById(id, zoneFields({ id, name: "Lahore and Islamabad", areas: "PK:lahore,PK:islamabad", version: await versionOf(id) }), { id: actorId });
+      expect(saved).toMatchObject({ ok: true });
+      expect(await zoneById(id)).toMatchObject({ name: "Lahore and Islamabad" });
+    });
+
     it("refuses an area another zone owns, naming both, and refuses a second fallback", async () => {
       const overlap = await staff.createZone(zoneFields({ areas: "PK:lahore,PK:karachi" }), { id: actorId });
       expect(overlap.ok).toBe(false);

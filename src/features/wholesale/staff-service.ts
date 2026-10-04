@@ -171,8 +171,8 @@ export type StaffWholesaleInquiryView = NonNullable<Awaited<ReturnType<typeof ge
 // ── CSV export ──────────────────────────────────────────────────────────────────────────────
 
 /** The current filter's matching rows (cap 5,000), one row per inquiry, items joined into one cell. */
-export async function buildWholesaleExport(tab: WholesaleStatus | "all", search: string | undefined): Promise<string> {
-  const rows = await listInquiriesForExport(tab, search);
+export async function buildWholesaleExport(tab: WholesaleStatus | "all", search: string | undefined): Promise<{ csv: string; rowCount: number; truncated: boolean }> {
+  const { rows, truncated } = await listInquiriesForExport(tab, search);
   const items = await getItemsByInquiryIds(rows.map((row) => row.id));
   const itemsByInquiry = new Map<number, typeof items>();
   for (const item of items) {
@@ -197,5 +197,5 @@ export async function buildWholesaleExport(tab: WholesaleStatus | "all", search:
       .join("; "),
     message: row.message,
   }));
-  return buildWholesaleCsv(csvRows);
+  return { csv: buildWholesaleCsv(csvRows), rowCount: rows.length, truncated };
 }

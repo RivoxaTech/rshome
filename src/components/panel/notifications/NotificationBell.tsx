@@ -132,6 +132,8 @@ export function NotificationBell({ vapidPublicKey }: { vapidPublicKey: string | 
         await subscription.unsubscribe();
       }
       setState("off");
+    } catch {
+      setMessage("Couldn't turn notifications off. Please try again.");
     } finally {
       setBusy(false);
     }

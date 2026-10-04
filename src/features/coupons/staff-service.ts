@@ -29,6 +29,7 @@ import {
   type CouponRow,
 } from "./staff-repo";
 import { couponStatus, couponValueText, usageText, type CouponStatus } from "./status";
+import { isDuplicateEntry } from "@/server/db/errors";
 
 export type { StaffActionResult, WriteOptions };
 
@@ -44,7 +45,6 @@ class CouponActionError extends Error {
   }
 }
 
-const DUPLICATE_ENTRY = 1062;
 const CODE_IN_USE = "That code is already in use. Choose another.";
 const RECENT_USAGES_SHOWN = 10;
 
@@ -54,13 +54,6 @@ function invalid(error: ZodError): StaffActionResult {
 
 function refused(error: CouponActionError): StaffActionResult {
   return error.field ? { ok: false, error: error.message, fieldErrors: { [error.field]: error.message } } : { ok: false, error: error.message };
-}
-
-/** Drizzle wraps driver errors (`DrizzleQueryError.cause`); the mysql2 error carries `errno`. */
-function isDuplicateEntry(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const candidate = "cause" in error && typeof error.cause === "object" && error.cause !== null ? error.cause : error;
-  return (candidate as { errno?: number }).errno === DUPLICATE_ENTRY;
 }
 
 /** The pricing module's shape for a stored row, with the live usage count in place of `used_count`. */

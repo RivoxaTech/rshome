@@ -1,3 +1,4 @@
+import "@/lib/zod-config";
 import { z } from "zod";
 import { orderNumberSchema } from "@/features/checkout/schemas";
 import { DEFAULT_PAGE_SIZE, ORDER_TABS, PAGE_SIZE_OPTIONS, TAB_INFO } from "./transitions";

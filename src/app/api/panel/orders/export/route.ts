@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { insertAuditLog } from "@/features/audit/repo";
 import { PERMISSIONS } from "@/features/auth/permissions";
-import { karachiDayIndex, karachiMidnightUtc, dayIndexFromKarachiDateString } from "@/features/dashboard/ranges";
+import { karachiDayIndex, karachiMidnightUtc, parseKarachiDateString } from "@/features/dashboard/ranges";
 import { buildOrderExportCsv } from "@/features/orders/csv-export";
 import { ORDER_TABS, type OrderTab } from "@/features/orders/transitions";
+import { KARACHI_OFFSET_MS } from "@/lib/karachi-datetime";
 import { db } from "@/server/db/client";
 import { authorizeRequest } from "@/server/auth/permissions";
 
@@ -11,8 +12,7 @@ const METHODS = ["bank_transfer", "cod", "all"] as const;
 type ExportMethod = (typeof METHODS)[number];
 
 function parseDayIndex(value: string | null, fallback: number): number {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return fallback;
-  return dayIndexFromKarachiDateString(value);
+  return parseKarachiDateString(value) ?? fallback;
 }
 
 /**
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     }),
   );
 
-  const filename = `orders-${new Date().toISOString().slice(0, 10)}.csv`;
+  const filename = `orders-${new Date(now.getTime() + KARACHI_OFFSET_MS).toISOString().slice(0, 10)}.csv`;
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

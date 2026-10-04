@@ -5,12 +5,12 @@
 import { and, asc, count, eq, inArray, like, ne, or, type SQL } from "drizzle-orm";
 import { db, type DbClient } from "@/server/db/client";
 import { categories, products } from "@/server/db/schema/catalog";
+import { likeContains } from "@/lib/sql-like";
 
 export type CategoryRow = typeof categories.$inferSelect;
 export type CategoryUpdate = Partial<typeof categories.$inferInsert>;
 
-/** LIKE treats `%` and `_` as wildcards and `\` as its escape: a search is matched literally. */
-const contains = (text: string) => `%${text.replace(/[%_]/g, "\\$&")}%`;
+const contains = likeContains;
 
 function searchCondition(text: string): SQL | undefined {
   return or(like(categories.name, contains(text)), like(categories.slug, contains(text)));
@@ -40,8 +40,8 @@ export async function listCategoriesPage(
   return { rows, total: total.count };
 }
 
-export async function getCategoryById(id: number): Promise<CategoryRow | undefined> {
-  const [row] = await db.select().from(categories).where(eq(categories.id, id));
+export async function getCategoryById(id: number, client: DbClient = db): Promise<CategoryRow | undefined> {
+  const [row] = await client.select().from(categories).where(eq(categories.id, id));
   return row;
 }
 
@@ -51,8 +51,8 @@ export async function lockCategoryById(tx: DbClient, id: number): Promise<Catego
   return row;
 }
 
-export async function countChildren(parentId: number): Promise<number> {
-  const [row] = await db.select({ count: count() }).from(categories).where(eq(categories.parentId, parentId));
+export async function countChildren(parentId: number, client: DbClient = db): Promise<number> {
+  const [row] = await client.select({ count: count() }).from(categories).where(eq(categories.parentId, parentId));
   return row.count;
 }
 

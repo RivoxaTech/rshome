@@ -49,6 +49,19 @@ function orderUrl(orderNumber: string): string {
   return new URL(`/order/${orderNumber}`, env.APP_URL).toString();
 }
 
+/**
+ * Every sender runs inside this (S22 BUG-15): the reads that build the email can fail too (the
+ * database dropping between the commit and the `after()` task), and `after()` would only
+ * log that — the `notify.failed` audit row is the record the owner actually sees.
+ */
+async function guarded(orderNumber: string, send: () => Promise<void>): Promise<void> {
+  try {
+    await send();
+  } catch (error) {
+    await logMailFailure(orderNumber, error instanceof Error ? error.message : "Unknown error");
+  }
+}
+
 /** Sends, swallowing and logging any failure — the one rule every caller below relies on. */
 async function send(orderNumber: string, to: string, content: { subject: string; html: string; text: string }): Promise<void> {
   try {
@@ -59,7 +72,11 @@ async function send(orderNumber: string, to: string, content: { subject: string;
 }
 
 /** Fired once, right after `createOrder` (ARCHITECTURE.md §4.2 step 10), only when an email was given. */
-export async function sendOrderReceivedEmail(orderNumber: string): Promise<void> {
+export function sendOrderReceivedEmail(orderNumber: string): Promise<void> {
+  return guarded(orderNumber, () => sendOrderReceivedEmailUnguarded(orderNumber));
+}
+
+async function sendOrderReceivedEmailUnguarded(orderNumber: string): Promise<void> {
   const order = await getOrderByNumber(orderNumber);
   if (!order || !order.email) return;
 
@@ -82,7 +99,11 @@ export async function sendOrderReceivedEmail(orderNumber: string): Promise<void>
 }
 
 /** Fired after `approveOrder` sets the delivery charge and moves the order on. */
-export async function sendOrderApprovedEmail(orderNumber: string): Promise<void> {
+export function sendOrderApprovedEmail(orderNumber: string): Promise<void> {
+  return guarded(orderNumber, () => sendOrderApprovedEmailUnguarded(orderNumber));
+}
+
+async function sendOrderApprovedEmailUnguarded(orderNumber: string): Promise<void> {
   const order = await getOrderByNumber(orderNumber);
   if (!order || !order.email || order.shippingTotal === null) return;
 
@@ -102,7 +123,11 @@ export async function sendOrderApprovedEmail(orderNumber: string): Promise<void>
 }
 
 /** Fired after `updateFulfilment` moves the order to `shipped` (never for `delivered`). */
-export async function sendOrderShippedEmail(orderNumber: string): Promise<void> {
+export function sendOrderShippedEmail(orderNumber: string): Promise<void> {
+  return guarded(orderNumber, () => sendOrderShippedEmailUnguarded(orderNumber));
+}
+
+async function sendOrderShippedEmailUnguarded(orderNumber: string): Promise<void> {
   const order = await getOrderByNumber(orderNumber);
   if (!order || !order.email) return;
 
@@ -118,7 +143,11 @@ export async function sendOrderShippedEmail(orderNumber: string): Promise<void> 
 }
 
 /** Fired after `closeOrder`, or `reviewProof`'s reject branch (D37: rejecting a screenshot rejects the whole order). */
-export async function sendOrderClosedEmail(orderNumber: string): Promise<void> {
+export function sendOrderClosedEmail(orderNumber: string): Promise<void> {
+  return guarded(orderNumber, () => sendOrderClosedEmailUnguarded(orderNumber));
+}
+
+async function sendOrderClosedEmailUnguarded(orderNumber: string): Promise<void> {
   const order = await getOrderByNumber(orderNumber);
   if (!order || !order.email) return;
   if (order.orderStatus !== "rejected" && order.orderStatus !== "cancelled") return;

@@ -107,6 +107,33 @@ describe.skipIf(!TEST_DATABASE_URL)("push notifications (integration)", () => {
     expect(await subscriptionsOf(userId)).toHaveLength(0);
   });
 
+  // S22 SEC-04: the endpoint is where the server will POST every order event.
+  it("refuses an endpoint that is not an https host name (http, localhost, an IP literal)", async () => {
+    const { userId } = await signInAs([PERMISSIONS.ORDER_VIEW]);
+    const keys = { p256dh: "p256dh-key", auth: "auth-key" };
+    for (const endpoint of ["http://push.example.com/x", "https://localhost/x", "https://127.0.0.1:3306/x", "https://[::1]/x", "ftp://push.example.com/x"]) {
+      const response = await subscribeRoute.POST(jsonRequest("/api/push/subscribe", "POST", { endpoint, keys }));
+      expect(response.status, endpoint).toBe(400);
+    }
+    expect(await subscriptionsOf(userId)).toHaveLength(0);
+  });
+
+  it("keeps at most 10 subscriptions per user, dropping the oldest", async () => {
+    const { userId } = await signInAs([PERMISSIONS.ORDER_VIEW]);
+    const keys = { p256dh: "p256dh-key", auth: "auth-key" };
+    const first = nextEndpoint();
+    const response = await subscribeRoute.POST(jsonRequest("/api/push/subscribe", "POST", { endpoint: first, keys }));
+    expect(response.status).toBe(201);
+    // Older than everything that follows, whatever the clock resolution.
+    await db.update(pushSubscriptions).set({ createdAt: new Date(Date.now() - 60_000) }).where(eq(pushSubscriptions.userId, userId));
+    for (let i = 0; i < 10; i += 1) {
+      expect((await subscribeRoute.POST(jsonRequest("/api/push/subscribe", "POST", { endpoint: nextEndpoint(), keys }))).status).toBe(201);
+    }
+    const rows = await subscriptionsOf(userId);
+    expect(rows).toHaveLength(10);
+    expect(rows.some((row) => row.endpoint === first)).toBe(false);
+  });
+
   it("refuses to subscribe a session holding neither order.view nor wholesale.view", async () => {
     await signInAs([PERMISSIONS.PRODUCT_VIEW]);
     const response = await subscribeRoute.POST(

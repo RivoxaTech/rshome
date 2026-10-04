@@ -34,6 +34,7 @@ import { deleteSessionsForUsers } from "@/features/users/staff-repo";
 import { fingerprint } from "@/lib/fingerprint";
 import { db, type DbClient } from "@/server/db/client";
 import { createRoleInputSchema, resetRoleInputSchema, savePermissionsInputSchema, updateRoleInputSchema } from "./schemas";
+import { isDuplicateEntry } from "@/server/db/errors";
 import {
   countActiveHoldersOutsideRole,
   countMembers,
@@ -66,7 +67,6 @@ class RoleActionError extends Error {
   }
 }
 
-const DUPLICATE_ENTRY = 1062;
 const KEY_IN_USE = "Another role already uses this key.";
 export const SYSTEM_ROLE_DELETE_MESSAGE = "This is a system role: the seed and the users page rely on it existing, so it can't be deleted. Change its permissions instead.";
 export const STALE_ROLE_MESSAGE = "Someone else changed this role after you opened the page. Reload to see their changes, then make yours again.";
@@ -79,12 +79,6 @@ function invalid(error: ZodError): StaffActionResult {
 
 function refused(error: RoleActionError): StaffActionResult {
   return error.field ? { ok: false, error: error.message, fieldErrors: { [error.field]: error.message } } : { ok: false, error: error.message };
-}
-
-function isDuplicateEntry(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  const candidate = "cause" in error && typeof error.cause === "object" && error.cause !== null ? error.cause : error;
-  return (candidate as { errno?: number }).errno === DUPLICATE_ENTRY;
 }
 
 const ORDERED_KEYS = Object.values(PERMISSIONS) as PermissionKey[];

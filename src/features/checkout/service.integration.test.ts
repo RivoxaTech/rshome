@@ -13,8 +13,9 @@ import { rateLimits } from "@/server/db/schema/access-control";
 import { productVariants } from "@/server/db/schema/catalog";
 import { orderItems, orderStatusHistory, orders, paymentProofs } from "@/server/db/schema/orders";
 import { couponUsages, coupons } from "@/server/db/schema/promotions";
+import { shippingZones } from "@/server/db/schema/shipping";
 import { assertTestDatabase, checkoutInput, resetTables, seedFixtures, type FixtureIds } from "@/test/integration-fixtures";
-import { COD_PAKISTAN_ONLY_MESSAGE, PRICES_CHANGED_MESSAGE, PROOF_EXPIRED_MESSAGE, PROOF_REQUIRED_MESSAGE } from "./service";
+import { COD_NOT_AVAILABLE_MESSAGE, COD_PAKISTAN_ONLY_MESSAGE, PRICES_CHANGED_MESSAGE, PROOF_EXPIRED_MESSAGE, PROOF_REQUIRED_MESSAGE } from "./service";
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
@@ -361,5 +362,21 @@ describe.skipIf(!TEST_DATABASE_URL)("createOrder (integration)", () => {
       ]);
       expect(await getCustomerOrder("RSH-260101-ZZZZ")).toBeNull();
     });
+  });
+  // S22 BUG-12: a zone with COD switched off must say so in the quote and refuse with a zone message, not the Pakistan-only one.
+  // Last in the file on purpose: outside a Next request React's cache() never resets (D45), so the switched-off zone would leak into every later test.
+  it("a zone with COD switched off hides COD from the quote and refuses a COD order with the zone message", async () => {
+    const base = input();
+    const quoteBefore = await quoteCart({ lines: base.lines, destination: { country: "PK", city: "Karachi" } }, { ip: nextIp() });
+    expect(quoteBefore.ok && quoteBefore.quote.codAvailable).toBe(true);
+
+    await db.update(shippingZones).set({ codEnabled: false }).where(eq(shippingZones.id, ids.karachiZone));
+    const quote = await quoteCart({ lines: base.lines, destination: { country: "PK", city: "Karachi" } }, { ip: nextIp() });
+    expect(quote.ok && quote.quote.codAvailable).toBe(false);
+
+    const before = await orderCount();
+    const refused = await createOrder(input({ paymentMethod: "cod" }), { ip: nextIp() });
+    expect(refused).toEqual({ ok: false, error: COD_NOT_AVAILABLE_MESSAGE });
+    expect(await orderCount()).toBe(before);
   });
 });

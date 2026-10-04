@@ -84,9 +84,12 @@ export function CheckoutForm({
   const [proofPickerKey, setProofPickerKey] = useState(0);
 
   const isPakistan = form.country === PAKISTAN;
-  const codOffered = codEnabled && isPakistan;
+  // The quote says whether this destination's zone takes COD (S22 BUG-12); until it arrives, assume yes.
+  const codOffered = codEnabled && isPakistan && (quote?.codAvailable ?? true);
+  // Once COD is off the table (another country, or a zone without it) the order goes by bank transfer whatever was ticked before.
+  const paymentMethod = codOffered ? form.paymentMethod : "bank_transfer";
   const cityValue = isPakistan && form.cityChoice === "karachi" ? KARACHI : form.city;
-  const isBankTransfer = form.paymentMethod === "bank_transfer";
+  const isBankTransfer = paymentMethod === "bank_transfer";
 
   // An empty cart has nothing to check out; the order just placed empties it too, hence the ref.
   useEffect(() => {
@@ -125,7 +128,7 @@ export function CheckoutForm({
       addressLine: form.addressLine,
       postalCode: form.postalCode,
       note: form.note,
-      paymentMethod: form.paymentMethod,
+      paymentMethod,
       proofToken: isBankTransfer ? (proof?.token ?? null) : null,
       lines: quote.storedLines,
       couponCode: quote.storedCouponCode,
@@ -141,7 +144,14 @@ export function CheckoutForm({
     }
 
     startSubmit(async () => {
-      const result = await createOrderAction(payload);
+      let result: Awaited<ReturnType<typeof createOrderAction>>;
+      try {
+        result = await createOrderAction(payload);
+      } catch {
+        // A dropped connection or server error must not leave the page blank (S22 BUG-07).
+        setError("Something went wrong placing your order. Please check your connection and try again.");
+        return;
+      }
       if (result.ok) {
         placedRef.current = true;
         clearCheckoutToken();
@@ -187,6 +197,7 @@ export function CheckoutForm({
               type="tel"
               autoComplete="tel"
               inputMode="tel"
+              maxLength={32}
               required
               placeholder={isPakistan ? "03XX XXXXXXX" : "+44 7911 123456"}
               hint={isPakistan ? "We'll confirm your delivery charge on WhatsApp." : "Include your country code."}
@@ -250,6 +261,7 @@ export function CheckoutForm({
               {form.cityChoice === "other" && (
                 <TextField
                   id="city"
+                  maxLength={100}
                   label="City"
                   autoComplete="address-level2"
                   required
@@ -263,6 +275,7 @@ export function CheckoutForm({
           ) : (
             <TextField
               id="city"
+              maxLength={100}
               label="City"
               autoComplete="address-level2"
               required
@@ -301,7 +314,7 @@ export function CheckoutForm({
                 value="bank_transfer"
                 title="Bank transfer"
                 description="Transfer the products total to our account now and upload the screenshot below. The delivery charge is paid separately once confirmed."
-                selected={form.paymentMethod === "bank_transfer"}
+                selected={paymentMethod === "bank_transfer"}
                 onSelect={() => update({ paymentMethod: "bank_transfer" })}
               />
               {codOffered && (
@@ -309,7 +322,7 @@ export function CheckoutForm({
                   value="cod"
                   title="Cash on delivery"
                   description="Pay in cash when your order arrives. Pakistan only."
-                  selected={form.paymentMethod === "cod"}
+                  selected={paymentMethod === "cod"}
                   onSelect={() => update({ paymentMethod: "cod" })}
                 />
               )}

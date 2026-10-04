@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import { db } from "@/server/db/client";
 import { rateLimits } from "@/server/db/schema/access-control";
 
@@ -33,6 +33,9 @@ export function decideRateLimit(
 
 export type RateLimitResult = { allowed: true } | { allowed: false; retryAfterSeconds: number };
 
+/** Expired rows are swept once their window has been over for this long. */
+const SWEEP_AFTER_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Consumes one attempt from `bucket` (e.g. `login:email:foo@bar.com`). Locks the row for the
  * duration of the transaction so concurrent Passenger processes can't both slip past the limit.
@@ -43,13 +46,13 @@ export type RateLimitResult = { allowed: true } | { allowed: false; retryAfterSe
 export async function consumeRateLimit(bucket: string, options: RateLimitOptions): Promise<RateLimitResult> {
   const now = new Date();
 
-  return db.transaction(
+  const result = await db.transaction(
     async (tx) => {
       const [existing] = await tx.select().from(rateLimits).where(eq(rateLimits.bucket, bucket)).for("update");
       const decision = decideRateLimit(existing ?? null, now, options);
 
       if (decision.action === "block") {
-        return { allowed: false, retryAfterSeconds: decision.retryAfterSeconds };
+        return { allowed: false as const, retryAfterSeconds: decision.retryAfterSeconds, started: false };
       }
 
       if (decision.action === "start") {
@@ -57,14 +60,20 @@ export async function consumeRateLimit(bucket: string, options: RateLimitOptions
           .insert(rateLimits)
           .values({ bucket, count: 1, windowEndsAt: decision.windowEndsAt })
           .onDuplicateKeyUpdate({ set: { count: 1, windowEndsAt: decision.windowEndsAt } });
-        return { allowed: true };
+        return { allowed: true as const, started: true };
       }
 
       await tx.update(rateLimits).set({ count: decision.count }).where(eq(rateLimits.bucket, bucket));
-      return { allowed: true };
+      return { allowed: true as const, started: false };
     },
     { isolationLevel: "read committed" },
   );
+
+  // A new window is the rare moment to sweep rows whose window ended long ago (S22 BUG-17): after
+  // the transaction, so the sweep never holds locks alongside the bucket row, and well past expiry,
+  // so it never races a bucket another request is just reopening.
+  if (result.started) await db.delete(rateLimits).where(lt(rateLimits.windowEndsAt, new Date(now.getTime() - SWEEP_AFTER_MS)));
+  return result.allowed ? { allowed: true } : { allowed: false, retryAfterSeconds: result.retryAfterSeconds };
 }
 
 /** Clears a bucket, e.g. after a successful login so a correct password doesn't count against the limit. */

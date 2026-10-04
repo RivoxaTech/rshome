@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { PERMISSIONS } from "@/features/auth/permissions";
-import { commitProductImport, MAX_IMPORT_FILE_BYTES } from "@/features/catalog/csv-import-service";
+import { commitProductImport, MAX_IMPORT_FILE_BYTES, MAX_IMPORT_FILE_NAME_LENGTH } from "@/features/catalog/csv-import-service";
 import { authorizeRequest } from "@/server/auth/permissions";
 import { isAllowedOrigin } from "@/server/request";
 
@@ -26,7 +26,8 @@ export async function POST(request: Request) {
   if (typeof token !== "string" || !token) return NextResponse.json({ ok: false, error: "Check the file first." }, { status: 400 });
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const fileName = typeof fileNameField === "string" && fileNameField ? fileNameField : file.name;
+  // Display text for the audit row only (S22 BUG-03): trimmed and capped, never a storage key.
+  const fileName = (typeof fileNameField === "string" && fileNameField.trim() ? fileNameField : file.name).trim().slice(0, MAX_IMPORT_FILE_NAME_LENGTH) || "import.csv";
   const result = await commitProductImport(buffer, token, { id: auth.session.id }, fileName);
   return NextResponse.json(result, { status: result.ok ? 200 : 400 });
 }

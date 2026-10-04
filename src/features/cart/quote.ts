@@ -125,6 +125,8 @@ export type CartQuote = {
    * is refused if prices moved in between (ARCHITECTURE.md D11). Not for display.
    */
   expectedTotal: string;
+  /** Whether cash on delivery may be chosen for this destination (the zone's flag and Pakistan-only rule, S22 BUG-12); true while no destination is known. */
+  codAvailable: boolean;
   notices: CartNotice[];
   /** What the browser should now store: the reconciled lines and the code only while it applies. */
   storedLines: CartInputLine[];
@@ -176,6 +178,7 @@ export function formatCartQuote(
     goodsTotal: formatMoney(calculation.goodsTotal),
     total: formatMoney(calculation.total),
     expectedTotal: paisaToDecimal(calculation.total),
+    codAvailable: calculation.codAvailable,
     notices: allNotices,
     storedLines: lines.map(({ variantId, quantity }) => ({ variantId, quantity })),
     storedCouponCode: coupon.status === "applied" ? coupon.code : null,

@@ -7,12 +7,12 @@ import { and, count, desc, eq, inArray, like, ne } from "drizzle-orm";
 import { db, type DbClient } from "@/server/db/client";
 import { orders } from "@/server/db/schema/orders";
 import { couponUsages, coupons } from "@/server/db/schema/promotions";
+import { likeContains } from "@/lib/sql-like";
 
 export type CouponRow = typeof coupons.$inferSelect;
 export type CouponUpdate = Partial<typeof coupons.$inferInsert>;
 
-/** LIKE treats `%` and `_` as wildcards and `\` as its escape: a search is matched literally. */
-const contains = (text: string) => `%${text.replace(/[%_]/g, "\\$&")}%`;
+const contains = likeContains;
 
 /**
  * Every coupon (optionally code-searched), newest first. A handful of rows: the status tabs and

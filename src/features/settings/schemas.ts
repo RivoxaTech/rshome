@@ -1,3 +1,4 @@
+import "@/lib/zod-config";
 import { z } from "zod";
 import { normalizePhone } from "@/lib/phone";
 
@@ -137,15 +138,23 @@ export type StoreIdentity = z.infer<typeof storeIdentitySchema>;
 /** A plain string; blank hides the bar (rendered as text, never HTML). */
 export const announcementTextSchema = z.string();
 
+const HTTPS_URL = /^https:\/\/[^\s]+$/;
+
+/**
+ * A stored link is blank or `https://` even when read back (S22 SEC-12): a row edited outside the
+ * panel can never become a `javascript:` href, since the reader falls back to config instead.
+ */
+const storedHttpsUrl = z.string().refine((value) => value === "" || HTTPS_URL.test(value));
+
 export const socialLinksSchema = z.object({
-  facebook: z.string(),
-  instagram: z.string(),
+  facebook: storedHttpsUrl,
+  instagram: storedHttpsUrl,
   instagramHandle: z.string(),
 });
 export type SocialLinks = z.infer<typeof socialLinksSchema>;
 
 /** Blank, or an absolute `https://` URL — a storefront link is never `javascript:` or a relative path. */
-const httpsUrlField = optionalText(300).refine((value) => value === "" || /^https:\/\/[^\s]+$/.test(value), "Enter a full https:// link, or leave it blank.");
+const httpsUrlField = optionalText(300).refine((value) => value === "" || HTTPS_URL.test(value), "Enter a full https:// link, or leave it blank.");
 
 const NO_HTML = /^[^<>]*$/;
 

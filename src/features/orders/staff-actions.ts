@@ -44,7 +44,8 @@ import {
   type CloseAction,
 } from "./transitions";
 
-export type StaffActionResult = { ok: true } | { ok: false; error: string; fieldErrors?: Record<string, string> };
+/** `orderNumber` comes back from `reviewProof` so the action can send the right email without a second lookup. */
+export type StaffActionResult = { ok: true; orderNumber?: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 /** The signed-in staff member, from `requirePermission`. */
 type Actor = { id: number };
@@ -190,7 +191,7 @@ export async function reviewProof(rawInput: unknown, actor: Actor): Promise<Staf
   const orderNumber = await getProofOrderNumber(input.proofId);
   if (!orderNumber) return { ok: false, error: "Screenshot not found." };
 
-  return withLockedOrder(orderNumber, async (tx, order, now) => {
+  const result = await withLockedOrder(orderNumber, async (tx, order, now) => {
     const proof = await getProof(tx, input.proofId);
     if (!proof || proof.orderId !== order.id) throw new StaffActionError("Screenshot not found.");
     if (proof.status !== "submitted") throw new StaffActionError("This screenshot has already been checked.");
@@ -245,6 +246,7 @@ export async function reviewProof(rawInput: unknown, actor: Actor): Promise<Staf
       createdAt: now,
     });
   });
+  return result.ok ? { ok: true, orderNumber } : result;
 }
 
 /** The fulfilment dropdown (C20): Sent (courier and tracking note optional) or Delivered, forward only. */

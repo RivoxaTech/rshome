@@ -69,6 +69,14 @@
   --sand: oklch(0.935 0.017 82);
   /* WhatsApp's brand green, only for the WhatsApp buttons. */
   --whatsapp: #25d366;
+}
+
+/*
+ * Shadows live in @theme (not :root) so Tailwind generates the `shadow-soft`/`shadow-lift`
+ * utilities the panel uses; `static` keeps the variables emitted for `var(--shadow-lift)` in
+ * `.tilt-card` below (S22 BUG-13: as :root variables the bare class was a silent no-op).
+ */
+@theme static {
   --shadow-soft: 0 30px 60px -30px oklch(0.4 0.03 60 / 0.35);
   --shadow-lift: 0 45px 80px -35px oklch(0.4 0.03 60 / 0.45);
 }

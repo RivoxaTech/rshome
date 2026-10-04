@@ -1,3 +1,4 @@
+import "@/lib/zod-config";
 import { z } from "zod";
 
 // The panel's users CRUD (S20, REQUIREMENTS DV-08): one Zod schema per form, shared by the form

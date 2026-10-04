@@ -93,8 +93,12 @@ export function ArrangeList({ scope, items }: { scope: ArrangeScope; items: Arra
     setError(null);
 
     const orderedIds = next.map((item) => item.id);
-    const result =
-      scope.kind === "shop" ? await saveShopOrderAction({ categoryId: scope.categoryId, orderedIds }) : await saveFeaturedOrderAction({ orderedIds });
+    let result: Awaited<ReturnType<typeof saveShopOrderAction>>;
+    try {
+      result = scope.kind === "shop" ? await saveShopOrderAction({ categoryId: scope.categoryId, orderedIds }) : await saveFeaturedOrderAction({ orderedIds });
+    } catch {
+      result = { ok: false, error: "Could not save the new order. Check your connection and try again." };
+    }
 
     setSaving(false);
     if (!result.ok) {

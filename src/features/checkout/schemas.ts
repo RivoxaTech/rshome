@@ -1,3 +1,4 @@
+import "@/lib/zod-config";
 import { z } from "zod";
 import { COUNTRY_CODES } from "@/config/countries";
 import { cartInputSchema } from "@/features/cart/schemas";

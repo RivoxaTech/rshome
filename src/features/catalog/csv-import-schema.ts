@@ -133,7 +133,9 @@ export function validateImportRow(row: Record<string, string>, rowNumber: number
   const skuResult = skuField.safeParse(get("Variant SKU"));
   if (!skuResult.success) fail("Variant SKU", skuResult.error.issues[0]?.message ?? "Enter a SKU.");
 
-  const label = get("Variant label").trim().slice(0, 150);
+  const label = get("Variant label").trim();
+  // Reported like every other over-long column, never silently cut (a cut could split a surrogate pair; S22 BUG-25).
+  if (label.length > 150) fail("Variant label", "Keep the label under 150 characters.");
 
   const { pairs, malformed } = parseAttributesCell(get("Attributes"));
   if (malformed) fail("Attributes", 'Use "Key:Value" pairs separated by semicolons, e.g. "Colour:White;Size:Large".');

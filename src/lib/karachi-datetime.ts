@@ -23,6 +23,17 @@ export function karachiLocalToUtc(value: string): Date | null {
   return new Date(pretendUtc - KARACHI_OFFSET_MS);
 }
 
+const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** True for a real "YYYY-MM-DD" calendar date: `Date.UTC` would silently roll "2026-02-30" over to March, so it is checked back (S22 BUG-16/20). */
+export function isValidIsoDate(value: string): boolean {
+  const match = DATE_PATTERN.exec(value);
+  if (!match) return false;
+  const [, year, month, day] = match.map(Number);
+  const check = new Date(Date.UTC(year, month - 1, day));
+  return check.getUTCFullYear() === year && check.getUTCMonth() === month - 1 && check.getUTCDate() === day;
+}
+
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** A UTC instant -> the "YYYY-MM-DDTHH:mm" Karachi value a `datetime-local` input shows. */

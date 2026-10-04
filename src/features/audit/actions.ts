@@ -23,6 +23,7 @@ export const AUDIT_ENTITIES: { key: string; label: string }[] = [
   { key: "settings", label: "Settings" },
   { key: "order", label: "Order" },
   { key: "order_export", label: "Order CSV export" },
+  { key: "wholesale_export", label: "Wholesale CSV export" },
   { key: "payment_proof", label: "Payment screenshot" },
   { key: "wholesale_inquiry", label: "Wholesale inquiry" },
   { key: "notify", label: "Notification" },
@@ -47,6 +48,7 @@ export const AUDIT_ACTIONS: { key: string; label: string }[] = [
   { key: "order.approve", label: "Order approved" },
   { key: "order.delete", label: "Order deleted" },
   { key: "order.export", label: "Orders exported" },
+  { key: "wholesale.export", label: "Wholesale inquiries exported" },
   { key: "payment.approve", label: "Payment screenshot approved" },
   { key: "payment.reject", label: "Payment screenshot rejected" },
   // Wholesale (S17).

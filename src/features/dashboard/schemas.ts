@@ -1,3 +1,4 @@
+import "@/lib/zod-config";
 import { z } from "zod";
 import { DEFAULT_RANGE, RANGE_KEYS } from "./ranges";
 

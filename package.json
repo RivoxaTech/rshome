@@ -10,7 +10,7 @@
     "dev:webpack": "next dev --webpack",
     "build": "next build",
     "build:standalone": "node scripts/build-standalone.mjs",
-    "start:standalone": "node .next/standalone/server.js",
+    "start:standalone": "node --env-file=.env.local .next/standalone/server.js",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

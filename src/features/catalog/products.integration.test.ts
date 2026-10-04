@@ -7,7 +7,7 @@
  */
 import { and, asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { ADMIN_DEFAULT_PERMISSIONS, DEVELOPER_DEFAULT_PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
+import { ADMIN_DEFAULT_PERMISSIONS, DEVELOPER_DEFAULT_PERMISSIONS, PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 import { auditLogs } from "@/server/db/schema/audit";
 import { categories, productImages, productVariants, products } from "@/server/db/schema/catalog";
 import { orderItems } from "@/server/db/schema/orders";
@@ -716,6 +716,16 @@ describe.skipIf(!TEST_DATABASE_URL)("products CRUD (integration)", () => {
       );
       const [product] = await db.select().from(products).where(eq(products.id, created.id!));
       expect(product).toMatchObject({ name: "Updated by action", price: "1600.00" });
+    });
+
+    // S22 SEC-07: a tampered hidden id answers "not found" instead of handing NaN to the database.
+    it("quick actions refuse a tampered id without touching the database", async () => {
+      await signInAs([PERMISSIONS.PRODUCT_UPDATE, PERMISSIONS.PRODUCT_DELETE]);
+      for (const id of ["abc", "", "0", "-7", "2.5", "NaN"]) {
+        expect(await panelActions.archiveProductAction(null, form({ id })), id).toEqual({ ok: false, error: "Product not found." });
+        expect(await panelActions.setFeaturedAction(null, form({ id, isFeatured: "true" })), id).toEqual({ ok: false, error: "Product not found." });
+        expect(await panelActions.deleteProductAction(null, form({ id })), id).toEqual({ ok: false, error: "Product not found." });
+      }
     });
 
     it("archiveProductAction and restoreProductAction toggle status without redirecting", async () => {

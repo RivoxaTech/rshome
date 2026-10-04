@@ -4,7 +4,7 @@
  * Mirrors `staff-repo.ts` (categories, S10 phase 1). Variant queries moved to
  * `variants-staff-repo.ts` in phase 3a.
  */
-import { and, asc, count, desc, eq, inArray, like, ne, or, sql, sum, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, like, max, ne, or, sql, sum, type SQL } from "drizzle-orm";
 // Variant queries (incl. the create form's "Default" variant) live in `variants-staff-repo.ts` (S10
 // phase 3a); image queries (incl. the whole-product delete's image cleanup) live in
 // `images-staff-repo.ts` (S10 phase 3b).
@@ -12,12 +12,12 @@ import { db, type DbClient } from "@/server/db/client";
 import { categories, productVariants, products } from "@/server/db/schema/catalog";
 import { orderItems } from "@/server/db/schema/orders";
 import type { ProductTab } from "./schemas";
+import { likeContains } from "@/lib/sql-like";
 
 export type ProductRow = typeof products.$inferSelect;
 export type ProductUpdate = Partial<typeof products.$inferInsert>;
 
-/** LIKE treats `%` and `_` as wildcards and `\` as its escape: a search is matched literally. */
-const contains = (text: string) => `%${text.replace(/[%_]/g, "\\$&")}%`;
+const contains = likeContains;
 
 function searchCondition(text: string): SQL | undefined {
   return or(like(products.name, contains(text)), like(products.slug, contains(text)));
@@ -150,6 +150,12 @@ export async function slugInUse(slug: string, excludeId?: number): Promise<boole
   const where = excludeId ? and(eq(products.slug, slug), ne(products.id, excludeId)) : eq(products.slug, slug);
   const [row] = await db.select({ id: products.id }).from(products).where(where).limit(1);
   return !!row;
+}
+
+/** The last positions of the shop and featured orders (-1 when empty), so a bulk import can append without a full renumber (S22 BUG-10). */
+export async function getMaxSortOrders(tx: DbClient): Promise<{ shop: number; featured: number }> {
+  const [row] = await tx.select({ shop: max(products.sortOrder), featured: max(products.featuredSortOrder) }).from(products);
+  return { shop: row?.shop ?? -1, featured: row?.featured ?? -1 };
 }
 
 export async function insertProduct(tx: DbClient, values: typeof products.$inferInsert): Promise<number> {

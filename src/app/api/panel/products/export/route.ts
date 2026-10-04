@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { buildProductExportCsv } from "@/features/catalog/csv-export";
 import { PRODUCT_TABS, type ProductTab } from "@/features/catalog/schemas";
+import { KARACHI_OFFSET_MS } from "@/lib/karachi-datetime";
 import { authorizeRequest } from "@/server/auth/permissions";
 
 /** The products list's current filter as CSV (S18): same tab/search/category the page is showing. */
@@ -16,8 +17,10 @@ export async function GET(request: Request) {
   const categoryParam = url.searchParams.get("category");
   const categoryId = categoryParam && /^\d+$/.test(categoryParam) ? Number(categoryParam) : undefined;
 
-  const { csv } = await buildProductExportCsv({ tab, q, categoryId });
-  const filename = `products-${new Date().toISOString().slice(0, 10)}.csv`;
+  const { csv, truncated } = await buildProductExportCsv({ tab, q, categoryId });
+  // A Karachi date, and a visible mark when the row cap cut the export short (S22 BUG-25).
+  const day = new Date(Date.now() + KARACHI_OFFSET_MS).toISOString().slice(0, 10);
+  const filename = `products-${day}${truncated ? "-first-rows-only" : ""}.csv`;
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

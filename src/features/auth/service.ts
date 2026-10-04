@@ -6,10 +6,21 @@ import { db } from "@/server/db/client";
 import { hashPassword, verifyPassword } from "@/server/auth/password";
 import { createSession, destroySession, getCurrentSessionId } from "@/server/auth/session";
 
+/** `login:email:` + the email must fit the rate-limit bucket column (VARCHAR(191)); real addresses are far shorter. */
+export const LOGIN_EMAIL_MAX_LENGTH = 170;
+
 export const LoginInputSchema = z.object({
-  email: z.email().trim().toLowerCase(),
+  email: z.email().trim().toLowerCase().max(LOGIN_EMAIL_MAX_LENGTH),
   password: z.string().min(1, "Password is required"),
 });
+
+/**
+ * A real scrypt hash of a random string nobody knows. A login for an unknown or deactivated email
+ * is verified against it, so a failed attempt takes the same time whether or not the address
+ * exists (S22 SEC-03: no user enumeration by timing). The result is always discarded.
+ */
+const UNKNOWN_USER_HASH =
+  "scrypt:16384:8:1:0352f9c0f443eb085588abcae0b2226c:2076339d6a67d9ae45f8e54edf1acded9b9cfea07e0f72b1a8c127e56b681e8c8b3074bf87ae0ae19acde2bd4624bdb34ed9f0342d67dc174f807879b7d2fbce";
 
 export type LoginInput = z.infer<typeof LoginInputSchema>;
 
@@ -30,12 +41,9 @@ export async function login(input: LoginInput, ctx: { ip: string; userAgent: str
   }
 
   const user = await findUserByEmail(input.email);
-  if (!user || !user.isActive) {
-    return { ok: false, error: GENERIC_LOGIN_ERROR };
-  }
-
-  const valid = await verifyPassword(input.password, user.passwordHash);
-  if (!valid) {
+  // Always one scrypt run, even with no (or an inactive) user, so the response time says nothing.
+  const valid = await verifyPassword(input.password, user?.passwordHash ?? UNKNOWN_USER_HASH);
+  if (!user || !user.isActive || !valid) {
     return { ok: false, error: GENERIC_LOGIN_ERROR };
   }
 

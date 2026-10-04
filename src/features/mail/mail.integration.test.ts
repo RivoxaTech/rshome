@@ -16,6 +16,13 @@ vi.mock("@/server/mail/transport", () => ({ sendMail }));
 // Nothing in this suite subscribes to push; stub it out so the shared `sendEvent` path never
 // makes a real network call while still exercising the owner-email channel it also drives.
 vi.mock("@/server/notify/push", () => ({ sendPush: vi.fn().mockResolvedValue({ ok: true }) }));
+// S22 BUG-15: the reads that build an email can fail too; the settings reader stands in for "the database dropped".
+const getContactInfo = vi.hoisted(() => vi.fn());
+vi.mock("@/features/settings/service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/settings/service")>();
+  getContactInfo.mockImplementation(actual.getContactInfo);
+  return { ...actual, getContactInfo };
+});
 
 type Db = typeof import("@/server/db/client");
 type StaffActions = typeof import("@/features/orders/staff-actions");
@@ -86,6 +93,16 @@ describe.skipIf(!TEST_DATABASE_URL)("order emails (integration)", () => {
     expect(failures).toHaveLength(1);
     expect(failures[0].entityId).toBe(orderNumber);
     expect(JSON.parse(failures[0].newValues!)).toEqual({ channel: "mail", reason: "smtp down" });
+  });
+
+  it("records notify.failed when a read inside the sender fails, instead of rejecting the after() task", async () => {
+    const orderNumber = await placeOrder({ email: "customer@example.com" });
+    getContactInfo.mockRejectedValueOnce(new Error("database went away"));
+    await expect(mail.sendOrderReceivedEmail(orderNumber)).resolves.toBeUndefined();
+    expect(sendMail).not.toHaveBeenCalled();
+    const failures = await notifyFailures();
+    expect(failures).toHaveLength(1);
+    expect(JSON.parse(failures[0].newValues!)).toMatchObject({ channel: "mail", reason: "database went away" });
   });
 
   it("sends no owner order email by default (the setting is off)", async () => {

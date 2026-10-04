@@ -5,11 +5,11 @@ import { users } from "@/server/db/schema/access-control";
 import { auditLogs } from "@/server/db/schema/audit";
 import { wholesaleInquiries, wholesaleInquiryItems, wholesaleInquiryNotes } from "@/server/db/schema/wholesale";
 import type { WholesaleStatus } from "./transitions";
+import { likeContains } from "@/lib/sql-like";
 
 export type InquiryUpdate = Partial<typeof wholesaleInquiries.$inferInsert>;
 
-/** LIKE treats `%` and `_` as wildcards and `\` as its escape: a search is matched literally. */
-const contains = (text: string) => `%${text.replace(/[%_]/g, "\\$&")}%`;
+const contains = likeContains;
 
 function searchCondition(text: string): SQL | undefined {
   const digits = text.replace(/\D/g, "");
@@ -46,9 +46,14 @@ export async function listInquiries(
 }
 
 /** Every matching inquiry, capped at 5,000, for the CSV export — no pagination. */
+/** The export reads one row past the cap so the caller can tell a full export from a truncated one (S22 BUG-24). */
+export const WHOLESALE_EXPORT_ROW_CAP = 5000;
+
 export async function listInquiriesForExport(status: WholesaleStatus | "all", search: string | undefined) {
   const where = and(status === "all" ? undefined : eq(wholesaleInquiries.status, status), search ? searchCondition(search) : undefined);
-  return db.select().from(wholesaleInquiries).where(where).orderBy(desc(wholesaleInquiries.createdAt)).limit(5000);
+  const rows = await db.select().from(wholesaleInquiries).where(where).orderBy(desc(wholesaleInquiries.createdAt)).limit(WHOLESALE_EXPORT_ROW_CAP + 1);
+  const truncated = rows.length > WHOLESALE_EXPORT_ROW_CAP;
+  return { rows: truncated ? rows.slice(0, WHOLESALE_EXPORT_ROW_CAP) : rows, truncated };
 }
 
 /** How many inquiries there are per status: a handful of rows at most. */

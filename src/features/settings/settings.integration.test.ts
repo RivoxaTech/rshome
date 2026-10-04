@@ -154,6 +154,14 @@ describe.skipIf(!TEST_DATABASE_URL)("settings pages (integration)", () => {
       await db.update(settings).set({ value: JSON.stringify({ storeName: "" }) }).where(eq(settings.key, "store_identity"));
       expect(await readers.getStoreIdentity()).toEqual({ storeName: siteConfig.storeName, logoText: siteConfig.logoText });
     });
+
+    // S22 SEC-12: the https rule holds on the way out too, so a row edited outside the panel can never become a javascript: href.
+    it("a social link that is not https:// falls back to config even when the row parses", async () => {
+      await db.insert(settings).values({ key: "social_links", value: JSON.stringify({ facebook: "javascript:alert(1)", instagram: "https://instagram.com/x", instagramHandle: "@x" }) });
+      expect(await readers.getSocialLinks()).toEqual(siteConfig.socialLinks);
+      await db.update(settings).set({ value: JSON.stringify({ facebook: "", instagram: "https://instagram.com/x", instagramHandle: "@x" }) }).where(eq(settings.key, "social_links"));
+      expect(await readers.getSocialLinks()).toEqual({ facebook: "", instagram: "https://instagram.com/x", instagramHandle: "@x" });
+    });
   });
 
   describe("Admin: bank & contact (settings.bank)", () => {
@@ -329,7 +337,8 @@ describe.skipIf(!TEST_DATABASE_URL)("settings pages (integration)", () => {
 
       sendMail.mockRejectedValueOnce(new Error("535 Authentication failed"));
       const failed = await actions.sendTestEmailAction(null, form({ list: "order" }));
-      expect(failed).toEqual({ ok: false, error: "Sending failed: 535 Authentication failed" });
+      // S22 SEC-13: the SMTP server's own reply stays in the server log, never on the page.
+      expect(failed).toEqual({ ok: false, error: "Sending failed. Check the SMTP settings on the server; the mail server's reply is in the server log." });
 
       expect(await actions.sendTestEmailAction(null, form({ list: "nonsense" }))).toEqual({ ok: false, error: "Choose which recipient list to test." });
     });

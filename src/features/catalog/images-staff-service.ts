@@ -84,6 +84,8 @@ function imageAudit(actor: Actor, imageId: number, action: string, oldValues: ob
  * the file would otherwise be orphaned (its DB row never existed), so it's deleted here before
  * returning — the uploader never has to know the on-disk path to clean it up itself.
  */
+const ALREADY_ADDED_MESSAGE = "That image was already added.";
+
 export async function addProductImage(productId: number, rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
   const parsed = productImageSchema.safeParse(rawInput);
   if (!parsed.success) return invalid(parsed.error);
@@ -95,7 +97,7 @@ export async function addProductImage(productId: number, rawInput: unknown, acto
       if (!product) throw new ImageActionError("Product not found.");
       const siblings = await lockImagesByProductId(tx, productId);
       if (siblings.length >= MAX_PRODUCT_IMAGES) throw new ImageActionError(MAX_IMAGES_MESSAGE);
-      if (await imagePathInUse(input.path)) throw new ImageActionError("That image was already added.");
+      if (await imagePathInUse(input.path)) throw new ImageActionError(ALREADY_ADDED_MESSAGE);
 
       const now = new Date();
       const id = await insertProductImage(tx, {
@@ -113,7 +115,8 @@ export async function addProductImage(productId: number, rawInput: unknown, acto
     });
     return { ok: true, id };
   } catch (error) {
-    await deleteMediaImage(input.path);
+    // "Already added" means the files belong to an existing row, so they stay (S22 BUG-26).
+    if (!(error instanceof ImageActionError && error.message === ALREADY_ADDED_MESSAGE)) await deleteMediaImage(input.path);
     return refusal(error);
   }
 }

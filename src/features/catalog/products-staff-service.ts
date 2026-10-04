@@ -61,6 +61,7 @@ import {
 } from "./products-staff-repo";
 import { deleteVariantsByProductId, insertVariant, skuInUse } from "./variants-staff-repo";
 import { getPanelVariants, type PanelVariant } from "./variants-staff-service";
+import { isDuplicateEntry } from "@/server/db/errors";
 
 export { getActiveCategoryGroups, getProductStatusCounts };
 
@@ -86,8 +87,6 @@ function fieldErrorFor(message: string): Record<string, string> | undefined {
   if (message.toLowerCase().includes("categor")) return { categoryId: message };
   return undefined;
 }
-
-const DUPLICATE_ENTRY = 1062;
 
 async function assertSlugAvailable(slug: string, excludeId?: number): Promise<void> {
   if (await slugInUse(slug, excludeId)) throw new ProductActionError("That slug is already in use. Choose another.");
@@ -349,7 +348,7 @@ export async function createProduct(rawInput: unknown, actor: Actor): Promise<St
     return { ok: true, id };
   } catch (error) {
     if (error instanceof ProductActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
-    if ((error as { errno?: number }).errno === DUPLICATE_ENTRY) {
+    if (isDuplicateEntry(error)) {
       return { ok: false, error: "That slug or SKU is already in use. Choose another." };
     }
     throw error;
@@ -446,7 +445,7 @@ export async function updateProductById(id: number, rawInput: unknown, actor: Ac
     });
   } catch (error) {
     if (error instanceof ProductActionError) return { ok: false, error: error.message, fieldErrors: fieldErrorFor(error.message) };
-    if ((error as { errno?: number }).errno === DUPLICATE_ENTRY) {
+    if (isDuplicateEntry(error)) {
       return { ok: false, error: "That slug is already in use. Choose another.", fieldErrors: { slug: "That slug is already in use. Choose another." } };
     }
     throw error;
