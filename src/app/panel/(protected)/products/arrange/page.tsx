@@ -7,7 +7,7 @@ import { ArrangeCategoryFilter } from "@/components/panel/products/arrange/Arran
 import { ArrangeList } from "@/components/panel/products/arrange/ArrangeList";
 import { PERMISSIONS } from "@/features/auth/permissions";
 import { getFeaturedArrangeList, getShopArrangeList } from "@/features/catalog/arrange-service";
-import { listAllCategoriesForStaff } from "@/features/catalog/staff-repo";
+import { listCategoryOptions } from "@/features/catalog/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 
 export const metadata: Metadata = { title: "Arrange products" };
@@ -23,7 +23,7 @@ export default async function ArrangeProductsPage({ searchParams }: { searchPara
   await requirePermission(PERMISSIONS.PRODUCT_UPDATE);
   const query = arrangeQuerySchema.parse(await searchParams);
 
-  const categories = query.tab === "shop" ? await listAllCategoriesForStaff() : [];
+  const categories = query.tab === "shop" ? await listCategoryOptions() : [];
   const items = query.tab === "shop" ? await getShopArrangeList(query.category) : await getFeaturedArrangeList();
 
   return (
@@ -33,7 +33,7 @@ export default async function ArrangeProductsPage({ searchParams }: { searchPara
       <div className="flex flex-col gap-3">
         <ArrangeTabs currentTab={query.tab} category={query.category} />
         {query.tab === "shop" && (
-          <ArrangeCategoryFilter category={query.category} options={categories.map((category) => ({ id: category.id, name: category.name }))} />
+          <ArrangeCategoryFilter category={query.category} options={categories} />
         )}
         <ArrangeList
           key={`${query.tab}-${query.category ?? "all"}`}

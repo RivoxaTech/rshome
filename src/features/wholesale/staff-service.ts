@@ -5,9 +5,12 @@
  */
 import { cache } from "react";
 import { siteConfig } from "@/config/site.config";
+import { insertAuditLog } from "@/features/audit/repo";
 import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 import { getStoreIdentity } from "@/features/settings/service";
+import { KARACHI_OFFSET_MS } from "@/lib/karachi-datetime";
 import { formatPhone } from "@/lib/phone";
+import { db } from "@/server/db/client";
 import { buildWholesaleCsv, type WholesaleCsvRow } from "./csv";
 import {
   countInquiriesByStatus,
@@ -171,7 +174,7 @@ export type StaffWholesaleInquiryView = NonNullable<Awaited<ReturnType<typeof ge
 // ── CSV export ──────────────────────────────────────────────────────────────────────────────
 
 /** The current filter's matching rows (cap 5,000), one row per inquiry, items joined into one cell. */
-export async function buildWholesaleExport(tab: WholesaleStatus | "all", search: string | undefined): Promise<{ csv: string; rowCount: number; truncated: boolean }> {
+async function buildWholesaleExport(tab: WholesaleStatus | "all", search: string | undefined): Promise<{ csv: string; rowCount: number; truncated: boolean }> {
   const { rows, truncated } = await listInquiriesForExport(tab, search);
   const items = await getItemsByInquiryIds(rows.map((row) => row.id));
   const itemsByInquiry = new Map<number, typeof items>();
@@ -198,4 +201,29 @@ export async function buildWholesaleExport(tab: WholesaleStatus | "all", search:
     message: row.message,
   }));
   return { csv: buildWholesaleCsv(csvRows), rowCount: rows.length, truncated };
+}
+
+/**
+ * The export route's whole job (`wholesale.view`, checked by the route): the CSV, a
+ * `wholesale.export` audit row, and a file name that marks a capped export (S22 BUG-24).
+ */
+export async function exportWholesaleForStaff(
+  tab: WholesaleStatus | "all",
+  search: string | undefined,
+  actor: { id: number },
+): Promise<{ csv: string; filename: string }> {
+  const now = new Date();
+  const { csv, rowCount, truncated } = await buildWholesaleExport(tab, search);
+  await insertAuditLog(db, {
+    userId: actor.id,
+    action: "wholesale.export",
+    entity: "wholesale_export",
+    entityId: tab,
+    oldValues: null,
+    newValues: { tab, q: search ?? null, rowCount, truncated },
+    createdAt: now,
+  });
+
+  const day = new Date(now.getTime() + KARACHI_OFFSET_MS).toISOString().slice(0, 10);
+  return { csv, filename: `wholesale-inquiries-${day}${truncated ? "-first-rows-only" : ""}.csv` };
 }

@@ -1,24 +1,15 @@
 import { NextResponse } from "next/server";
-import { insertAuditLog } from "@/features/audit/repo";
 import { PERMISSIONS } from "@/features/auth/permissions";
-import { karachiDayIndex, karachiMidnightUtc, parseKarachiDateString } from "@/features/dashboard/ranges";
-import { buildOrderExportCsv } from "@/features/orders/csv-export";
+import { exportOrdersForStaff } from "@/features/orders/csv-export";
 import { ORDER_TABS, type OrderTab } from "@/features/orders/transitions";
-import { KARACHI_OFFSET_MS } from "@/lib/karachi-datetime";
-import { db } from "@/server/db/client";
 import { authorizeRequest } from "@/server/auth/permissions";
 
 const METHODS = ["bank_transfer", "cod", "all"] as const;
 type ExportMethod = (typeof METHODS)[number];
 
-function parseDayIndex(value: string | null, fallback: number): number {
-  return parseKarachiDateString(value) ?? fallback;
-}
-
 /**
- * The orders list's CSV export (S18, REQUIREMENTS AD-06, `order.export`, Admin only). Defaults to
- * the last 30 days when `from`/`to` are missing or invalid, so the client can't widen the export
- * by simply omitting them.
+ * The orders list's CSV export (S18, REQUIREMENTS AD-06, `order.export`, Admin only). The date
+ * defaults, the CSV and the audit row are the service's (`exportOrdersForStaff`).
  */
 export async function GET(request: Request) {
   const auth = await authorizeRequest(PERMISSIONS.ORDER_EXPORT);
@@ -30,28 +21,11 @@ export async function GET(request: Request) {
   const tabParam = url.searchParams.get("tab") ?? "all";
   const tab: OrderTab | "all" = (ORDER_TABS as readonly string[]).includes(tabParam) ? (tabParam as OrderTab) : "all";
 
-  const now = new Date();
-  const todayIndex = karachiDayIndex(now);
-  const fromDayIndex = parseDayIndex(url.searchParams.get("from"), todayIndex - 29);
-  const toDayIndex = parseDayIndex(url.searchParams.get("to"), todayIndex);
-  const from = karachiMidnightUtc(Math.min(fromDayIndex, toDayIndex));
-  const to = karachiMidnightUtc(Math.max(fromDayIndex, toDayIndex) + 1);
-
-  const { csv, rowCount, truncated } = await buildOrderExportCsv({ method, tab, from, to });
-
-  await db.transaction((tx) =>
-    insertAuditLog(tx, {
-      userId: auth.session.id,
-      action: "order.export",
-      entity: "order_export",
-      entityId: `${method}:${tab}`,
-      oldValues: null,
-      newValues: { method, tab, from: from.toISOString(), to: to.toISOString(), rowCount, truncated },
-      createdAt: now,
-    }),
+  const { csv, filename } = await exportOrdersForStaff(
+    { method, tab, from: url.searchParams.get("from"), to: url.searchParams.get("to") },
+    { id: auth.session.id },
   );
 
-  const filename = `orders-${new Date(now.getTime() + KARACHI_OFFSET_MS).toISOString().slice(0, 10)}.csv`;
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

@@ -80,6 +80,12 @@ export async function listStaffCategories(query: {
   return { items, total, page: query.page, pageSize: query.pageSize, pageCount: Math.max(1, Math.ceil(total / query.pageSize)) };
 }
 
+/** Every category in sort order, as the products list's filter and the arrange page offer them. */
+export async function listCategoryOptions(): Promise<{ id: number; name: string }[]> {
+  const all = await listAllCategoriesForStaff();
+  return all.map((category) => ({ id: category.id, name: category.name }));
+}
+
 // ── The create/edit form ────────────────────────────────────────────────────────────────────
 
 export type ParentOption = { id: number; name: string };

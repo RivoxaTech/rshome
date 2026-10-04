@@ -12,9 +12,9 @@ import { ProductTabs } from "@/components/panel/products/ProductTabs";
 import { ProductsTable } from "@/components/panel/products/ProductsTable";
 import { ProductsTableSkeleton } from "@/components/panel/products/ProductsTableSkeleton";
 import { PERMISSIONS } from "@/features/auth/permissions";
-import { listAllCategoriesForStaff } from "@/features/catalog/staff-repo";
 import { PRODUCT_DEFAULT_PAGE_SIZE, PRODUCT_PAGE_SIZE_OPTIONS, productListQuerySchema, type ProductListQuery } from "@/features/catalog/schemas";
 import { getProductStatusCounts, listStaffProducts } from "@/features/catalog/products-staff-service";
+import { listCategoryOptions } from "@/features/catalog/staff-service";
 import { requirePermission } from "@/server/auth/permissions";
 
 function productsPath(query: { tab?: string; q?: string; category?: string; page?: number; pageSize?: number }): string {
@@ -61,7 +61,7 @@ export async function ProductsPageBody({ searchParams }: { searchParams: Record<
   const categoryParam = query.category ? String(query.category) : undefined;
   const backHref = productsPath({ tab: query.tab, q: query.q, category: categoryParam, page: query.page, pageSize: query.pageSize });
 
-  const [counts, categories] = await Promise.all([getProductStatusCounts(), listAllCategoriesForStaff()]);
+  const [counts, categories] = await Promise.all([getProductStatusCounts(), listCategoryOptions()]);
 
   return (
     <>
@@ -102,7 +102,7 @@ export async function ProductsPageBody({ searchParams }: { searchParams: Record<
                 ariaLabel="Search products"
               />
             </div>
-            <CategoryFilterSelect tab={query.tab} q={query.q} category={query.category} options={categories.map((category) => ({ id: category.id, name: category.name }))} />
+            <CategoryFilterSelect tab={query.tab} q={query.q} category={query.category} options={categories} />
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <Link
