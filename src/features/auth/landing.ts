@@ -3,7 +3,7 @@ import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 /**
  * Where a signed-in user lands, in the fixed priority order from ARCHITECTURE.md §4.5 / DATABASE.md
  * DB18: dashboard, orders (bank, then COD — one permission covers both pages, bank is just the
- * preferred landing), wholesale, products, categories, settings, users, audit. Used for the post-login
+ * preferred landing), wholesale, products, categories, settings, users, roles, audit (S20). Used for the post-login
  * redirect, the `/panel` dashboard page when the viewer lacks `dashboard.view`, the login page
  * when already signed in, and the 403 page's back link. The two settings permissions land on two
  * different pages (S14): `settings.bank` on the Admin's bank/contact page, `settings.manage` on the
@@ -25,7 +25,8 @@ const PRIORITY: { permissions: PermissionKey[]; href: string }[] = [
   { permissions: [PERMISSIONS.SHIPPING_MANAGE], href: "/panel/shipping" },
   { permissions: [PERMISSIONS.SETTINGS_MANAGE], href: "/panel/settings" },
   { permissions: [PERMISSIONS.USER_MANAGE], href: "/panel/users" },
-  { permissions: [PERMISSIONS.AUDIT_VIEW], href: "/panel/audit-log" },
+  { permissions: [PERMISSIONS.ROLE_MANAGE], href: "/panel/roles" },
+  { permissions: [PERMISSIONS.AUDIT_VIEW], href: "/panel/audit" },
 ];
 
 /** Any signed-in user can always reach their own account page, permission or not. */

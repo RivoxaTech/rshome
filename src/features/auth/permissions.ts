@@ -59,8 +59,10 @@ export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
 
 /**
  * Admin default set (BUILD_PLAN.md C24, reversing C6: Admin no longer gets `product.view`,
- * and gains `settings.bank`). Disjoint from `DEVELOPER_DEFAULT_PERMISSIONS` below — the seed
- * sync asserts this, and a unit test does too.
+ * and gains `settings.bank`). Disjoint from `DEVELOPER_DEFAULT_PERMISSIONS` below (a unit test
+ * pins that). Since S20 these defaults are only the **first-run starting point**: the seed grants
+ * them when it first creates the role (and grants a brand-new key to its default role once), and
+ * the live sets then belong to the panel's roles page, which may make them overlap.
  */
 export const ADMIN_DEFAULT_PERMISSIONS: PermissionKey[] = [
   PERMISSIONS.DASHBOARD_VIEW,
@@ -96,20 +98,53 @@ export const DEVELOPER_DEFAULT_PERMISSIONS: PermissionKey[] = [
   PERMISSIONS.AUDIT_VIEW,
 ];
 
+/** The two seed-created roles and their first-run defaults, by `roles.key` (ARCHITECTURE.md §4.5). */
+export const SYSTEM_ROLE_DEFAULTS: Record<string, { name: string; permissions: PermissionKey[] }> = {
+  developer: { name: "Developer", permissions: DEVELOPER_DEFAULT_PERMISSIONS },
+  admin: { name: "Admin", permissions: ADMIN_DEFAULT_PERMISSIONS },
+};
+
 /**
- * What a system role's `role_permissions` rows should become, given its default set and what it
- * currently holds (ARCHITECTURE.md §4.5): the seed sync grants what's missing and revokes what's
- * no longer listed, so reversing a role's access takes effect on the next seed run. Pure, so it's
- * unit-tested directly; `features/auth/repo.ts` does the actual grant/revoke I/O.
+ * Keys that expose customer data (orders, screenshots, wholesale leads, revenue, bank details):
+ * granting one of these to the `developer` role is a deliberate step the owner must confirm.
  */
-export function diffRolePermissions(
-  desired: readonly PermissionKey[],
-  current: readonly PermissionKey[],
-): { toGrant: PermissionKey[]; toRevoke: PermissionKey[] } {
-  const desiredSet = new Set(desired);
-  const currentSet = new Set(current);
-  return {
-    toGrant: desired.filter((key) => !currentSet.has(key)),
-    toRevoke: current.filter((key) => !desiredSet.has(key)),
-  };
+export const CUSTOMER_DATA_PERMISSIONS: PermissionKey[] = [
+  PERMISSIONS.DASHBOARD_VIEW,
+  PERMISSIONS.ORDER_VIEW,
+  PERMISSIONS.ORDER_UPDATE_STATUS,
+  PERMISSIONS.ORDER_VERIFY_PAYMENT,
+  PERMISSIONS.ORDER_SET_SHIPPING,
+  PERMISSIONS.ORDER_EXPORT,
+  PERMISSIONS.WHOLESALE_VIEW,
+  PERMISSIONS.WHOLESALE_MANAGE,
+  PERMISSIONS.SETTINGS_BANK,
+];
+
+/** Keys that change the store's configuration or who has access: granting one to the `admin` role is confirmed the same way. */
+export const CONFIGURATION_PERMISSIONS: PermissionKey[] = [
+  PERMISSIONS.PRODUCT_VIEW,
+  PERMISSIONS.PRODUCT_CREATE,
+  PERMISSIONS.PRODUCT_UPDATE,
+  PERMISSIONS.PRODUCT_DELETE,
+  PERMISSIONS.PRODUCT_IMPORT,
+  PERMISSIONS.PRODUCT_EXPORT,
+  PERMISSIONS.CATEGORY_MANAGE,
+  PERMISSIONS.DISCOUNT_MANAGE,
+  PERMISSIONS.COUPON_MANAGE,
+  PERMISSIONS.SHIPPING_MANAGE,
+  PERMISSIONS.SETTINGS_MANAGE,
+  PERMISSIONS.USER_MANAGE,
+  PERMISSIONS.ROLE_MANAGE,
+  PERMISSIONS.AUDIT_VIEW,
+];
+
+/**
+ * The keys a save would *newly* grant to a system role that fall outside that role's side of the
+ * store (customer data for `developer`, configuration for `admin`). Pure: the roles page shows a
+ * confirmation dialog for these and the service refuses the save without the confirmation flag.
+ * Any other role, or a key the role already holds, is never sensitive.
+ */
+export function sensitiveGrants(roleKey: string, current: readonly PermissionKey[], next: readonly PermissionKey[]): PermissionKey[] {
+  const watched = roleKey === "developer" ? CUSTOMER_DATA_PERMISSIONS : roleKey === "admin" ? CONFIGURATION_PERMISSIONS : [];
+  return next.filter((key) => watched.includes(key) && !current.includes(key));
 }

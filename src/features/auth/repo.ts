@@ -1,5 +1,5 @@
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
-import { diffRolePermissions, type PermissionKey } from "@/features/auth/permissions";
+import type { PermissionKey } from "@/features/auth/permissions";
 import { db, type DbClient } from "@/server/db/client";
 import { permissions, rolePermissions, roles, sessions, users } from "@/server/db/schema/access-control";
 
@@ -61,31 +61,24 @@ export async function deleteOtherSessions(tx: DbClient, userId: number, keepSess
 }
 
 /**
- * Grants and revokes `role_permissions` rows so `roleId` ends up holding exactly `desiredKeys`
- * (ARCHITECTURE.md §4.5, DATABASE.md DB18): the seed sync for `developer` and `admin`.
+ * Grants `keys` to `roleId`, idempotently, and never revokes anything (ARCHITECTURE.md §4.5, S20):
+ * the seed's only tool for a system role's permissions — the full default set when the role is
+ * first created, a brand-new key once after that. The live sets belong to the panel's roles page.
+ * Returns the keys that were actually new to the role.
  */
-export async function syncRolePermissions(roleId: number, desiredKeys: PermissionKey[]): Promise<{ granted: number; revoked: number }> {
-  const currentKeys = await getPermissionKeysForRole(roleId);
-  const { toGrant, toRevoke } = diffRolePermissions(desiredKeys, currentKeys);
+export async function grantRolePermissions(roleId: number, keys: readonly PermissionKey[]): Promise<PermissionKey[]> {
+  if (keys.length === 0) return [];
+  const currentKeys = new Set(await getPermissionKeysForRole(roleId));
+  const toGrant = keys.filter((key) => !currentKeys.has(key));
+  if (toGrant.length === 0) return [];
 
-  if (toGrant.length > 0) {
-    const rows = await db.select({ id: permissions.id }).from(permissions).where(inArray(permissions.key, toGrant));
-    for (const row of rows) {
-      await db
-        .insert(rolePermissions)
-        .values({ roleId, permissionId: row.id })
-        // No-op update: makes the insert idempotent without an "insert ignore".
-        .onDuplicateKeyUpdate({ set: { roleId: sql`role_id` } });
-    }
+  const rows = await db.select({ id: permissions.id, key: permissions.key }).from(permissions).where(inArray(permissions.key, toGrant));
+  for (const row of rows) {
+    await db
+      .insert(rolePermissions)
+      .values({ roleId, permissionId: row.id })
+      // No-op update: makes the insert idempotent without an "insert ignore".
+      .onDuplicateKeyUpdate({ set: { roleId: sql`role_id` } });
   }
-
-  if (toRevoke.length > 0) {
-    const rows = await db.select({ id: permissions.id }).from(permissions).where(inArray(permissions.key, toRevoke));
-    const revokeIds = rows.map((row) => row.id);
-    if (revokeIds.length > 0) {
-      await db.delete(rolePermissions).where(and(eq(rolePermissions.roleId, roleId), inArray(rolePermissions.permissionId, revokeIds)));
-    }
-  }
-
-  return { granted: toGrant.length, revoked: toRevoke.length };
+  return rows.map((row) => row.key as PermissionKey);
 }

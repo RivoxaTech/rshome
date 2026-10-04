@@ -1,12 +1,13 @@
 /**
- * The disjoint RBAC redesign against the test database (BUILD_PLAN.md C24, S9b): the seed sync's
- * grant-and-revoke behaviour, and that a Developer session is refused on every order/wholesale
+ * The disjoint RBAC defaults against the test database (BUILD_PLAN.md C24, S9b; seed behaviour
+ * revised in S20): the seed's create-once / grant-new-keys-only / never-revoke behaviour, and that
+ * a Developer session holding the DEFAULT set is refused on every order/wholesale
  * surface (pages, Server Actions, the proof route, the sidebar's order counts) while an Admin
  * session is refused on the products page. Mirrors the `next/headers` mock other panel
  * integration suites use, since there is no Next server around a direct call. Skips without
  * TEST_DATABASE_URL.
  */
-import { randomBytes } from "node:crypto";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_DEFAULT_PERMISSIONS, DEVELOPER_DEFAULT_PERMISSIONS, PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 import { assertTestDatabase, checkoutInput, createStaffSession, resetTables, seedFixtures, type FixtureIds } from "@/test/integration-fixtures";
@@ -43,7 +44,7 @@ describe.skipIf(!TEST_DATABASE_URL)("RBAC redesign (integration)", () => {
   let pool: Db["pool"];
   let hashToken: typeof import("@/server/auth/session").hashToken;
   let getPermissionKeysForRole: typeof import("./repo").getPermissionKeysForRole;
-  let syncRolePermissions: typeof import("./repo").syncRolePermissions;
+  let seedPermissionsAndRoles: typeof import("./seed-roles").seedPermissionsAndRoles;
   let OrdersPageBody: typeof import("@/components/panel/orders/OrdersPageBody").OrdersPageBody;
   let OrderDetailPage: typeof import("@/components/panel/orders/detail/OrderDetailPage").OrderDetailPage;
   let ProductsPageBody: typeof import("@/components/panel/products/ProductsPageBody").ProductsPageBody;
@@ -76,7 +77,8 @@ describe.skipIf(!TEST_DATABASE_URL)("RBAC redesign (integration)", () => {
     assertTestDatabase();
     ({ db, pool } = await import("@/server/db/client"));
     ({ hashToken } = await import("@/server/auth/session"));
-    ({ getPermissionKeysForRole, syncRolePermissions } = await import("./repo"));
+    ({ getPermissionKeysForRole } = await import("./repo"));
+    ({ seedPermissionsAndRoles } = await import("./seed-roles"));
     ({ OrdersPageBody } = await import("@/components/panel/orders/OrdersPageBody"));
     ({ OrderDetailPage } = await import("@/components/panel/orders/detail/OrderDetailPage"));
     ({ ProductsPageBody } = await import("@/components/panel/products/ProductsPageBody"));
@@ -100,24 +102,60 @@ describe.skipIf(!TEST_DATABASE_URL)("RBAC redesign (integration)", () => {
     codOrderNumber = placed.orderNumber;
   });
 
-  describe("seed sync", () => {
-    it("grants the desired set and revokes whatever the role no longer qualifies for", async () => {
-      const { permissions: permissionsTable } = await import("@/server/db/schema/access-control");
-      const keys = new Set([...ADMIN_DEFAULT_PERMISSIONS, PERMISSIONS.PRODUCT_VIEW]);
-      for (const key of keys) await db.insert(permissionsTable).values({ key });
+  describe("seed: create once, grant new keys only, never revoke (S20)", () => {
+    const seedInput = (extraDeveloperKeys: string[] = []) => ({
+      keys: [...Object.values(PERMISSIONS), ...extraDeveloperKeys],
+      descriptions: {} as Record<string, string>,
+      defaults: {
+        developer: { name: "Developer", permissions: [...DEVELOPER_DEFAULT_PERMISSIONS, ...extraDeveloperKeys] },
+        admin: { name: "Admin", permissions: ADMIN_DEFAULT_PERMISSIONS },
+      },
+    });
+    const roleId = async (key: string) => (await db.select().from(roles).where(eq(roles.key, key)))[0].id;
 
-      const [role] = await db.insert(roles).values({ key: `test-sync-${randomBytes(4).toString("hex")}`, name: "Test sync role" });
-      await syncRolePermissions(role.insertId, [PERMISSIONS.PRODUCT_VIEW, PERMISSIONS.SETTINGS_BANK]);
-      expect(new Set(await getPermissionKeysForRole(role.insertId))).toEqual(new Set([PERMISSIONS.PRODUCT_VIEW, PERMISSIONS.SETTINGS_BANK]));
+    it("creates both system roles with their full defaults on first run, and a re-run grants nothing", async () => {
+      const first = await seedPermissionsAndRoles(seedInput());
+      expect(first.createdRoles.sort()).toEqual(["admin", "developer"]);
+      expect(new Set(await getPermissionKeysForRole(await roleId("developer")))).toEqual(new Set(DEVELOPER_DEFAULT_PERMISSIONS));
+      expect(new Set(await getPermissionKeysForRole(await roleId("admin")))).toEqual(new Set(ADMIN_DEFAULT_PERMISSIONS));
 
-      // A later sync to the Admin set drops product.view (not listed) and keeps/adds settings.bank.
-      await syncRolePermissions(role.insertId, ADMIN_DEFAULT_PERMISSIONS);
-      expect(new Set(await getPermissionKeysForRole(role.insertId))).toEqual(new Set(ADMIN_DEFAULT_PERMISSIONS));
+      const second = await seedPermissionsAndRoles(seedInput());
+      expect(second.createdRoles).toEqual([]);
+      expect(second.newKeys).toEqual([]);
+      expect(second.granted).toEqual({ developer: [], admin: [] });
+    });
 
-      // Idempotent: syncing again changes nothing.
-      const before = new Set(await getPermissionKeysForRole(role.insertId));
-      await syncRolePermissions(role.insertId, ADMIN_DEFAULT_PERMISSIONS);
-      expect(new Set(await getPermissionKeysForRole(role.insertId))).toEqual(before);
+    it("does not undo a panel edit: a key granted to Admin stays, a key removed from Developer is not re-granted", async () => {
+      await seedPermissionsAndRoles(seedInput());
+      const { permissions: permissionsTable, rolePermissions } = await import("@/server/db/schema/access-control");
+      const admin = await roleId("admin");
+      const developer = await roleId("developer");
+      const [productView] = await db.select().from(permissionsTable).where(eq(permissionsTable.key, PERMISSIONS.PRODUCT_VIEW));
+      const [auditView] = await db.select().from(permissionsTable).where(eq(permissionsTable.key, PERMISSIONS.AUDIT_VIEW));
+      await db.insert(rolePermissions).values({ roleId: admin, permissionId: productView.id });
+      await db.delete(rolePermissions).where(and(eq(rolePermissions.roleId, developer), eq(rolePermissions.permissionId, auditView.id)));
+
+      await seedPermissionsAndRoles(seedInput());
+
+      expect(await getPermissionKeysForRole(admin)).toContain(PERMISSIONS.PRODUCT_VIEW);
+      expect(await getPermissionKeysForRole(developer)).not.toContain(PERMISSIONS.AUDIT_VIEW);
+    });
+
+    it("grants a brand-new key to its default role only, once", async () => {
+      await seedPermissionsAndRoles(seedInput());
+      const result = await seedPermissionsAndRoles(seedInput(["product.publish"]));
+      expect(result.newKeys).toEqual(["product.publish"]);
+      expect(result.granted).toEqual({ developer: ["product.publish"], admin: [] });
+      expect(await getPermissionKeysForRole(await roleId("developer"))).toContain("product.publish");
+      expect(await getPermissionKeysForRole(await roleId("admin"))).not.toContain("product.publish");
+
+      // The panel removes it again; the next run doesn't bring it back (the key is no longer new).
+      const { permissions: permissionsTable, rolePermissions } = await import("@/server/db/schema/access-control");
+      const [publish] = await db.select().from(permissionsTable).where(eq(permissionsTable.key, "product.publish"));
+      await db.delete(rolePermissions).where(eq(rolePermissions.permissionId, publish.id));
+      const again = await seedPermissionsAndRoles(seedInput(["product.publish"]));
+      expect(again.granted).toEqual({ developer: [], admin: [] });
+      expect(await getPermissionKeysForRole(await roleId("developer"))).not.toContain("product.publish");
     });
   });
 

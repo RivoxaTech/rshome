@@ -13,13 +13,15 @@
 export function buildListPath(
   basePath: string,
   tabSlug: string | undefined,
-  { q, page, pageSize, category }: { q?: string; page?: number; pageSize?: number; category?: string },
+  { q, page, pageSize, category, extra }: { q?: string; page?: number; pageSize?: number; category?: string; extra?: Record<string, string | undefined> },
   defaultPageSize: number,
 ): string {
   const params = new URLSearchParams();
   if (tabSlug) params.set("tab", tabSlug);
   if (q) params.set("q", q);
   if (category) params.set("category", category);
+  // A list with its own filters (the audit viewer, S20) carries them as plain string pairs; blank ones are dropped.
+  for (const [key, value] of Object.entries(extra ?? {})) if (value) params.set(key, value);
   if (page && page > 1) params.set("page", String(page));
   if (pageSize && pageSize !== defaultPageSize) params.set("pageSize", String(pageSize));
   const search = params.toString();

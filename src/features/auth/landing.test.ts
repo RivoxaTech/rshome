@@ -47,4 +47,11 @@ describe("firstAllowedPath", () => {
     // Both held: discounts first, matching the sidebar's order.
     expect(firstAllowedPath(new Set<PermissionKey>([PERMISSIONS.COUPON_MANAGE, PERMISSIONS.DISCOUNT_MANAGE]))).toBe("/panel/discounts");
   });
+
+  it("lands a partial role on users, roles or the audit log, in that order (S20)", () => {
+    expect(firstAllowedPath(new Set<PermissionKey>([PERMISSIONS.USER_MANAGE]))).toBe("/panel/users");
+    expect(firstAllowedPath(new Set<PermissionKey>([PERMISSIONS.ROLE_MANAGE]))).toBe("/panel/roles");
+    expect(firstAllowedPath(new Set<PermissionKey>([PERMISSIONS.AUDIT_VIEW]))).toBe("/panel/audit");
+    expect(firstAllowedPath(new Set<PermissionKey>([PERMISSIONS.AUDIT_VIEW, PERMISSIONS.ROLE_MANAGE, PERMISSIONS.USER_MANAGE]))).toBe("/panel/users");
+  });
 });

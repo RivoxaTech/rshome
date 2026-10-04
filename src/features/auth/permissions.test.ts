@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { ADMIN_DEFAULT_PERMISSIONS, DEVELOPER_DEFAULT_PERMISSIONS, diffRolePermissions, PERMISSIONS } from "./permissions";
+import {
+  ADMIN_DEFAULT_PERMISSIONS,
+  CONFIGURATION_PERMISSIONS,
+  CUSTOMER_DATA_PERMISSIONS,
+  DEVELOPER_DEFAULT_PERMISSIONS,
+  PERMISSIONS,
+  SYSTEM_ROLE_DEFAULTS,
+  sensitiveGrants,
+} from "./permissions";
 
 describe("ADMIN_DEFAULT_PERMISSIONS / DEVELOPER_DEFAULT_PERMISSIONS", () => {
-  it("are disjoint (BUILD_PLAN.md C24)", () => {
+  // The DEFAULT sets stay disjoint (BUILD_PLAN.md C24). The LIVE sets in the database may overlap
+  // since S20: the roles page can grant any key to any role, and the seed never revokes.
+  it("are disjoint as first-run defaults", () => {
     const adminSet = new Set(ADMIN_DEFAULT_PERMISSIONS);
     const overlap = DEVELOPER_DEFAULT_PERMISSIONS.filter((key) => adminSet.has(key));
     expect(overlap).toEqual([]);
@@ -26,37 +36,32 @@ describe("ADMIN_DEFAULT_PERMISSIONS / DEVELOPER_DEFAULT_PERMISSIONS", () => {
     ];
     for (const key of forbidden) expect(DEVELOPER_DEFAULT_PERMISSIONS).not.toContain(key);
   });
+
+  it("are what SYSTEM_ROLE_DEFAULTS hands the seed", () => {
+    expect(SYSTEM_ROLE_DEFAULTS.developer.permissions).toBe(DEVELOPER_DEFAULT_PERMISSIONS);
+    expect(SYSTEM_ROLE_DEFAULTS.admin.permissions).toBe(ADMIN_DEFAULT_PERMISSIONS);
+  });
 });
 
-describe("diffRolePermissions", () => {
-  it("grants everything when the role currently holds nothing", () => {
-    const { toGrant, toRevoke } = diffRolePermissions([PERMISSIONS.PRODUCT_VIEW, PERMISSIONS.CATEGORY_MANAGE], []);
-    expect(toGrant).toEqual([PERMISSIONS.PRODUCT_VIEW, PERMISSIONS.CATEGORY_MANAGE]);
-    expect(toRevoke).toEqual([]);
+describe("sensitive grants (S20)", () => {
+  it("customer-data and configuration keys together cover every permission exactly once", () => {
+    const all = [...CUSTOMER_DATA_PERMISSIONS, ...CONFIGURATION_PERMISSIONS];
+    expect(new Set(all).size).toBe(all.length);
+    expect(new Set(all)).toEqual(new Set(Object.values(PERMISSIONS)));
   });
 
-  it("revokes a permission the desired set no longer lists", () => {
-    const { toGrant, toRevoke } = diffRolePermissions(
-      [PERMISSIONS.SETTINGS_BANK],
-      [PERMISSIONS.PRODUCT_VIEW, PERMISSIONS.SETTINGS_BANK],
-    );
-    expect(toGrant).toEqual([]);
-    expect(toRevoke).toEqual([PERMISSIONS.PRODUCT_VIEW]);
+  it("flags a customer-data key newly granted to the developer role, and a configuration key to the admin role", () => {
+    expect(sensitiveGrants("developer", DEVELOPER_DEFAULT_PERMISSIONS, [...DEVELOPER_DEFAULT_PERMISSIONS, PERMISSIONS.ORDER_VIEW])).toEqual([PERMISSIONS.ORDER_VIEW]);
+    expect(sensitiveGrants("admin", ADMIN_DEFAULT_PERMISSIONS, [...ADMIN_DEFAULT_PERMISSIONS, PERMISSIONS.PRODUCT_VIEW, PERMISSIONS.ROLE_MANAGE])).toEqual([
+      PERMISSIONS.PRODUCT_VIEW,
+      PERMISSIONS.ROLE_MANAGE,
+    ]);
   });
 
-  it("does nothing once the role already matches the desired set", () => {
-    const keys = [PERMISSIONS.DASHBOARD_VIEW, PERMISSIONS.ORDER_VIEW];
-    const { toGrant, toRevoke } = diffRolePermissions(keys, keys);
-    expect(toGrant).toEqual([]);
-    expect(toRevoke).toEqual([]);
-  });
-
-  it("grants and revokes in the same pass (reversing a role's access, like C24 for Admin)", () => {
-    const { toGrant, toRevoke } = diffRolePermissions(
-      [PERMISSIONS.SETTINGS_BANK],
-      [PERMISSIONS.PRODUCT_VIEW],
-    );
-    expect(toGrant).toEqual([PERMISSIONS.SETTINGS_BANK]);
-    expect(toRevoke).toEqual([PERMISSIONS.PRODUCT_VIEW]);
+  it("ignores keys the role already holds, keys on its own side, removals, and custom roles", () => {
+    expect(sensitiveGrants("developer", [PERMISSIONS.ORDER_VIEW], [PERMISSIONS.ORDER_VIEW, PERMISSIONS.PRODUCT_VIEW])).toEqual([]);
+    expect(sensitiveGrants("admin", [], [PERMISSIONS.ORDER_VIEW, PERMISSIONS.SETTINGS_BANK])).toEqual([]);
+    expect(sensitiveGrants("developer", [PERMISSIONS.ORDER_VIEW, PERMISSIONS.PRODUCT_VIEW], [PERMISSIONS.PRODUCT_VIEW])).toEqual([]);
+    expect(sensitiveGrants("ops-team", [], Object.values(PERMISSIONS))).toEqual([]);
   });
 });

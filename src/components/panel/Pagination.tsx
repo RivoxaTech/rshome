@@ -28,6 +28,7 @@ export function Pagination({
   total,
   pageSize,
   defaultPageSize,
+  extra,
 }: {
   basePath: string;
   tabSlug?: string;
@@ -38,9 +39,11 @@ export function Pagination({
   total: number;
   pageSize: number;
   defaultPageSize: number;
+  /** A list's own extra filters (plain strings), kept in every page link. */
+  extra?: Record<string, string | undefined>;
 }) {
   if (total === 0) return null;
-  const pageHref = (target: number) => buildListPath(basePath, tabSlug, { q, category, page: target, pageSize }, defaultPageSize);
+  const pageHref = (target: number) => buildListPath(basePath, tabSlug, { q, category, page: target, pageSize, extra }, defaultPageSize);
   const start = (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
   const linkClass = "rounded-md px-2.5 py-1.5 hover:bg-secondary";

@@ -5,18 +5,12 @@ import { fileURLToPath } from "node:url";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { siteConfig } from "../src/config/site.config";
-import {
-  ADMIN_DEFAULT_PERMISSIONS,
-  DEVELOPER_DEFAULT_PERMISSIONS,
-  PERMISSION_DESCRIPTIONS,
-  PERMISSIONS,
-  type PermissionKey,
-} from "../src/features/auth/permissions";
-import { syncRolePermissions } from "../src/features/auth/repo";
+import { PERMISSION_DESCRIPTIONS, PERMISSIONS, SYSTEM_ROLE_DEFAULTS } from "../src/features/auth/permissions";
+import { seedPermissionsAndRoles } from "../src/features/auth/seed-roles";
 import { hashPassword } from "../src/server/auth/password";
 import { db, pool } from "../src/server/db/client";
 import { categories, productImages, productVariants, products } from "../src/server/db/schema/catalog";
-import { permissions as permissionsTable, roles, users } from "../src/server/db/schema/access-control";
+import { roles, users } from "../src/server/db/schema/access-control";
 import { coupons, discounts, discountTargets } from "../src/server/db/schema/promotions";
 import { settings } from "../src/server/db/schema/settings";
 import { shippingZoneAreas, shippingZones } from "../src/server/db/schema/shipping";
@@ -54,46 +48,27 @@ async function seedMediaImages(): Promise<Record<SeedImageKey, ProcessedMediaIma
   return Object.fromEntries(entries) as Record<SeedImageKey, ProcessedMediaImage>;
 }
 
-async function seedPermissions() {
-  const allKeys = Object.values(PERMISSIONS) as PermissionKey[];
-  for (const key of allKeys) {
-    await db
-      .insert(permissionsTable)
-      .values({ key, description: PERMISSION_DESCRIPTIONS[key] })
-      .onDuplicateKeyUpdate({ set: { description: PERMISSION_DESCRIPTIONS[key] } });
-  }
-  console.log(`Upserted ${allKeys.length} permissions.`);
-}
-
-// Both are system roles (DATABASE.md): neither can be edited or deleted in the panel, and their
-// permission sets are owned by the code above, not by whatever a past run granted.
-async function seedRoles() {
-  await db
-    .insert(roles)
-    .values({ key: "developer", name: "Developer", isSystem: true })
-    .onDuplicateKeyUpdate({ set: { name: "Developer", isSystem: true } });
-  await db
-    .insert(roles)
-    .values({ key: "admin", name: "Admin", isSystem: true })
-    .onDuplicateKeyUpdate({ set: { name: "Admin", isSystem: true } });
-  console.log("Upserted roles: developer, admin.");
-}
-
 /**
- * Syncs both system roles to their default sets by granting AND revoking (ARCHITECTURE.md §4.5,
- * BUILD_PLAN.md C24): a permission no longer listed for a role is deleted from `role_permissions`,
- * not just left alone, so reversing a role's access takes effect on the next seed run.
+ * Permissions and the two system roles (S20, owner decision amending C24; ARCHITECTURE.md §4.5):
+ * every permission row is upserted from the code's PERMISSIONS; `developer` and `admin` are
+ * created once with their code defaults, and after that the seed only grants a BRAND-NEW key (one
+ * it inserted into `permissions` for the first time) to the role whose default list names it. It
+ * never revokes and never re-grants a key the panel removed — the live sets belong to /panel/roles.
+ * "Reset to defaults" on a system role's page restores the code set on demand.
  */
-async function seedRolePermissions() {
+async function seedPermissionsAndSystemRoles() {
+  const result = await seedPermissionsAndRoles({
+    keys: Object.values(PERMISSIONS),
+    descriptions: PERMISSION_DESCRIPTIONS,
+    defaults: SYSTEM_ROLE_DEFAULTS,
+  });
+  console.log(`Permissions: ${Object.values(PERMISSIONS).length} upserted, ${result.newKeys.length} new.`);
+  for (const roleKey of Object.keys(SYSTEM_ROLE_DEFAULTS)) {
+    const created = result.createdRoles.includes(roleKey);
+    console.log(`Role ${roleKey}: ${created ? "created with its default set" : "exists, left as the panel last saved it"}; granted ${result.granted[roleKey]?.length ?? 0} key(s) this run.`);
+  }
   const roleRows = await db.select().from(roles);
-  const developerRole = roleRows.find((r) => r.key === "developer")!;
-  const adminRole = roleRows.find((r) => r.key === "admin")!;
-
-  const developerSync = await syncRolePermissions(developerRole.id, DEVELOPER_DEFAULT_PERMISSIONS);
-  const adminSync = await syncRolePermissions(adminRole.id, ADMIN_DEFAULT_PERMISSIONS);
-  console.log(`Developer role: granted ${developerSync.granted}, revoked ${developerSync.revoked}.`);
-  console.log(`Admin role: granted ${adminSync.granted}, revoked ${adminSync.revoked}.`);
-  return { developerRole, adminRole };
+  return { developerRole: roleRows.find((r) => r.key === "developer")!, adminRole: roleRows.find((r) => r.key === "admin")! };
 }
 
 async function seedUsers(developerRoleId: number, adminRoleId: number) {
@@ -543,9 +518,7 @@ async function createSettingOnceIfMissing(key: string, value: unknown, described
 }
 
 async function main() {
-  await seedPermissions();
-  await seedRoles();
-  const { developerRole, adminRole } = await seedRolePermissions();
+  const { developerRole, adminRole } = await seedPermissionsAndSystemRoles();
   await seedUsers(developerRole.id, adminRole.id);
   await seedShippingZones();
   const media = await seedMediaImages();

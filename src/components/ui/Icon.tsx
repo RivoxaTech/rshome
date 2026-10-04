@@ -89,6 +89,12 @@ export const ICON_PATHS = {
   // six zero-length dots are too faint to read at a 16px toolbar-icon size (fine at the larger
   // drag-handle size it was designed for).
   reorder: "M7 10l5-5 5 5M7 14l5 5 5-5",
+  // Users nav item (S20): two people outlines.
+  users: "M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75",
+  // Roles nav item (S20): a shield with a tick.
+  shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4",
+  // Audit log nav item (S20): a clipboard with lines.
+  clipboard: "M9 4h6v3H9zM9 4H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2h-2M9 12h6M9 16h6",
 } as const;
 
 /**

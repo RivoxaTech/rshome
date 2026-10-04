@@ -13,6 +13,7 @@ export function RowsPerPageSelect({
   pageSize,
   options,
   defaultPageSize,
+  extra,
 }: {
   basePath: string;
   tabSlug?: string;
@@ -21,6 +22,8 @@ export function RowsPerPageSelect({
   pageSize: number;
   options: readonly number[];
   defaultPageSize: number;
+  /** A list's own extra filters (plain strings), kept when the page size changes. */
+  extra?: Record<string, string | undefined>;
 }) {
   const router = useRouter();
 
@@ -32,7 +35,7 @@ export function RowsPerPageSelect({
         items={options.map((size) => ({ value: String(size), label: String(size) }))}
         ariaLabel="Rows per page"
         className="w-16 text-xs [&_summary]:px-1 [&_summary]:py-1"
-        onChange={(value) => router.push(buildListPath(basePath, tabSlug, { q, category, page: 1, pageSize: Number(value) }, defaultPageSize))}
+        onChange={(value) => router.push(buildListPath(basePath, tabSlug, { q, category, page: 1, pageSize: Number(value), extra }, defaultPageSize))}
       />
     </div>
   );

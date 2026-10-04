@@ -24,10 +24,10 @@ export default async function EditCategoryPage({
   const { back } = await searchParams;
   const backHref = categoryBackHrefSchema.parse(back) ?? "/panel/categories";
 
-  const formData = await getCategoryForEdit(categoryId);
+  // Two independent reads, in parallel (the other edit pages already do this; found in the S20 dev-speed pass).
+  const [formData, deleteGuard] = await Promise.all([getCategoryForEdit(categoryId), checkCategoryDeletable(categoryId)]);
   if (!formData) notFound();
   const { category, parentOptions, hasChildren } = formData;
-  const deleteGuard = await checkCategoryDeletable(categoryId);
 
   return (
     <>
