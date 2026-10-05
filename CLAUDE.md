@@ -1,7 +1,7 @@
 @AGENTS.md
 # RS HOME Store: project rules for Claude Code
 
-Read these first, in order: `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/BUILD_PLAN.md` (slice order, status and the owner's answers).
+Read these first, in order: `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/BUILD_PLAN.md` (slice order, status and the owner's answers). `docs/DEPLOY.md` is the cPanel checklist; `docs/HARDENING_REPORT.md` holds the S22 audit findings and what was done about each.
 The Lovable demo source (when available) is in `design-reference/`. It is a visual reference only and is never imported by the app.
 
 ## What this is
@@ -37,6 +37,11 @@ Deployed to cPanel shared hosting (Passenger) as a `standalone` build. Never rel
 9. No client-specific text in components. Use `config/site.config.ts` and the `settings` table. Respect feature flags in `config/features.ts`. A value the panel can edit (store name, logo text, announcement, contact, WhatsApp number, social links, bank accounts, alert recipients) is read only through `features/settings/service.ts`'s readers, never from `siteConfig` directly — `siteConfig` is their fallback and the home of templates and build-time copy (ARCHITECTURE.md D56). Static page text (Contact, About, Shipping and Returns, Privacy, Terms) lives in `src/content/pages.ts`, edited directly — no database, no panel editor (ARCHITECTURE.md D57).
 10. Mutations that matter (prices, discounts, coupons, settings, order and payment status) write to `audit_logs` or `order_status_history`.
 11. Keep memory use low (shared hosting): limit sharp concurrency, paginate every list, no heavy work at request time.
+12. Security headers live in `src/config/security-headers.ts` (production-only, applied by `next.config.ts`); a change there is checked with curl on a standalone build, never only in dev. Zod schemas import `lib/zod-config.ts` (`jitless`) so the CSP never needs `unsafe-eval`.
+13. Never import `server/load-env.ts` from app code (only `scripts/*` and `drizzle.config.ts` do): the import made Next copy `.env.local` into the standalone bundle. Secrets never ship; the host sets its env vars in cPanel (`docs/DEPLOY.md`).
+14. Every SQL `LIKE` goes through `lib/sql-like.ts#likeContains`. Every panel Server Action parses its id with `lib/form-id.ts#parseFormId` after `requirePermission`, before any query. Duplicate-key errors are detected with `server/db/errors.ts#isDuplicateEntry`, never by reading `errno` off the Drizzle wrapper.
+15. Shared helpers, never re-declared: `features/shared/staff-result.ts` (`StaffResult`, `StaffActionError`, `invalidInput`, `refusal`), `features/shared/pagination.ts`, `lib/field-errors.ts`, `lib/karachi-datetime.ts#karachiFormatter`, `lib/pill-colors.ts`, `components/panel/FormField.tsx#inputClass`.
+16. Design tokens the Tailwind utilities must see (`shadow-*`, colours, radii) belong in `theme.css`'s `@theme` blocks, not in `:root` alone. Panel overlays (dialogs, drawers, status menus) portal into `#panel-shell` through `components/panel/overlay-root.ts` and take their focus handling from `components/ui/use-modal.ts`; never portal to `document.body` (the panel font and dark palette are scoped to the shell) and never put `sr-only` on anything inside a panel page.
 
 ## UI rules
 Storefront must match the demo exactly: fonts, colours, spacing, icons, logo text, hover and scroll behaviour, mobile layout. Extract tokens into Tailwind config first. The storefront itself is unchanged by the panel work below. Admin and developer panels share the storefront's colour palette (the same CSS variables) — not a separate utilitarian look — but use their own type and corners: Inter, 0.5rem radii, not the storefront's serif/display pairing or its near-zero radius, and their layouts stay dense and functional (tables, forms), not storefront-style pages.

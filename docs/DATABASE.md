@@ -21,8 +21,8 @@ Reviewed and agreed on 28 September 2026. See the Decisions section at the end, 
 | permissions | id, `key` VARCHAR(100) unique (e.g. `order.verify_payment`), description |
 | role_permissions | role_id (FK), permission_id (FK), PK (role_id, permission_id) |
 | users | id, name, email VARCHAR(191) unique, password_hash (scrypt, encoded with salt and params), role_id (FK), is_active, last_login_at NULL, created_at, updated_at |
-| sessions | id CHAR(64) PK (SHA-256 hex of the cookie token), user_id (FK), expires_at, last_seen_at, ip VARCHAR(45), user_agent VARCHAR(255), created_at. Index user_id, expires_at |
-| rate_limits | bucket VARCHAR(191) PK (e.g. `login:ip:1.2.3.4`), count INT UNSIGNED, window_ends_at DATETIME. Updated with an atomic upsert; expired rows are reset on the next hit and swept on writes |
+| sessions | id CHAR(64) PK (SHA-256 hex of the cookie token), user_id (FK), expires_at, last_seen_at, ip VARCHAR(45), user_agent VARCHAR(255), created_at. Index user_id, expires_at. Every successful login deletes all expired rows (S22) |
+| rate_limits | bucket VARCHAR(191) PK (e.g. `login:ip:1.2.3.4`), count INT UNSIGNED, window_ends_at DATETIME. Updated with an atomic upsert under a row lock; an expired row is reused when its bucket is hit again, and whenever any bucket starts a new window, rows whose window ended more than 24 hours earlier are deleted (S22) |
 
 Permission keys (REQUIREMENTS §3.2, plus client decisions): `dashboard.view`, `order.view`, `order.update_status`, `order.verify_payment`, `order.set_shipping`, `order.export`, `wholesale.view`, `wholesale.manage`, `product.view`, `product.create`, `product.update`, `product.delete`, `product.import`, `product.export`, `category.manage`, `discount.manage`, `coupon.manage`, `shipping.manage`, `settings.manage`, `settings.bank`, `user.manage`, `role.manage`, `audit.view`. (`product.export`, S18: product CSV export, alongside the already-reserved `product.import`.)
 
