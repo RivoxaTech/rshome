@@ -11,6 +11,7 @@ function assertNoPersonalData(payload: { title: string; body: string; url: strin
 describe("buildPushPayload", () => {
   it("names the bank transfer and COD titles, with only the order number as the body", () => {
     const bank = buildPushPayload({ type: "new_order", orderNumber: "RSH-261001-ABCD", paymentMethod: "bank_transfer" });
+    expect(bank.type).toBe("new_order");
     expect(bank.title).toBe("New bank transfer order");
     expect(bank.body).toBe("RSH-261001-ABCD");
     expect(bank.url).toContain("/panel/orders/bank/RSH-261001-ABCD");
@@ -26,6 +27,7 @@ describe("buildPushPayload", () => {
 
   it("always links a delivery-charge screenshot event to the bank transfer detail page", () => {
     const payload = buildPushPayload({ type: "delivery_screenshot_uploaded", orderNumber: "RSH-261001-ABCD" });
+    expect(payload.type).toBe("delivery_screenshot_uploaded");
     expect(payload.title).toBe("Delivery charge screenshot uploaded");
     expect(payload.body).toBe("RSH-261001-ABCD");
     expect(payload.url).toContain("/panel/orders/bank/RSH-261001-ABCD");
@@ -34,6 +36,7 @@ describe("buildPushPayload", () => {
 
   it("builds the wholesale inquiry payload with no identifying detail beyond the inquiry id", () => {
     const payload = buildPushPayload({ type: "new_wholesale_inquiry", inquiryId: 42 });
+    expect(payload.type).toBe("new_wholesale_inquiry");
     expect(payload.title).toBe("New wholesale inquiry");
     expect(payload.body).toBe("");
     expect(payload.url).toContain("/panel/wholesale/42");

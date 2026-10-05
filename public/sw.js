@@ -38,7 +38,18 @@ self.addEventListener("push", (event) => {
     renotify: true,
     data: { url: panelUrl(payload.url || "/panel") },
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      // S22 follow-up: tell every open panel tab too, not only whoever sees the OS banner — each
+      // tab's OrderCountsPoller re-polls its counts, silently refreshes its own page, and (for
+      // payload.type new_order/new_wholesale_inquiry/test) plays a sound. Still just one message a
+      // push away, not a persistent connection, so it doesn't need anything Passenger can't offer.
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+        for (const client of clients) client.postMessage({ type: "rshome-push", eventType: payload.type || null });
+      }),
+    ]),
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {

@@ -203,7 +203,12 @@ describe.skipIf(!TEST_DATABASE_URL)("RBAC redesign (integration)", () => {
 
     it("can still open its own orders counts", async () => {
       const counts = await getOrderCountsForPermissions(new Set(ADMIN_DEFAULT_PERMISSIONS));
-      expect(counts).toEqual({ "orders-bank": expect.any(Number), "orders-cod": expect.any(Number) });
+      expect(counts).toEqual({
+        "orders-bank": expect.any(Number),
+        "orders-cod": expect.any(Number),
+        "orders-bank-new": expect.any(Number),
+        "orders-cod-new": expect.any(Number),
+      });
     });
   });
 });

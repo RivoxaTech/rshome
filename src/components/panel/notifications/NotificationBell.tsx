@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Switch } from "@/components/panel/Switch";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
+import { isSoundEnabled, setSoundEnabled } from "@/lib/panel-sound";
 
 type BellState = "checking" | "unsupported" | "ios-install" | "blocked" | "off" | "on";
 
@@ -39,7 +41,21 @@ export function NotificationBell({ vapidPublicKey }: { vapidPublicKey: string | 
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // Defaults to the on-by-default value so server and client render the same markup before this
+  // effect reads the real, per-browser preference (S22 follow-up: the notification sound).
+  const [soundOn, setSoundOn] = useState(true);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Same one-shot read of this browser's own state as `refresh()` above, not a store subscription.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSoundOn(isSoundEnabled());
+  }, []);
+
+  function toggleSound(next: boolean) {
+    setSoundOn(next);
+    setSoundEnabled(next);
+  }
 
   const refresh = useCallback(async () => {
     if (!vapidPublicKey || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
@@ -175,6 +191,16 @@ export function NotificationBell({ vapidPublicKey }: { vapidPublicKey: string | 
           role="menu"
           className="bg-popover border-border shadow-soft absolute top-full right-0 z-50 mt-1.5 w-72 rounded-lg border p-3 text-sm"
         >
+          {/* Independent of push support/state below: the sound also fires from the regular
+              counts poll (OrderCountsPoller), so it works even where push itself doesn't. */}
+          <div className="border-border mb-3 flex items-center justify-between gap-3 border-b pb-3">
+            <div>
+              <p className="font-medium">Sound</p>
+              <p className="text-muted-foreground text-xs">Play a chime for a new order or lead</p>
+            </div>
+            <Switch name="panel-sound" checked={soundOn} onChange={toggleSound} />
+          </div>
+
           {state === "checking" && <p className="text-muted-foreground">Checking this browser…</p>}
 
           {state === "unsupported" && <p className="text-muted-foreground">Notifications aren&apos;t supported in this browser.</p>}

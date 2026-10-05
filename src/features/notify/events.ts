@@ -12,7 +12,13 @@ export type NotifyEvent =
   | { type: "delivery_screenshot_uploaded"; orderNumber: string }
   | { type: "new_wholesale_inquiry"; inquiryId: number };
 
-type PushPayload = { title: string; body: string; url: string; tag: string };
+/**
+ * `type` (S22 follow-up) lets an open panel tab tell these apart once the service worker relays a
+ * push's payload to it: a sound plays for `new_order`/`new_wholesale_inquiry`, never for
+ * `delivery_screenshot_uploaded` (owner choice — that's an existing order's second screenshot, not
+ * a new lead). It travels inside the push payload itself, same as `title`/`body`/`url`/`tag`.
+ */
+type PushPayload = { type: NotifyEvent["type"]; title: string; body: string; url: string; tag: string };
 
 const NEW_ORDER_TITLES: Record<PaymentMethod, string> = {
   bank_transfer: "New bank transfer order",
@@ -38,6 +44,7 @@ export function buildPushPayload(event: NotifyEvent): PushPayload {
   switch (event.type) {
     case "new_order":
       return {
+        type: event.type,
         title: NEW_ORDER_TITLES[event.paymentMethod],
         body: event.orderNumber,
         url: orderDetailUrl(event.paymentMethod, event.orderNumber),
@@ -46,6 +53,7 @@ export function buildPushPayload(event: NotifyEvent): PushPayload {
     case "delivery_screenshot_uploaded":
       // Only a bank-transfer order ever takes a second (delivery-charge) screenshot.
       return {
+        type: event.type,
         title: "Delivery charge screenshot uploaded",
         body: event.orderNumber,
         url: orderDetailUrl("bank_transfer", event.orderNumber),
@@ -53,6 +61,7 @@ export function buildPushPayload(event: NotifyEvent): PushPayload {
       };
     case "new_wholesale_inquiry":
       return {
+        type: event.type,
         title: "New wholesale inquiry",
         body: "",
         url: panelUrl(`/panel/wholesale/${event.inquiryId}`),

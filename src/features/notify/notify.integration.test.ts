@@ -222,5 +222,8 @@ describe.skipIf(!TEST_DATABASE_URL)("push notifications (integration)", () => {
 
     const after = (await (await pollRoute.GET()).json()) as Record<string, number>;
     expect(after["orders-cod"]).toBe((before["orders-cod"] ?? 0) + 1);
+    // The raw Need review count (S22 follow-up: what the panel's poll-based sound fallback
+    // compares) moves the same way needsAction does for a brand-new COD order.
+    expect(after["orders-cod-new"]).toBe((before["orders-cod-new"] ?? 0) + 1);
   });
 });

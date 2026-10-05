@@ -131,7 +131,9 @@ type TestNotificationResult = { ok: true; sent: number } | { ok: false; error: s
 export async function sendTestNotification(userId: number): Promise<TestNotificationResult> {
   const subscriptions = await listSubscriptionsForUser(userId);
   if (subscriptions.length === 0) return { ok: false, error: "Enable notifications on this device first." };
-  const payload = { title: "Test notification", body: "Push notifications are working.", url: new URL("/panel", env.APP_URL).toString(), tag: "test" };
+  // `type: "test"` (S22 follow-up) is also one of the open tab's sound-worthy types, so this one
+  // button proves both push delivery and the chime at once.
+  const payload = { type: "test", title: "Test notification", body: "Push notifications are working.", url: new URL("/panel", env.APP_URL).toString(), tag: "test" };
   await dispatchPush(subscriptions, payload, `user:${userId}`);
   return { ok: true, sent: subscriptions.length };
 }

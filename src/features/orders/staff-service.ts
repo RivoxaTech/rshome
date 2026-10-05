@@ -98,13 +98,24 @@ export const getOrderCounts = cache(async (): Promise<Record<PaymentMethod, TabC
 /**
  * The sidebar's per-nav-item counts (`nav-items.ts` keys): `{}` for a viewer without `order.view`
  * (the Developer, since S9b) so the panel layout never even queries orders for them.
+ *
+ * The `-new` pair (S22 follow-up) is the raw Need review tab count, not `needsAction`: it's what
+ * `OrderCountsPoller` compares poll to poll to decide a notification sound is warranted. Unlike
+ * `needsAction`, this count never grows just because an existing (already-approved) order's second
+ * screenshot needs checking — only a genuinely new order landing in Need review moves it, so the
+ * poll fallback (no push) rings for the same reason the push payload's `new_order` type does.
  */
 export async function getOrderCountsForPermissions(
   permissions: ReadonlySet<PermissionKey>,
 ): Promise<Partial<Record<string, number>>> {
   if (!permissions.has(PERMISSIONS.ORDER_VIEW)) return {};
   const counts = await getOrderCounts();
-  return { "orders-bank": counts.bank_transfer.needsAction, "orders-cod": counts.cod.needsAction };
+  return {
+    "orders-bank": counts.bank_transfer.needsAction,
+    "orders-cod": counts.cod.needsAction,
+    "orders-bank-new": counts.bank_transfer.need_review,
+    "orders-cod-new": counts.cod.need_review,
+  };
 }
 
 // ── What a row or the detail page can do ────────────────────────────────────────────────────
