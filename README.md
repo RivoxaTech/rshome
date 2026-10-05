@@ -20,7 +20,7 @@ Read these first, in order:
 
 1. Copy `.env.example` to `.env.local` and fill it in (`docs/ARCHITECTURE.md` section 6 explains each variable).
 2. `npm install`
-3. `npm run db:migrate` then `npm run db:seed` (roles, permissions, two staff users, shipping zones, settings and a sample catalogue).
+3. `npm run db:migrate` then `npm run db:seed` (roles, permissions, two staff users, shipping zones, settings and a sample catalogue; `npm run db:seed -- --no-samples` leaves the sample catalogue out, which is what a production database gets, see `docs/DEPLOY.md`).
 4. `npm run dev` and open `http://localhost:3000` (storefront) or `http://localhost:3000/panel` (staff login).
 
 ## Everyday commands

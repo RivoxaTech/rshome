@@ -517,20 +517,45 @@ async function createSettingOnceIfMissing(key: string, value: unknown, described
   }
 }
 
-async function main() {
+export type SeedOptions = { samples: boolean };
+
+/**
+ * `npm run db:seed -- --no-samples` (S22, docs/DEPLOY.md §5) seeds a production database: the
+ * fixed rows only (permissions, system roles, the two staff users, shipping zones, settings) and
+ * no sample catalogue, images, discount or coupon. Every step creates what is missing and never
+ * deletes or overwrites, so either form is safe to re-run. Any other argument is a mistake.
+ */
+export function parseSeedArgs(args: string[]): SeedOptions {
+  let samples = true;
+  for (const arg of args) {
+    if (arg === "--no-samples") samples = false;
+    else throw new Error(`Unknown argument "${arg}". The only option is --no-samples.`);
+  }
+  return { samples };
+}
+
+export async function runSeed({ samples }: SeedOptions): Promise<void> {
   const { developerRole, adminRole } = await seedPermissionsAndSystemRoles();
   await seedUsers(developerRole.id, adminRole.id);
   await seedShippingZones();
+  await seedSettings();
+  if (!samples) {
+    console.log("Skipped the sample catalogue, images, discount and coupon (--no-samples).");
+    return;
+  }
   const media = await seedMediaImages();
   await seedCatalog(media);
   await seedSampleDiscount();
   await seedSampleCoupon();
-  await seedSettings();
+}
+
+async function main() {
+  await runSeed(parseSeedArgs(process.argv.slice(2)));
   console.log("Seed complete.");
 }
 
 // Only run when this file is the entry point (`tsx scripts/seed.ts`), not when
-// scripts/seed-demo-orders.ts imports PRODUCT_SEEDS from it.
+// scripts/seed-demo-orders.ts imports PRODUCT_SEEDS from it or a test imports runSeed.
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
   main()
     .catch((error) => {
