@@ -163,6 +163,7 @@ export function getProofsForStaff(orderIds: number[]) {
       id: paymentProofs.id,
       orderId: paymentProofs.orderId,
       purpose: paymentProofs.purpose,
+      channel: paymentProofs.channel,
       status: paymentProofs.status,
       rejectionReason: paymentProofs.rejectionReason,
       createdAt: paymentProofs.createdAt,
@@ -236,6 +237,27 @@ export async function updateProof(tx: DbClient, proofId: number, values: Partial
 }
 
 /**
+ * Records a delivery-charge payment confirmed on WhatsApp instead of uploaded here (D63): a
+ * `payment_proofs` row with no file, pre-verified, so the rest of the approve/status/audit
+ * pipeline (`recomputePaymentStatus`, `statusAfterPaymentReview`) treats it exactly like an
+ * approved screenshot. Returns the new row's id, for the audit log entry.
+ */
+export async function insertWhatsappDeliveryProof(tx: DbClient, orderId: number, reviewedBy: number, now: Date): Promise<number> {
+  const [result] = await tx.insert(paymentProofs).values({
+    orderId,
+    purpose: "delivery",
+    channel: "whatsapp",
+    filePath: null,
+    fileSize: null,
+    status: "verified",
+    reviewedBy,
+    reviewedAt: now,
+    createdAt: now,
+  });
+  return result.insertId;
+}
+
+/**
  * Puts the order's items back into variant stock, once: `stock_restored_at` is claimed first, so
  * a second call finds it set and changes nothing. Variants are updated in ascending id order,
  * the order checkout locks them in.
@@ -279,7 +301,8 @@ export async function releaseCouponUsage(tx: DbClient, orderId: number): Promise
  * braces), payment proofs, status history and items, then the order row itself. `audit_logs` rows
  * are left alone — `entity_id` is a plain string, not a foreign key, so they keep recording who
  * did what even once the order they're about is gone. Returns the proofs' file paths so the
- * caller can delete them from disk after the transaction commits.
+ * caller can delete them from disk after the transaction commits. A WhatsApp-confirmed proof
+ * (D63) has no file, so its null `filePath` is dropped rather than handed to `deleteProofFile`.
  */
 export async function deleteOrderCascade(tx: DbClient, orderId: number): Promise<{ proofFilePaths: string[] }> {
   const proofs = await tx.select({ filePath: paymentProofs.filePath }).from(paymentProofs).where(eq(paymentProofs.orderId, orderId));
@@ -288,7 +311,7 @@ export async function deleteOrderCascade(tx: DbClient, orderId: number): Promise
   await tx.delete(orderStatusHistory).where(eq(orderStatusHistory.orderId, orderId));
   await tx.delete(orderItems).where(eq(orderItems.orderId, orderId));
   await tx.delete(orders).where(eq(orders.id, orderId));
-  return { proofFilePaths: proofs.map((proof) => proof.filePath) };
+  return { proofFilePaths: proofs.map((proof) => proof.filePath).filter((filePath) => filePath !== null) };
 }
 
 // ── CSV export (S18) ────────────────────────────────────────────────────────────────────────────

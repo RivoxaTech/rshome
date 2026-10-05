@@ -57,6 +57,9 @@ export const approveOrderSchema = z.object({
   note: optionalText(255, "Keep the note under 255 characters."),
 });
 
+/** "Approve order (paid via WhatsApp)" (D63): no file, so just the order to confirm. */
+export const approveWhatsappSchema = z.object({ orderNumber: orderNumberSchema });
+
 export const reviewProofSchema = z.discriminatedUnion("decision", [
   z.object({ proofId: z.coerce.number().int().positive(), decision: z.literal("approve") }),
   z.object({ proofId: z.coerce.number().int().positive(), decision: z.literal("reject"), reason }),

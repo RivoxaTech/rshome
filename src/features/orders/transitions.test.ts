@@ -80,6 +80,7 @@ describe("order status transitions", () => {
 describe("payment status transitions", () => {
   const allowed = [
     "unpaid→proof_submitted",
+    "unpaid→verified", // A delivery charge confirmed on WhatsApp (D63): no screenshot to submit first.
     "rejected→proof_submitted",
     "proof_submitted→verified",
     "proof_submitted→rejected",
@@ -198,8 +199,8 @@ describe("status menu steps (C21, C22)", () => {
     // No products screenshot yet, or waiting for a new one: only cancel and reject.
     expect(statusActions(bankOrder("awaiting_shipping_quote", "unpaid"))).toEqual(["cancel", "reject"]);
     expect(statusActions(bankOrder("awaiting_shipping_quote", "rejected", { goods: "rejected" }))).toEqual(["cancel", "reject"]);
-    // Waiting for the delivery charge: nothing forward.
-    expect(statusActions(bankOrder("pending", "unpaid", { goods: "verified" }))).toEqual(["cancel", "reject"]);
+    // Waiting for the delivery charge: nothing forward, unless it arrived on WhatsApp instead (D63).
+    expect(statusActions(bankOrder("pending", "unpaid", { goods: "verified" }))).toEqual(["approve_whatsapp", "cancel", "reject"]);
     expect(statusActions(bankOrder("pending", "rejected", { goods: "verified", delivery: "rejected" }))).toEqual(["cancel", "reject"]);
     // A screenshot waiting with both payments in: check it, on to Processing (products or delivery charge).
     expect(statusActions(bankOrder("pending", "proof_submitted", { goods: "verified", delivery: "submitted" }))).toEqual(["check_screenshot", "cancel", "reject"]);
@@ -220,6 +221,7 @@ describe("status menu steps (C21, C22)", () => {
     expect(actionTarget("approve", "bank_transfer", false)).toBe("processing");
     expect(actionTarget("approve", "cod", true)).toBe("processing");
     expect(actionTarget("check_screenshot", "bank_transfer", true)).toBe("processing");
+    expect(actionTarget("approve_whatsapp", "bank_transfer", true)).toBe("processing");
     expect(actionTarget("ship", "cod", true)).toBe("delivery");
     expect(actionTarget("complete", "cod", true)).toBe("completed");
     expect(actionTarget("cancel", "cod", true)).toBe("cancelled");
@@ -244,6 +246,18 @@ describe("status menu steps (C21, C22)", () => {
         }
       }
     }
+  });
+
+  it("offers approve_whatsapp only once the products screenshot is verified and no delivery screenshot exists yet (D63)", () => {
+    expect(statusActions(bankOrder("pending", "unpaid", { goods: "verified", delivery: "missing" }))).toContain("approve_whatsapp");
+    // Not yet: the products screenshot itself still needs review.
+    expect(statusActions(bankOrder("pending", "proof_submitted", { goods: "submitted", delivery: "missing" }))).not.toContain("approve_whatsapp");
+    // Not once a delivery screenshot exists, whatever its state.
+    for (const delivery of ["submitted", "verified", "rejected"] as const) {
+      expect(statusActions(bankOrder("pending", "unpaid", { goods: "verified", delivery }))).not.toContain("approve_whatsapp");
+    }
+    // COD never owes a delivery-charge screenshot.
+    expect(statusActions(codOrder("pending"))).not.toContain("approve_whatsapp");
   });
 
   it("never approves a bank order without a products screenshot", () => {

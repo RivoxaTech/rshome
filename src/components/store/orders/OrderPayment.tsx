@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CopyButton } from "@/components/ui/CopyButton";
 import type { CustomerOrderView } from "@/features/orders/service";
 import type { BankAccount } from "@/features/settings/schemas";
@@ -51,7 +52,16 @@ function UploadHeading({ upload }: { upload: NonNullable<Payment["upload"]> }) {
  * cash on delivery, per `features.deliveryChargeByTransfer`). Rejecting a screenshot rejects the
  * whole order (owner decision, S9), so there is never a second chance to upload here.
  */
-export function OrderPayment({ order, bankAccounts }: { order: CustomerOrderView; bankAccounts: BankAccount[] }) {
+export function OrderPayment({
+  order,
+  bankAccounts,
+  whatsAppUrl,
+}: {
+  order: CustomerOrderView;
+  bankAccounts: BankAccount[];
+  /** Reused from the page's own WhatsApp button, so the delivery-charge screenshot has a WhatsApp fallback too (D63). */
+  whatsAppUrl: string;
+}) {
   const closed = order.orderStatus === "cancelled" || order.orderStatus === "rejected";
   const { payment } = order;
 
@@ -96,10 +106,25 @@ export function OrderPayment({ order, bankAccounts }: { order: CustomerOrderView
               <CopyButton value={upload.amount.replace(/\D/g, "")} label="Copy amount" />
             </div>
           </div>
-          <OrderProofUpload orderNumber={order.orderNumber} purpose={upload.purpose} />
+          <OrderProofUpload orderNumber={order.orderNumber} purpose={upload.purpose} whatsAppUrl={whatsAppUrl} />
         </div>
       ) : (
-        <p className="text-muted-foreground text-sm leading-relaxed">{nextStep(payment)}</p>
+        <div>
+          <p className="text-muted-foreground text-sm leading-relaxed">{nextStep(payment)}</p>
+          {payment.delivery === "awaiting_charge" && (
+            <p className="text-destructive mt-2 text-sm leading-relaxed">
+              Once we confirm your delivery charge, come back to this page (or look it up again at{" "}
+              <Link href="/track" className="underline underline-offset-4">
+                /track
+              </Link>
+              ) to upload that screenshot — or just send it to us on{" "}
+              <a href={whatsAppUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">
+                WhatsApp
+              </a>{" "}
+              instead.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

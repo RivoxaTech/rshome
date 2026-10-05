@@ -13,13 +13,14 @@ import { decimalToPaisa, formatMoney, paisaToDecimal } from "@/features/pricing/
 import { totalWithDeliveryCharge } from "@/features/pricing/pricing";
 import { db, type DbClient } from "@/server/db/client";
 import { deleteProofFile } from "@/server/storage/proofs";
-import { approveOrderSchema, closeOrderSchema, deleteOrderSchema, fulfilmentSchema, orderNoteSchema, reviewProofSchema } from "./schemas";
-import { paymentProgress, type OrderStatus, type PaymentStatus } from "./status";
+import { approveOrderSchema, approveWhatsappSchema, closeOrderSchema, deleteOrderSchema, fulfilmentSchema, orderNoteSchema, reviewProofSchema } from "./schemas";
+import { latestProofStates, paymentProgress, type OrderStatus, type PaymentStatus } from "./status";
 import {
   deleteOrderCascade,
   getLatestProof,
   getProof,
   getProofOrderNumber,
+  insertWhatsappDeliveryProof,
   lockOrderByNumber,
   releaseCouponUsage,
   restoreStockOnce,
@@ -240,6 +241,47 @@ export async function reviewProof(rawInput: unknown, actor: Actor): Promise<Staf
     });
   });
   return result.ok ? { ok: true, orderNumber } : result;
+}
+
+/**
+ * "Approve order (paid via WhatsApp)" (D63): a bank order in Pending delivery charge whose
+ * customer sent the delivery-charge screenshot straight to the shop's WhatsApp instead of
+ * uploading it here. Records a pre-verified `payment_proofs` row with no file, then reuses the
+ * same recompute/advance logic `reviewProof` uses for a real screenshot — there is no separate
+ * state machine for this.
+ */
+export async function approveDeliveryViaWhatsapp(rawInput: unknown, actor: Actor): Promise<StaffActionResult> {
+  const parsed = approveWhatsappSchema.safeParse(rawInput);
+  if (!parsed.success) return invalidInput(parsed.error);
+  const input = parsed.data;
+
+  return withLockedOrder(input.orderNumber, async (tx, order, now) => {
+    if (order.paymentMethod !== "bank_transfer") throw new StaffActionError("This isn't a bank-transfer order.");
+    if (order.orderStatus !== "pending") throw new StaffActionError("This order isn't waiting for its delivery charge.");
+    const before = latestProofStates(await getProofSummaries(order.id, tx));
+    if (before.delivery !== "missing") throw new StaffActionError("This order already has a delivery-charge screenshot — check it instead.");
+
+    const proofId = await insertWhatsappDeliveryProof(tx, order.id, actor.id, now);
+
+    const paymentStatus = recomputePaymentStatus({ ...order, proofs: await getProofSummaries(order.id, tx) }, features.deliveryChargeByTransfer);
+    await writePaymentStatus(tx, order, paymentStatus, "Delivery charge payment verified via WhatsApp", actor, now);
+
+    const orderStatus = statusAfterPaymentReview(order.orderStatus, paymentStatus);
+    if (orderStatus !== order.orderStatus) {
+      await updateOrder(tx, order.id, { orderStatus });
+      await writeOrderStatus(tx, order, orderStatus, "Delivery charge confirmed via WhatsApp", actor, now);
+    }
+
+    await insertAuditLog(tx, {
+      userId: actor.id,
+      action: "payment.approve_whatsapp",
+      entity: "payment_proof",
+      entityId: proofId,
+      oldValues: { delivery: before.delivery },
+      newValues: { status: "verified", purpose: "delivery", channel: "whatsapp", orderNumber: order.orderNumber, orderPaymentStatus: paymentStatus },
+      createdAt: now,
+    });
+  });
 }
 
 /** The fulfilment dropdown (C20): Sent (courier and tracking note optional) or Delivered, forward only. */

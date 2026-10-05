@@ -6,7 +6,7 @@ import { usePanelUi } from "@/components/panel/PanelUiContext";
 import { isSoundEnabled, playNotificationSound } from "@/lib/panel-sound";
 import { ordersTabTitle } from "@/lib/tab-title";
 
-const POLL_MS = 25_000;
+const POLL_MS = 12_000;
 
 /**
  * Push event types worth a sound (owner choice, S22 follow-up): a brand-new order or wholesale
@@ -26,7 +26,7 @@ const SOUND_COUNT_KEYS = ["orders-bank-new", "orders-cod-new", "wholesale"] as c
 
 /**
  * The sidebar badges, the browser tab title, and a near-real-time nudge (BUILD_PLAN.md S21,
- * extended S22 follow-up): polls `/api/panel/notifications` every 25s while the tab is visible,
+ * extended S22 follow-up): polls `/api/panel/notifications` every 12s while the tab is visible,
  * immediately on mount, and immediately again on every client-side navigation inside the panel —
  * the shared layout that seeds the sidebar's initial counts doesn't re-run on a soft navigation
  * (Next keeps it mounted), so without this the badge can keep showing whatever it was up to one

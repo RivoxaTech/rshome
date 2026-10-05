@@ -69,7 +69,7 @@ export default async function OrderPage({ params }: PageProps<"/order/[orderNumb
         <div className="grid content-start gap-12">
           <section>
             <p className="eyebrow">Payment</p>
-            <OrderPayment order={order} bankAccounts={bankAccounts} />
+            <OrderPayment order={order} bankAccounts={bankAccounts} whatsAppUrl={whatsapp} />
           </section>
 
           <section className={`${SECTION} flex items-start justify-between gap-6`}>

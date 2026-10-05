@@ -1,5 +1,6 @@
 import { DetailCard } from "@/components/panel/DetailCard";
 import { ProofImage } from "@/components/panel/orders/ProofImage";
+import { WhatsAppGlyph } from "@/components/store/WhatsAppButton";
 import type { ProofView } from "@/features/orders/staff-service";
 
 const STATUS_COLORS: Record<ProofView["status"], string> = {
@@ -24,13 +25,21 @@ export function ScreenshotsCard({ proofs, isCod }: { proofs: ProofView[]; isCod:
       <ul className="divide-border flex flex-col divide-y">
         {decided.map((proof) => (
           <li key={proof.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-            <ProofImage proofId={proof.id} label={`${proof.purposeLabel} screenshot`} />
+            {proof.channel === "whatsapp" ? (
+              <div className="border-border bg-whatsapp/10 flex h-16 w-16 shrink-0 items-center justify-center rounded-md border text-center">
+                <WhatsAppGlyph className="text-whatsapp h-6 w-6" />
+              </div>
+            ) : (
+              <ProofImage proofId={proof.id} label={`${proof.purposeLabel} screenshot`} />
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium">{proof.purposeLabel}</span>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[proof.status]}`}>{proof.statusLabel}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[proof.status]}`}>
+                  {proof.channel === "whatsapp" ? "Verified via WhatsApp" : proof.statusLabel}
+                </span>
               </div>
-              <p className="text-muted-foreground mt-0.5 text-xs">Uploaded {proof.uploadedAt}</p>
+              <p className="text-muted-foreground mt-0.5 text-xs">{proof.channel === "whatsapp" ? "Recorded" : "Uploaded"} {proof.uploadedAt}</p>
               {proof.reviewed && <p className="text-muted-foreground text-xs">Reviewed by {proof.reviewed}</p>}
               {proof.rejectionReason && <p className="text-destructive text-xs">Reason: {proof.rejectionReason}</p>}
             </div>

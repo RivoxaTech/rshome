@@ -6,6 +6,7 @@ import { PERMISSIONS, type PermissionKey } from "@/features/auth/permissions";
 import { sendOrderApprovedEmail, sendOrderClosedEmail, sendOrderShippedEmail } from "@/features/mail/service";
 import {
   addOrderNote,
+  approveDeliveryViaWhatsapp,
   approveOrder,
   closeOrder,
   deleteOrder,
@@ -47,6 +48,11 @@ export async function reviewProofAction(_state: StaffActionResult | null, formDa
   const orderNumber = result.ok ? result.orderNumber : undefined;
   if (orderNumber && decision === "reject") after(() => sendOrderClosedEmail(orderNumber));
   return result;
+}
+
+/** "Approve order (paid via WhatsApp)" (D63): same permission as approving a real screenshot. */
+export async function approveDeliveryWhatsappAction(_state: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {
+  return run([PERMISSIONS.ORDER_VERIFY_PAYMENT], formData, approveDeliveryViaWhatsapp);
 }
 
 export async function updateFulfilmentAction(_state: StaffActionResult | null, formData: FormData): Promise<StaffActionResult> {

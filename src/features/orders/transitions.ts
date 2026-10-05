@@ -63,10 +63,12 @@ const ORDER_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[]> = {
 /**
  * Upload (`unpaid | rejected → proof_submitted`), review (`proof_submitted → verified | rejected |
  * unpaid`, the last when the products are approved and the delivery charge is now due), an order
- * paid before its charge was set (`verified → unpaid`), and cash collected on delivery.
+ * paid before its charge was set (`verified → unpaid`), cash collected on delivery, and a delivery
+ * charge confirmed on WhatsApp (`unpaid → verified`, D63): there is no screenshot to submit, so it
+ * skips `proof_submitted` entirely.
  */
 const PAYMENT_TRANSITIONS: Record<PaymentStatus, readonly PaymentStatus[]> = {
-  unpaid: ["proof_submitted"],
+  unpaid: ["proof_submitted", "verified"],
   rejected: ["proof_submitted"],
   proof_submitted: ["verified", "rejected", "unpaid"],
   verified: ["unpaid"],
@@ -221,19 +223,25 @@ export function needsAction(order: FlagOrder): boolean {
 }
 
 /** A step the status menu offers; each opens a dialog. */
-export type StatusAction = "approve" | "check_screenshot" | "ship" | "complete" | "cancel" | "reject";
+export type StatusAction = "approve" | "check_screenshot" | "approve_whatsapp" | "ship" | "complete" | "cancel" | "reject";
 
 /**
  * What staff can do next (C21, C22): only forward moves this order can make now, never back, then
  * cancel and reject until it is out for delivery. Pending delivery charge moves on to Processing
- * by checking the screenshots, once both payments are in. A bank order waiting for the customer
- * offers nothing forward. The Server Action checks the move again under the order lock.
+ * by checking the screenshots, once both payments are in, or (D63) by recording a delivery-charge
+ * payment the customer confirmed on WhatsApp instead of uploading here, once the products screenshot
+ * is already verified and no delivery screenshot has shown up yet. A bank order waiting for the
+ * customer with neither option available offers nothing forward. The Server Action checks the move
+ * again under the order lock.
  */
 export function statusActions(order: FlagOrder): StatusAction[] {
   const actions: StatusAction[] = [];
   if (order.orderStatus === "awaiting_shipping_quote" && approvalRefusal(order, goodsState(order)) === null) actions.push("approve");
   const bothIn = PROOF_PURPOSES.every((purpose) => order.latest[purpose] === "submitted" || order.latest[purpose] === "verified");
   if (order.orderStatus === "pending" && screenshotToCheck(order) && bothIn) actions.push("check_screenshot");
+  if (order.orderStatus === "pending" && order.paymentMethod === "bank_transfer" && order.latest.goods === "verified" && order.latest.delivery === "missing") {
+    actions.push("approve_whatsapp");
+  }
   const targets = fulfilmentTargets(order.orderStatus);
   if (targets.includes("shipped")) actions.push("ship");
   if (targets.includes("delivered")) actions.push("complete");
@@ -247,6 +255,8 @@ export function actionTarget(action: StatusAction, paymentMethod: PaymentMethod,
     case "approve":
       return paymentMethod === "bank_transfer" && deliveryChargeByTransfer ? "pending_delivery" : "processing";
     case "check_screenshot":
+      return "processing";
+    case "approve_whatsapp":
       return "processing";
     case "ship":
       return "delivery";

@@ -73,7 +73,7 @@ async function resetDashboard(): Promise<void> {
     }
 
     const proofs = await db.select({ filePath: paymentProofs.filePath }).from(paymentProofs).where(inArray(paymentProofs.orderId, orderIds));
-    for (const proof of proofs) await deleteProofFile(proof.filePath);
+    for (const proof of proofs) if (proof.filePath) await deleteProofFile(proof.filePath);
 
     await db.delete(paymentProofs).where(inArray(paymentProofs.orderId, orderIds));
     await db.delete(orderStatusHistory).where(inArray(orderStatusHistory.orderId, orderIds));

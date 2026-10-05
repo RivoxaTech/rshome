@@ -1,6 +1,7 @@
 "use client";
 
 import { ApproveDialog } from "@/components/panel/orders/dialogs/ApproveDialog";
+import { ApproveWhatsappDialog } from "@/components/panel/orders/dialogs/ApproveWhatsappDialog";
 import { CheckScreenshotDialog } from "@/components/panel/orders/dialogs/CheckScreenshotDialog";
 import { CloseOrderDialog } from "@/components/panel/orders/dialogs/CloseOrderDialog";
 import { CompleteDialog } from "@/components/panel/orders/dialogs/CompleteDialog";
@@ -38,6 +39,8 @@ export function OrderDialogs({
       );
     case "check_screenshot":
       return <CheckScreenshotDialog items={control.toCheck} onClose={onClose} />;
+    case "approve_whatsapp":
+      return <ApproveWhatsappDialog orderNumber={orderNumber} onClose={onClose} />;
     case "ship":
       return <ShipDialog orderNumber={orderNumber} onClose={onClose} />;
     case "complete":

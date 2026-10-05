@@ -119,8 +119,11 @@ export const paymentProofs = mysqlTable(
       .references(() => orders.id),
     /** What the transfer paid for: the goods (at checkout) or the delivery charge quoted later. */
     purpose: mysqlEnum("purpose", ["goods", "delivery"]).notNull(),
-    filePath: varchar("file_path", { length: 255 }).notNull(),
-    fileSize: int("file_size", { unsigned: true }).notNull(),
+    /** `whatsapp` (ARCHITECTURE.md D63): staff recorded a payment confirmed on WhatsApp, never a
+     * real upload — `filePath`/`fileSize` stay null and the serving route refuses to stream it. */
+    channel: mysqlEnum("channel", ["upload", "whatsapp"]).notNull().default("upload"),
+    filePath: varchar("file_path", { length: 255 }),
+    fileSize: int("file_size", { unsigned: true }),
     status: mysqlEnum("status", ["submitted", "verified", "rejected"]).notNull().default("submitted"),
     rejectionReason: text("rejection_reason"),
     reviewedBy: bigint("reviewed_by", { mode: "number", unsigned: true }).references(

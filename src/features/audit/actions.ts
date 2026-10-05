@@ -51,6 +51,7 @@ export const AUDIT_ACTIONS: { key: string; label: string }[] = [
   { key: "wholesale.export", label: "Wholesale inquiries exported" },
   { key: "payment.approve", label: "Payment screenshot approved" },
   { key: "payment.reject", label: "Payment screenshot rejected" },
+  { key: "payment.approve_whatsapp", label: "Delivery charge verified via WhatsApp" },
   // Wholesale (S17).
   { key: "wholesale.status_change", label: "Wholesale inquiry status changed" },
   // Products, variants, images (S10, S18).

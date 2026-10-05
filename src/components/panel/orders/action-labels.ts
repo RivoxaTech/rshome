@@ -4,6 +4,7 @@ import type { StatusAction } from "@/features/orders/transitions";
 export const ACTION_LABELS: Record<StatusAction, string> = {
   approve: "Approve order",
   check_screenshot: "Check screenshot",
+  approve_whatsapp: "Approve order (paid via WhatsApp)",
   ship: "Move to Delivery",
   complete: "Mark completed",
   cancel: "Cancel order",

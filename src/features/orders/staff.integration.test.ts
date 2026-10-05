@@ -120,6 +120,7 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     actions.approveOrderAction(null, form(amount === undefined ? { orderNumber, note } : { orderNumber, amount, note }));
   const review = (proofId: number | string, decision: "approve" | "reject", reason?: string) =>
     actions.reviewProofAction(null, form(reason === undefined ? { proofId, decision } : { proofId, decision, reason }));
+  const approveWhatsapp = (orderNumber: string) => actions.approveDeliveryWhatsappAction(null, form({ orderNumber }));
   const fulfil = (orderNumber: string, status: string, extra: Record<string, string> = {}) =>
     actions.updateFulfilmentAction(null, form({ orderNumber, status, ...extra }));
   const close = (orderNumber: string, action: "reject" | "cancel", reason: string) => actions.closeOrderAction(null, form({ orderNumber, action, reason }));
@@ -196,8 +197,8 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     });
     expect((await proofsOf(order.id))[0]).toMatchObject({ purpose: "goods", status: "verified", reviewedBy: adminId });
     expect(await tabOf(order.orderNumber, "bank_transfer")).toBe("pending_delivery");
-    // Waiting for the customer: nothing forward is offered.
-    expect(await stepsOf(order.orderNumber, "bank_transfer")).toEqual(["cancel", "reject"]);
+    // Waiting for the customer: only the WhatsApp fallback is offered (D63), no normal screenshot yet.
+    expect(await stepsOf(order.orderNumber, "bank_transfer")).toEqual(["approve_whatsapp", "cancel", "reject"]);
     expect((await rowOf(order.orderNumber, "bank_transfer")).screenshotToCheck).toBe(false);
     expect((await historyOf(order.id)).slice(-2)).toMatchObject([
       { kind: "order", fromStatus: "awaiting_shipping_quote", toStatus: "pending", note: "Approved. Delivery charge PKR 1,450 (2 cartons, TCS)", changedBy: adminId },
@@ -357,6 +358,48 @@ describe.skipIf(!TEST_DATABASE_URL)("panel order work (integration)", () => {
     });
     const audits = await db.select().from(auditLogs).where(eq(auditLogs.action, "payment.approve"));
     expect(audits.filter((entry) => [goodsId, deliveryId].map(String).includes(entry.entityId))).toHaveLength(2);
+  });
+
+  it("approves a delivery-charge payment confirmed on WhatsApp, with no screenshot ever uploaded (D63)", async () => {
+    const order = await placeBankOrder();
+    expect(await approve(order.orderNumber, "450")).toEqual({ ok: true });
+    expect(await orderRow(order.orderNumber)).toMatchObject({ orderStatus: "pending", paymentStatus: "unpaid" });
+    expect(await stepsOf(order.orderNumber, "bank_transfer")).toEqual(["approve_whatsapp", "cancel", "reject"]);
+
+    expect(await approveWhatsapp(order.orderNumber)).toMatchObject({ ok: true });
+
+    const row = await orderRow(order.orderNumber);
+    expect(row).toMatchObject({ orderStatus: "processing", paymentStatus: "verified" });
+    expect(await tabOf(order.orderNumber, "bank_transfer")).toBe("processing");
+
+    const proofs = await proofsOf(order.id);
+    const whatsappProof = proofs.find((proof) => proof.purpose === "delivery")!;
+    expect(whatsappProof).toMatchObject({ channel: "whatsapp", status: "verified", filePath: null, fileSize: null, reviewedBy: adminId });
+
+    expect((await historyOf(order.id)).filter((entry) => entry.kind === "order").at(-1)).toMatchObject({
+      fromStatus: "pending",
+      toStatus: "processing",
+      note: "Delivery charge confirmed via WhatsApp",
+      changedBy: adminId,
+    });
+    const audits = await db.select().from(auditLogs).where(eq(auditLogs.action, "payment.approve_whatsapp"));
+    expect(audits.filter((entry) => entry.entityId === String(whatsappProof.id))).toHaveLength(1);
+
+    // Nothing to stream for a WhatsApp-recorded proof: the serving route refuses it like a missing file.
+    const { getProofFile } = await import("@/features/payments/service");
+    expect(await getProofFile(whatsappProof.id)).toBeNull();
+  });
+
+  it("refuses approve_whatsapp once a real delivery screenshot already exists, and on a non-pending order", async () => {
+    const order = await placeBankOrder();
+    expect(await approve(order.orderNumber, "450")).toEqual({ ok: true });
+    await customerUploads(order.orderNumber, "delivery");
+
+    expect(await approveWhatsapp(order.orderNumber)).toMatchObject({ ok: false });
+    expect(await stepsOf(order.orderNumber, "bank_transfer")).not.toContain("approve_whatsapp");
+
+    const other = await placeBankOrder();
+    expect(await approveWhatsapp(other.orderNumber)).toMatchObject({ ok: false });
   });
 
   it("refuses a products screenshot approved on its own in Need review, and allows it after (C22)", async () => {

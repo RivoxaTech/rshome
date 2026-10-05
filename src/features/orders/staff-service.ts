@@ -46,6 +46,7 @@ export const ACTION_PERMISSIONS: Record<StatusAction, PermissionKey[]> = {
   // Approving sets the delivery charge, approves the payment screenshot and moves the order on.
   approve: [PERMISSIONS.ORDER_SET_SHIPPING, PERMISSIONS.ORDER_VERIFY_PAYMENT, PERMISSIONS.ORDER_UPDATE_STATUS],
   check_screenshot: [PERMISSIONS.ORDER_VERIFY_PAYMENT],
+  approve_whatsapp: [PERMISSIONS.ORDER_VERIFY_PAYMENT],
   ship: [PERMISSIONS.ORDER_UPDATE_STATUS],
   complete: [PERMISSIONS.ORDER_UPDATE_STATUS],
   cancel: [PERMISSIONS.ORDER_UPDATE_STATUS],
@@ -129,6 +130,8 @@ function proofView(proof: StaffProof) {
     id: proof.id,
     purpose: proof.purpose,
     purposeLabel: PROOF_PURPOSE_LABELS[proof.purpose],
+    /** `whatsapp` (D63): staff confirmed the payment by hand, no file to show — the UI shows that instead of a thumbnail. */
+    channel: proof.channel,
     status: proof.status,
     statusLabel: PROOF_STATUS_LABELS[proof.status],
     rejectionReason: proof.rejectionReason,

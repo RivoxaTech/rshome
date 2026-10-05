@@ -172,10 +172,11 @@ describe.skipIf(!TEST_DATABASE_URL)("createOrder (integration)", () => {
       expect(proofs).toHaveLength(1);
       expect(proofs[0]).toMatchObject({ purpose: "goods", status: "submitted", rejectionReason: null, reviewedBy: null });
       expect(proofs[0].filePath).toMatch(/^proofs\/\d{4}\/\d{2}\/[a-f0-9]{32}\.webp$/);
-      const stored = path.join(env.UPLOAD_DIR, proofs[0].filePath);
+      const filePath = proofs[0].filePath!;
+      const stored = path.join(env.UPLOAD_DIR, filePath);
       expect(await exists(stored)).toBe(true);
       expect(proofs[0].fileSize).toBeGreaterThan(0);
-      const pendingName = path.basename(proofs[0].filePath);
+      const pendingName = path.basename(filePath);
       expect(await exists(path.join(env.UPLOAD_DIR, "proofs", "pending", pendingName))).toBe(false);
 
       const history = await db.select().from(orderStatusHistory).where(eq(orderStatusHistory.orderId, order.id));
