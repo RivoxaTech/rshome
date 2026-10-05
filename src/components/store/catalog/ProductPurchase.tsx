@@ -64,7 +64,9 @@ export function ProductPurchase({ optionName, variants }: { optionName: string; 
 
       <div className="mt-6 flex flex-wrap gap-4">
         <QuantityStepper value={soldOut ? 0 : shownQuantity} min={soldOut ? 0 : 1} max={maxQuantity} disabled={soldOut} onChange={setQuantity} />
-        <div className="grid min-w-48 flex-1">
+        {/* flex-1 fills the row on phones, where the stepper already takes most of the width; capped
+            at max-w-xs so the button doesn't stretch edge-to-edge of the much wider desktop column. */}
+        <div className="grid min-w-48 max-w-xs flex-1">
           <Button disabled={soldOut} onClick={() => addItem(selected.id, shownQuantity)}>
             {soldOut ? "Sold out" : "Add to Cart"}
           </Button>

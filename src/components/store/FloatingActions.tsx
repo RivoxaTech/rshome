@@ -8,8 +8,8 @@ import { WhatsAppButton } from "./WhatsAppButton";
 const SHOW_AFTER_PX = 400;
 
 /**
- * Fixed at the bottom right of every storefront page: the shop's WhatsApp, with back-to-top
- * above it once the page is scrolled. Sits below the header (z-50) and the cart drawer (z-60),
+ * Fixed at the bottom right of every storefront page: the shop's WhatsApp first, with back-to-top
+ * below it once the page is scrolled. Sits below the header (z-50) and the cart drawer (z-60),
  * whose backdrop covers it, and keeps off the phone's home-indicator area (safe-area insets).
  */
 export function FloatingActions({ whatsappHref }: { whatsappHref: string }) {
@@ -27,6 +27,7 @@ export function FloatingActions({ whatsappHref }: { whatsappHref: string }) {
       data-modal-shell
       className="fixed right-[calc(1rem_+_env(safe-area-inset-right))] bottom-[calc(1rem_+_env(safe-area-inset-bottom))] z-40 flex flex-col items-center gap-3 lg:right-6 lg:bottom-6"
     >
+      <WhatsAppButton href={whatsappHref} label="Chat with us on WhatsApp" />
       <button
         type="button"
         aria-label="Back to top"
@@ -39,7 +40,6 @@ export function FloatingActions({ whatsappHref }: { whatsappHref: string }) {
       >
         <Icon d={ICON_PATHS.arrowUp} className="h-4 w-4" />
       </button>
-      <WhatsAppButton href={whatsappHref} label="Chat with us on WhatsApp" />
     </div>
   );
 }
