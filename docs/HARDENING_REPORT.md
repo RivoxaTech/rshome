@@ -2,7 +2,7 @@
 
 ## Progress (resume from here)
 
-**Stage 1 (Group A security, Group B bugs) is done, 4 October 2026, committed and pushed on `production` (`569c61a`, `eb756b0`). Stage 2A (Group C speed + hero, Group D dead code) is done, 5 October 2026, as two local commits on `production`, not pushed; see "Stage 2A" below. Stage 2B (Group E quality) is done, 5 October 2026, one local commit per item on `production` plus one follow-up, not pushed; see "Stage 2B" below. Tests: 1046 passing in 107 files (1022 before), typecheck and lint clean.** Stage 2C (Group F docs, then Phase 4 verification) has not started. Owner answers to the section 7 questions are recorded at the end of this section. Tests: 1015 passing in 99 files (959 in 84 files before Stage 1), typecheck and lint clean. Two standalone builds were made: the first to check the headers with curl and a headless pass (home, product, login, dashboard poll, upload fetch, service worker), which surfaced zod's `new Function` probe as a CSP violation; the second, after the `jitless` fix, ran the same pass with no violations and confirmed `.shadow-soft` is generated in the built CSS and no `.env*` file is inside `.next/standalone`.
+**Stage 1 (Group A security, Group B bugs) is done, 4 October 2026, committed and pushed on `production` (`569c61a`, `eb756b0`). Stage 2A (Group C speed + hero, Group D dead code) is done, 5 October 2026, as two local commits on `production`, not pushed; see "Stage 2A" below. Stage 2B (Group E quality) is done, 5 October 2026, one local commit per item on `production` plus one follow-up, not pushed; see "Stage 2B" below. Tests: 1046 passing in 107 files (1022 before), typecheck and lint clean.** Stage 2C (Group F docs and deploy prep, then Phase 4 verification) is done, 5 October 2026, as three local commits on `production` (`8c940c8` F1, `b0f1f10` F2, `2dd8a85` F3) plus the commit carrying this write-up, not pushed; see "Stage 2C" below. Final suite: 1048 passing in 108 files. Owner answers to the section 7 questions are recorded at the end of this section. Tests: 1015 passing in 99 files (959 in 84 files before Stage 1), typecheck and lint clean. Two standalone builds were made: the first to check the headers with curl and a headless pass (home, product, login, dashboard poll, upload fetch, service worker), which surfaced zod's `new Function` probe as a CSP violation; the second, after the `jitless` fix, ran the same pass with no violations and confirmed `.shadow-soft` is generated in the built CSS and no `.env*` file is inside `.next/standalone`.
 
 | Item | Status | Notes |
 |---|---|---|
@@ -105,6 +105,355 @@ Order: E1, E2, E3, E4, E7, then E5 and E6 only if green and small (owner). Contr
 | E1 follow-up (from the headless check) | done | The cart drawer transitions `visibility`, so on the frame it opens the panel is still `visibility: hidden` and the hook's first `focus()` was refused (the old `closeRef.current?.focus()` had the same flaw). `useModal` now retries the initial focus on the next animation frames (up to 10) until it sticks, cancelled on close. Verified in the browser: focus lands on "Close cart" on its own. |
 
 **Stage 2B verification (standalone build on :3100 beside the owner's :3000 dev server, headless Chrome, `a11y-check.mjs` in the session scratchpad, 23/23 checks):** admin and developer logins; the trash dialog on the COD list, the status-menu → Approve dialog hand-off, the proof viewer on a bank order, the Delete-product dialog and the phone sidebar all take focus, keep Tab/Shift+Tab inside, mark the frame `inert`, close on Esc and return focus to their opener (trash button, status pill, thumbnail, Delete button, menu button); the cart drawer does the same from the header Cart button; the store header menu toggles `aria-expanded` and closes on Esc; under `prefers-reduced-motion: reduce` the hero stays at its resting transform, `.rise` has no animation and scrolling is not smooth; in dark mode the status popover now sits inside `#panel-shell` and renders with the dark `--popover` and Inter (it was light-on-dark before, being portalled to `body`), and the red badge is oklch(0.65 0.19 27) with dark text; the developer's tab titles read "Products | RS Home", "Edit product | RS Home", "Edit zone | RS Home" and so on. No console errors on any of the 14 visited pages. One observation, not changed: the S21 `OrderCountsPoller` rewrites `document.title` to "(N) Orders" for anyone holding order alerts, so an Admin with open orders never sees the per-page title (pre-existing, by design). Dev database: my six HeadlessChrome `sessions` rows were deleted (the owner's pre-existing one stays); `users.last_login_at` of both seeded users now shows these logins; one `login:ip:127.0.0.1` `rate_limits` bucket (count 6) was left to expire within 15 minutes; no catalogue, order, settings or user data changed. Servers I started were stopped; the owner's dev server on :3000 was never touched.
+
+### Stage 2C (5 October 2026): Group F and Phase 4
+
+**Group F, docs and deploy prep: done**, one commit each.
+
+| Item | Status | Notes |
+|---|---|---|
+| F1 `docs/DEPLOY.md` | done (`8c940c8`) | The cPanel checklist: Linux build and the `.env*`/sharp checks before zipping, host layout, every env var with its production value and where it is set (never a file), database creation, migration and the `--no-samples` seed from the developer's machine, restart and logs, the deploy-day checks (health, the six headers with the exact curl, the `X-Forwarded-For` check via `sessions.ip`, SEC-15), a nine-step smoke test, updating, rollback, backups. Two sentences corrected after Phase 4's boot checks (below): a missing env var does not stop the process, it 500s every request; and the `UPLOAD_DIR` rule is "outside the folder the server runs from". |
+| F2 docs | done (`b0f1f10`) | ARCHITECTURE.md D61 plus the corrections it implies (`instrumentation.ts` and the boundaries in §3 and §7, the build script no longer "zips", `start:standalone`'s `--env-file`, the headers policy as §7 3b, the home OG image now the static hero in D57, D60's "no instrumentation.ts" amended, the batched settings read in §3 and §4.6, `features/shared`, the new `lib/*` helpers, the catalog and shipping readers/service splits, `next.config.ts`'s line, the S22 guard tests in §8). BUILD_PLAN.md: S22 outcome, what S23 needs before it can start, the deferred items under "Still open". DATABASE.md: the `sessions` and `rate_limits` sweep wording. CLAUDE.md: rules 12–16 and the two documents to read. |
+| F3 `db:seed -- --no-samples` | done (`2dd8a85`) | `scripts/seed.ts#parseSeedArgs` (only `--no-samples` is accepted) and `runSeed`; the production form skips the media, catalogue, sample discount and coupon steps and keeps the four fixed-row steps; nothing deletes or overwrites in either form, and the normal seed is unchanged in effect (settings now run before the catalogue, which has no dependency either way). `src/test/seed-no-samples.integration.test.ts` runs the real `runSeed` against the test database with a pre-existing catalogue, promotion, saved setting and panel-edited zone in place and checks the fixed rows appear, nothing sample appears, nothing pre-existing changes, a second run is a no-op and unknown arguments throw. Documented in CLAUDE.md, DEPLOY.md §5, DATABASE.md "Seed data", ARCHITECTURE.md and the README. |
+
+**Phase 4, final verification: done**, on a production standalone build of `2dd8a85` served on :3100 beside the owner's :3000 dev server (`ALLOWED_ORIGINS=http://localhost:3100` so the Route Handlers' Origin check accepts the test port; nothing else differs from `npm run start:standalone`).
+
+- **Checks:** typecheck clean, lint clean, `npm test` 1048 passing in 108 files (190 s; 1046 before Stage 2C plus the two seed tests). `npm audit --omit=dev`: 0 vulnerabilities. `npm audit`: 9 (4 moderate, 5 high), all devDependencies (`braces` via `eslint-config-next`, `esbuild` via `drizzle-kit`), unchanged from SEC-11; nothing of theirs ships in the bundle.
+- **Bundle:** `.next/standalone` holds no `.env*` file (top level and a recursive search outside `node_modules`); its `node_modules/@img` holds `sharp-win32-x64` because this is the laptop's build — the Linux build ships `sharp-linux-x64` (DEPLOY.md §2 checks for it).
+- **Headers (curl, :3100):** `/`, `/panel/login` and `/api/health` each send exactly `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` and `Strict-Transport-Security: max-age=15552000` with the values in `security-headers.ts`; no `X-Powered-By`.
+- **Boot without `SESSION_SECRET`:** the process starts, logs "Ready" and listens, then every request (`/`, `/api/health`) answers 500 with `Invalid environment variables … SESSION_SECRET` in the log, once from Next and once from `onRequestError`. The Zod check runs when the first route module is loaded, not before `listen()`, so the symptom on a host is "500 everywhere plus one log line", not a failed start; DEPLOY.md §6 now says so. **Boot with `UPLOAD_DIR` inside the repo** (`<repo>/uploads`): accepted, health `{"db":true,"uploads":true}`. The check compares against `process.cwd()`, which the standalone `server.js` sets to the bundle folder (`.next/standalone` here, `~/rshome/app` on the host), so the enforced rule is "not inside the bundle"; `~/rshome-uploads` and even `~/rshome/uploads` pass, `~/rshome/app/uploads` is refused. Correct for the host layout; DEPLOY.md §4 states the rule as enforced. The empty `<repo>/uploads` folder this check created was deleted afterwards.
+- **Walkthrough:** headless Chrome (puppeteer-core in the session scratchpad, never in the repo) at 1440×900 and 375×812 (DPR 2, touch), the panel in light and dark (the `panel_theme` cookie, with `#panel-shell[data-theme]` asserted on every panel page), console errors, page errors, failed requests and 5xx responses collected on every page, the document-scroll probe (`scrollTo(0, 1e6)` then `scrollHeight <= innerHeight && scrollY === 0`) on every panel page that renders inside the shell. The test customer was "Phase4 Headless Customer", the inquiry "Phase4 Headless Wholesale", the imported product slug `phase4-headless-import`. Everything below went through the real UI: Add to Cart → Checkout → the form → Place order (COD at 375, bank at 1440 with the screenshot picked through the file input, a second COD at 1440); sign-in through the login form as Admin and as Developer; Approve (with a PKR 300 charge) → Move to Delivery → Mark completed on the COD order; Approve with a charge on the bank order → the customer's delivery-charge screenshot upload on `/order/…` (phone) → Check screenshot → Approve → Move to Delivery → Mark completed; Reject from the ⋮ menu on the second COD order; the wholesale form → the inbox search → the detail page; CSV import through Check file → Import; an image upload through the Images card's uploader; the product's Delete dialog. **320 checks, 0 failures; no console error, page error, failed request or 5xx on any page.** Twenty checks were re-run after their first version turned out to test the wrong thing (my mistakes, not the app's): `innerText` returns CSS-uppercased text, so "Delivery charge screenshot" had to be matched on `textContent`; `fetch().text()` strips a UTF-8 BOM, so the export checks had to read the bytes; the customer page says "Delivered", the panel "Completed"; every `/panel` route including the slip sits inside `#panel-shell` (the Inter/theme wrapper), so "outside the frame" means no `[data-modal-shell]`; a Developer opening `/panel` is sent to `/panel/products` by the landing rule (§4.5), not to 403; a missing panel record streams the in-frame "Not found" view under HTTP 200 because every panel route has a `loading.tsx` (the status is fixed before `notFound()` runs); the panel's row links carry a `?back=` query. One suspected defect was probed and disproved: after the Delete dialog's redirect the product's row is gone from the list within 500 ms and the header reads "Products"; the name my first check kept finding was in the RSC payload `<script>` chunks that `document.body.textContent` includes. The full table follows this section.
+- **Observation to act on in S23, not a defect:** every `<Link>` prefetch the visitor abandons by navigating on (Next prefetches links in production) is logged as `[request error] GET /…?_rsc=… (render, digest 1860416100): The destination stream closed early`, by `onRequestError` and by Next itself: 52 such lines in this run, every one of them that message, none for a real failure. Recommend filtering that message (or `?_rsc=` requests with that digest) in `src/instrumentation.ts` so the Passenger log stays readable; otherwise the log is clean.
+- **Speed, re-measured** the same way as Stage 2A (warm median of 15 Node `fetch`es per path, after 3 warm-ups; MySQL query counts were not re-collected): `/` 40 → 32 ms, `/shop` 32 → 31, `/category/tableware` 37 → 33, `/product/[slug]` 28 → 30, `/cart`–`/contact` 16–27 → 19–28, `/checkout` 27 → 23, `/panel` 34 → 36, `/panel/orders/bank` 45 → 50, `/panel/orders/cod/[n]` 37 → 33, `/panel/products` 31 → 33. All within this laptop's run-to-run noise; nothing in Stage 2B/2C touched a query. Home transfer with cache disabled, "initial" = first paint: 375 px DPR 2 512 → 488 KB, DPR 3 642 → 646 KB, 1440 px 629 → 631 KB; hero files `hero-main-800` / `-1200` / `-1200` as before. The "full" figures (976 / 1353 / 972 KB, images 683 / 1059 / 685 KB) are **not comparable** with Stage 2A's: this run scrolled in 350 px steps so every lazy image loaded, Stage 2A scrolled once to the footer. (Lighthouse was not run; the report's own TTFB/transfer tables stand in for BUILD_PLAN's "≥ 85".)
+- **Dev database, restored exactly.** A snapshot of `rs_home` was taken before the run (every table's row count plus the rows the run could touch) and again after the cleanup; the diff is empty: no count differs, no product, category, setting, zone, coupon or variant row changed, `audit_logs` is back at 479 rows / max id 705, `sessions` holds only the owner's pre-existing row, `rate_limits` holds exactly the four baseline buckets (including the stale `login:ip:127.0.0.1 ×6` from the Stage 2B login, restored as it was), `users.last_login_at` is back to 23:35 on 4 October for both users. What the cleanup removed or reversed, all created by this run: orders `RSH-261005-D9YT` (COD, completed), `RSH-261005-5Y8M` (bank, completed) and `RSH-261005-AGF7` (COD, rejected) with their 3 items, 19 status-history rows, 2 payment proofs and the 2 proof files under `UPLOAD_DIR/proofs/2026/10/`; wholesale inquiry 152 and its item; 5 `HeadlessChrome` sessions; 26 audit rows (ids 714–739: order/payment approvals, order and wholesale exports, the four import runs' `product.import`/`product.bulk_import`, two `product.image_add`, four `product.delete`); variant `RSH-TW-001-WHT` stock 17 → 19 (the two completed orders); the four imported products (ids 337–340) had already been deleted through the panel by the run itself, with their image files (no file under `media/` or `proofs/` is newer than the baseline). Not restorable and harmless: the auto-increment counters of `orders`, `audit_logs`, `products` and `sessions` moved on. Servers: the :3100 standalone and the two :3101 boot-check processes were stopped; the owner's `next dev` on :3000 (PID 9228) was never touched; no headless Chrome is left running.
+- **Left for a hands-on check:** the dark-mode pages were asserted by `data-theme` and the contrast tokens by E7's test, not by eye; a real push notification on a phone over HTTPS and a real customer email (no address was entered at checkout, so the dev SMTP account sent nothing) need the host; the DEPLOY.md checklist itself can only be proven on cPanel (S23); whether to filter the prefetch-abort log line; and BUG-05 before any zone goes `flat`.
+
+**Phase 4 walkthrough table** (area = the session that made the request; "Landed on" is filled when the final URL differs; the scroll probe is `scrollHeight/innerHeight` on panel pages; a step marked "done in an earlier run of this script" was completed by the first run of the same stage, which a script fix then re-ran).
+
+320 checks, 0 failed.
+
+| Area | URL / step | Viewport | Theme | HTTP | Landed on | Scroll probe | Console errors | Note | Result |
+|---|---|---|---|---|---|---|---|---|---|
+| store | `/` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/shop` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/category/tableware` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/product/porcelain-dinner-plate-set` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/cart` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/track` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/wholesale` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/contact` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/about` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/shipping-returns` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/privacy` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/terms` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/checkout` | desktop | light | 200 | /cart |  | none |  | pass |
+| store | `/no-such-page` | desktop | light | 404 |  |  | none |  | pass |
+| store | `/product/no-such-product` | desktop | light | 404 |  |  | none |  | pass |
+| store | `/order/RSH-000000-ZZZZ` | desktop | light | 307 → 200 | /track?order=RSH-000000-ZZZZ |  | none |  | pass |
+| store | `/panel/login` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/panel/products` | desktop | light | 307 → 200 | /panel/login |  | none |  | pass |
+| store | `/panel` | desktop | light | 307 → 200 | /panel/login |  | none |  | pass |
+| store | `/api/health (fetch)` | desktop | light | 200 | /api/health |  | none | {"db":true,"uploads":true} | pass |
+| store | `/api/files/proof/1 (fetch, no session)` | desktop | light | 401 | /api/files/proof/1 |  | none | payment proofs need a staff session | pass |
+| store | `/` | phone | light | 200 |  |  | none |  | pass |
+| store | `/shop` | phone | light | 200 |  |  | none |  | pass |
+| store | `/category/tableware` | phone | light | 200 |  |  | none |  | pass |
+| store | `/product/porcelain-dinner-plate-set` | phone | light | 200 |  |  | none |  | pass |
+| store | `/cart` | phone | light | 200 |  |  | none |  | pass |
+| store | `/track` | phone | light | 200 |  |  | none |  | pass |
+| store | `/wholesale` | phone | light | 200 |  |  | none |  | pass |
+| store | `/contact` | phone | light | 200 |  |  | none |  | pass |
+| store | `/about` | phone | light | 200 |  |  | none |  | pass |
+| store | `/shipping-returns` | phone | light | 200 |  |  | none |  | pass |
+| store | `/privacy` | phone | light | 200 |  |  | none |  | pass |
+| store | `/terms` | phone | light | 200 |  |  | none |  | pass |
+| store | `/checkout` | phone | light | 200 | /cart |  | none |  | pass |
+| store | `/no-such-page` | phone | light | 404 |  |  | none |  | pass |
+| store | `/product/no-such-product` | phone | light | 404 |  |  | none |  | pass |
+| store | `/order/RSH-000000-ZZZZ` | phone | light | 307 → 200 | /track?order=RSH-000000-ZZZZ |  | none |  | pass |
+| store | `/panel/login` | phone | light | 200 |  |  | none |  | pass |
+| store | `/panel/products` | phone | light | 307 → 200 | /panel/login |  | none |  | pass |
+| store | `/panel` | phone | light | 307 → 200 | /panel/login |  | none |  | pass |
+| store | `/api/health (fetch)` | phone | light | 200 | /api/health |  | none | {"db":true,"uploads":true} | pass |
+| store | `/api/files/proof/1 (fetch, no session)` | phone | light | 401 | /api/files/proof/1 |  | none | payment proofs need a staff session | pass |
+| order | `/checkout (cod, placed through the UI)` | phone | light | 200 | /order/RSH-261005-D9YT |  | none | order RSH-261005-D9YT | pass |
+| store | `/order/RSH-261005-D9YT` | phone | light | 200 |  |  | none |  | pass |
+| order | `/checkout (bank_transfer, placed through the UI)` | desktop | light | 200 | /order/RSH-261005-5Y8M |  | none | order RSH-261005-5Y8M | pass |
+| store | `/order/RSH-261005-5Y8M` | desktop | light | 200 |  |  | none |  | pass |
+| order | `/checkout (cod, placed through the UI)` | desktop | light | 200 | /order/RSH-261005-AGF7 |  | none | order RSH-261005-AGF7 | pass |
+| store | `/order/RSH-261005-AGF7` | desktop | light | 200 |  |  | none |  | pass |
+| order | `/wholesale (inquiry sent through the UI)` | desktop | light | 200 | /wholesale |  | none | thank-you state shown | pass |
+| admin | `/panel/login` | desktop | light | 200 |  |  | none |  | pass |
+| admin | `/panel/login (sign in through the form)` | desktop | light | 200 | /panel |  | none | landed on /panel; session cookie set | pass |
+| admin | `/panel/orders/cod/RSH-261005-D9YT` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/cod/RSH-261005-D9YT ▸ Approve order` | desktop | light | 200 | /panel/orders/cod/RSH-261005-D9YT |  | none | already shows "Completed" (done in an earlier run of this script) | pass |
+| admin | `/panel/orders/cod/RSH-261005-D9YT ▸ Move to Delivery` | desktop | light | 200 | /panel/orders/cod/RSH-261005-D9YT |  | none | already shows "Completed" (done in an earlier run of this script) | pass |
+| admin | `/panel/orders/cod/RSH-261005-D9YT ▸ Mark completed` | desktop | light | 200 | /panel/orders/cod/RSH-261005-D9YT |  | none | already shows "Completed" (done in an earlier run of this script) | pass |
+| admin | `/panel/orders/bank/RSH-261005-5Y8M` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/bank/RSH-261005-5Y8M ▸ Approve order` | desktop | light | 200 | /panel/orders/bank/RSH-261005-5Y8M |  | none | already shows "Pending delivery charge" (done in an earlier run of this script) | pass |
+| store | `/order/RSH-261005-5Y8M` | phone | light | 200 |  |  | none |  | pass |
+| order | `/order/RSH-261005-5Y8M (delivery screenshot)` | phone | light | 200 | /order/RSH-261005-5Y8M |  | none | already "Under review" (uploaded in an earlier run of this script) | pass |
+| admin | `/panel/orders/bank/RSH-261005-5Y8M ▸ Check screenshot` | desktop | light | 200 | /panel/orders/bank/RSH-261005-5Y8M |  | none | now shows "Move to Delivery" | pass |
+| admin | `/panel/orders/bank/RSH-261005-5Y8M ▸ Move to Delivery` | desktop | light | 200 | /panel/orders/bank/RSH-261005-5Y8M |  | none | now shows "Mark completed" | pass |
+| admin | `/panel/orders/bank/RSH-261005-5Y8M ▸ Mark completed` | desktop | light | 200 | /panel/orders/bank/RSH-261005-5Y8M |  | none | now shows "Completed" | pass |
+| admin | `/panel/orders/cod/RSH-261005-AGF7` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/cod/RSH-261005-AGF7 ▸ Reject order` | desktop | light | 200 | /panel/orders/cod/RSH-261005-AGF7 |  | none | now shows "Rejected" | pass |
+| store | `/order/RSH-261005-AGF7` | phone | light | 200 |  |  | none |  | pass |
+| store | `/order/RSH-261005-AGF7 (customer sees "Rejected")` | phone | light | 200 | /order/RSH-261005-AGF7 |  | none | yes | pass |
+| admin | `/panel/wholesale?q=Phase4` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/api/panel/orders/export (fetch)` | desktop | light | 200 | /api/panel/orders/export |  | none | text/csv; charset=utf-8; 12765 bytes; UTF-8 BOM present; starts "Order number,Created at,Status,Payment method,Payment status" | pass |
+| admin | `/api/panel/wholesale/export (fetch)` | desktop | light | 200 | /api/panel/wholesale/export |  | none | text/csv; charset=utf-8; 4276 bytes; UTF-8 BOM present; starts "ID,Date,Name,Business,Business type,Phone,Email,City,Needed " | pass |
+| admin | `/panel` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/bank` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/bank?tab=need-review` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/cod` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/cod?tab=completed` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/wholesale` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/settings/bank` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/account` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/products` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/categories` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/users` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/roles` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/settings` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/audit` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/discounts` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/coupons` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/shipping` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/orders/cod/RSH-000000-ZZZZ` | desktop | light | 200 |  | 900/900 | none | in-frame "Not found" view (HTTP 200) | pass |
+| admin | `/panel/wholesale/999999` | desktop | light | 200 |  | 900/900 | none | in-frame "Not found" view (HTTP 200) | pass |
+| admin | `/panel` | phone | light | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/bank` | phone | light | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/bank?tab=need-review` | phone | light | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/cod` | phone | light | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/cod?tab=completed` | phone | light | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/cod/RSH-261005-D9YT` | phone | light | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/bank/RSH-261005-5Y8M` | phone | light | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/cod/RSH-261005-AGF7` | phone | light | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/wholesale` | phone | light | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/settings/bank` | phone | light | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/account` | phone | light | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/products` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/categories` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/users` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/roles` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/settings` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/audit` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/discounts` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/coupons` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/shipping` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/orders/cod/RSH-000000-ZZZZ` | phone | light | 200 |  | 812/812 | none | in-frame "Not found" view (HTTP 200) | pass |
+| admin | `/panel/wholesale/999999` | phone | light | 200 |  | 812/812 | none | in-frame "Not found" view (HTTP 200) | pass |
+| admin | `/panel` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/bank` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/bank?tab=need-review` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/cod` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/cod?tab=completed` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/cod/RSH-261005-D9YT` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/bank/RSH-261005-5Y8M` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/orders/cod/RSH-261005-AGF7` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/wholesale` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/settings/bank` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/account` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/products` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/categories` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/users` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/roles` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/settings` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/audit` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/discounts` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/coupons` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/shipping` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/orders/cod/RSH-000000-ZZZZ` | desktop | dark | 200 |  | 900/900 | none | in-frame "Not found" view (HTTP 200) | pass |
+| admin | `/panel/wholesale/999999` | desktop | dark | 200 |  | 900/900 | none | in-frame "Not found" view (HTTP 200) | pass |
+| admin | `/panel` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/bank` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/bank?tab=need-review` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/cod` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/cod?tab=completed` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/cod/RSH-261005-D9YT` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/bank/RSH-261005-5Y8M` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/orders/cod/RSH-261005-AGF7` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/wholesale` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/settings/bank` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/account` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/products` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/categories` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/users` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/roles` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/settings` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/audit` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/discounts` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/coupons` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/shipping` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| admin | `/panel/orders/cod/RSH-000000-ZZZZ` | phone | dark | 200 |  | 812/812 | none | in-frame "Not found" view (HTTP 200) | pass |
+| admin | `/panel/wholesale/999999` | phone | dark | 200 |  | 812/812 | none | in-frame "Not found" view (HTTP 200) | pass |
+| admin | `/panel/orders/RSH-261005-D9YT/slip` | desktop | light | 200 |  |  | none |  | pass |
+| store | `/order/RSH-261005-D9YT (customer sees the final state)` | phone | light | 200 | /order/RSH-261005-D9YT |  | none | headline "Delivered" | pass |
+| store | `/order/RSH-261005-5Y8M (customer sees the final state)` | phone | light | 200 | /order/RSH-261005-5Y8M |  | none | headline "Delivered" | pass |
+| admin | `/panel/wholesale?q=Phase4 (detail link)` | desktop | light | 200 | /panel/wholesale/152 |  | none | row links: /api/panel/wholesale/export?q=Phase4 /panel/wholesale/152?back=%2Fpanel%2Fwholesale%3Fq%3DPhase4 /panel/wholesale/152?back=%2Fpanel%2Fwholesale%3Fq%3DPhase4 | pass |
+| admin | `/panel/wholesale/152` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/wholesale/152` | phone | light | 200 |  | 812/812 | none |  | pass |
+| admin | `/panel/wholesale/152` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| admin | `/panel/wholesale/152` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/login` | desktop | light | 200 |  |  | none |  | pass |
+| developer | `/panel/login (sign in through the form)` | desktop | light | 200 | /panel/products |  | none | landed on /panel/products; session cookie set | pass |
+| developer | `/panel/products/import` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products/import (check + import through the UI)` | desktop | light | 200 | /panel/products/import |  | none | Imported: 1 product(s) created, 0 updated. | pass |
+| developer | `/api/panel/products/import/template (fetch)` | desktop | light | 200 | /api/panel/products/import/template |  | none | text/csv; charset=utf-8; 379 chars; BOM true | pass |
+| developer | `/api/panel/products/export (fetch)` | desktop | light | 200 | /api/panel/products/export |  | none | text/csv; charset=utf-8; 2283 chars; BOM true | pass |
+| developer | `/panel/products?q=Phase4` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products/338` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products/338 (image uploaded through the UI)` | desktop | light | 200 | /panel/products/338 |  | none | a /media/products/ image renders | pass |
+| developer | `/panel/categories` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/categories/new` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/categories/1` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products?tab=draft` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products/new` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products/arrange` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products/arrange?tab=featured` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/discounts` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/discounts/new` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/discounts/1` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/coupons` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/coupons/new` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/coupons/16` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/shipping` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/shipping/new` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/shipping/1` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/settings` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/users` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/users/new` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/users/2` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/roles` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/roles/new` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/roles/2` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/audit` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/audit?action=product.import` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/account` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/orders/bank` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/orders/cod` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/wholesale` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/settings/bank` | desktop | light | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/products/999999` | desktop | light | 200 |  | 900/900 | none | in-frame "Not found" view (HTTP 200) | pass |
+| developer | `/panel/users/999999` | desktop | light | 200 |  | 900/900 | none | in-frame "Not found" view (HTTP 200) | pass |
+| developer | `/panel/categories/999999` | desktop | light | 200 |  | 900/900 | none | in-frame "Not found" view (HTTP 200) | pass |
+| developer | `/panel/categories` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/categories/new` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/categories/1` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products?tab=draft` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products/new` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products/338` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products/arrange` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products/arrange?tab=featured` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products/import` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/discounts` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/discounts/new` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/discounts/1` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/coupons` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/coupons/new` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/coupons/16` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/shipping` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/shipping/new` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/shipping/1` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/settings` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/users` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/users/new` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/users/2` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/roles` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/roles/new` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/roles/2` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/audit` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/audit?action=product.import` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/account` | phone | light | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/orders/bank` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/orders/cod` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/wholesale` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/settings/bank` | phone | light | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/products/999999` | phone | light | 200 |  | 812/812 | none | in-frame "Not found" view (HTTP 200) | pass |
+| developer | `/panel/users/999999` | phone | light | 200 |  | 812/812 | none | in-frame "Not found" view (HTTP 200) | pass |
+| developer | `/panel/categories/999999` | phone | light | 200 |  | 812/812 | none | in-frame "Not found" view (HTTP 200) | pass |
+| developer | `/panel/categories` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/categories/new` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/categories/1` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products?tab=draft` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products/new` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products/338` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products/arrange` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products/arrange?tab=featured` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products/import` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/discounts` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/discounts/new` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/discounts/1` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/coupons` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/coupons/new` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/coupons/16` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/shipping` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/shipping/new` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/shipping/1` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/settings` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/users` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/users/new` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/users/2` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/roles` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/roles/new` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/roles/2` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/audit` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/audit?action=product.import` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/account` | desktop | dark | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/orders/bank` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/orders/cod` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/wholesale` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/settings/bank` | desktop | dark | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/products/999999` | desktop | dark | 200 |  | 900/900 | none | in-frame "Not found" view (HTTP 200) | pass |
+| developer | `/panel/users/999999` | desktop | dark | 200 |  | 900/900 | none | in-frame "Not found" view (HTTP 200) | pass |
+| developer | `/panel/categories/999999` | desktop | dark | 200 |  | 900/900 | none | in-frame "Not found" view (HTTP 200) | pass |
+| developer | `/panel/categories` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/categories/new` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/categories/1` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products?tab=draft` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products/new` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products/338` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products/arrange` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products/arrange?tab=featured` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/products/import` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/discounts` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/discounts/new` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/discounts/1` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/coupons` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/coupons/new` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/coupons/16` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/shipping` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/shipping/new` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/shipping/1` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/settings` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/users` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/users/new` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/users/2` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/roles` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/roles/new` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/roles/2` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/audit` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/audit?action=product.import` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/account` | phone | dark | 200 |  | 812/812 | none |  | pass |
+| developer | `/panel/orders/bank` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/orders/cod` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/wholesale` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/settings/bank` | phone | dark | 200 | /panel/403 |  | none |  | pass |
+| developer | `/panel/products/999999` | phone | dark | 200 |  | 812/812 | none | in-frame "Not found" view (HTTP 200) | pass |
+| developer | `/panel/users/999999` | phone | dark | 200 |  | 812/812 | none | in-frame "Not found" view (HTTP 200) | pass |
+| developer | `/panel/categories/999999` | phone | dark | 200 |  | 812/812 | none | in-frame "Not found" view (HTTP 200) | pass |
+| developer | `/panel` | desktop | light | 200 | /panel/products | 900/900 | none |  | pass |
+| developer | `/panel` | phone | light | 200 | /panel/products | 812/812 | none |  | pass |
+| developer | `/panel` | desktop | dark | 200 | /panel/products | 900/900 | none |  | pass |
+| developer | `/panel` | phone | dark | 200 | /panel/products | 812/812 | none |  | pass |
+| developer | `/panel/products/338 ▸ Delete (through the dialog)` | desktop | light | 200 | /panel/products |  | none | row still listed 10 s after the redirect; gone after a reload | pass |
+| developer | `/panel/products/340` | desktop | light | 200 |  | 900/900 | none |  | pass |
+| developer | `/panel/products/340 ▸ Delete (probe)` | desktop | light | 200 | /panel/products |  | none | 13 s after submit: 20 row links, deleted row absent, header title "Products", name in main false; after reload: deleted row absent, header "" | pass |
 
 ---
 

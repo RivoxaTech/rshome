@@ -48,7 +48,7 @@ Set every variable in the Node app screen, never in a file on the host. `ARCHITE
 | `NODE_ENV` | `production` (the selector's Production mode sets it; check it is there). Without it the security headers are not sent and the production-required checks below are skipped. |
 | `DATABASE_URL` | `mysql://user:pass@localhost:3306/<cpaneluser>_rshome`. The database must be `utf8mb4_unicode_ci` (section 5). |
 | `SESSION_SECRET` | 32+ random characters, generated once: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`. Changing it signs every staff member out and invalidates order-access cookies and in-flight proof tokens. |
-| `UPLOAD_DIR` | The absolute path of `~/rshome-uploads` (for example `/home/<cpaneluser>/rshome-uploads`). The app refuses to start if it is inside the app folder. |
+| `UPLOAD_DIR` | The absolute path of `~/rshome-uploads` (for example `/home/<cpaneluser>/rshome-uploads`). The app refuses a path inside the folder the server runs from (the bundle, `~/rshome/app`); keep it outside the application root as well, so a redeploy or a zip of the app can never touch it. |
 | `APP_URL` | `https://<domain>` with no trailing slash. It is the only allowed Origin for state-changing requests, so a wrong value breaks every form and upload. |
 | `ALLOWED_ORIGINS` | Leave unset unless a second hostname must also post forms. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | Required in production: the app refuses to start without them. Use the domain's own mailbox: host `mail.<domain>` (or what cPanel's "Connect Devices" page shows), port 465, the full mailbox address as user, `MAIL_FROM` the same address. |
@@ -81,7 +81,7 @@ Later schema changes: back up first (section 10), run step 2 again with the new 
 
 ## 6. Start, restart, logs
 
-Restart from the Node app screen, or over SSH with `touch ~/rshome/tmp/restart.txt`. The app validates its environment at startup and exits with a message naming the missing or invalid variable; a start that fails shows up as a 503 and a line in `~/rshome/stderr.log` (the log the Node app screen links to). Unhandled request errors are logged there too, one line each with method, path and digest, never a body or cookie (`src/instrumentation.ts`). There is nothing else to tail: no cron, no queue, no worker.
+Restart from the Node app screen, or over SSH with `touch ~/rshome/tmp/restart.txt`. The app validates its environment when the first route loads, not before it starts listening: with a variable missing or invalid, the process stays up but every request answers 500 and `~/rshome/stderr.log` (the log the Node app screen links to) shows `Invalid environment variables` naming the variable (checked on the standalone build, S22 Phase 4). So a site that returns 500 everywhere right after a deploy means an env var, not a crash. Unhandled request errors are logged there too, one line each with method, path and digest, never a body or cookie (`src/instrumentation.ts`). There is nothing else to tail: no cron, no queue, no worker.
 
 ## 7. Deploy-day checks
 
