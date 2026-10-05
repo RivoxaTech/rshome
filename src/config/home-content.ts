@@ -31,7 +31,7 @@ export const HERO_IMAGES = {
 export const homeContent = {
   hero: {
     eyebrow: "RS Home • Karachi",
-    headingLines: ["Elevate", "Everyday Living"],
+    headingLines: ["The Art", " Of Being Home"],
     copy: "Curated home essentials, elegant tableware and timeless pieces for your space.",
     primaryCta: { label: "Shop Collection", href: "/shop" },
     secondaryCta: { label: "Explore Tableware", href: "/category/tableware" },
