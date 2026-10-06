@@ -113,11 +113,11 @@ export function OrderPayment({
           <p className="text-muted-foreground text-sm leading-relaxed">{nextStep(payment)}</p>
           {payment.delivery === "awaiting_charge" && (
             <p className="text-destructive mt-2 text-sm leading-relaxed">
-              Once we confirm your delivery charge, come back to this page (or look it up again at{" "}
+              Once we confirm your delivery charge, come back to this page (or look it up again at TRACKING or click {" "}
               <Link href="/track" className="underline underline-offset-4">
                 /track
               </Link>
-              ) to upload that screenshot — or just send it to us on{" "}
+              ) to upload that screenshot or just send it to us on{" "}
               <a href={whatsAppUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">
                 WhatsApp
               </a>{" "}

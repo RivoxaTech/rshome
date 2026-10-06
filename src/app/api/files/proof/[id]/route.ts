@@ -15,20 +15,22 @@ const idSchema = z.coerce.number().int().positive();
  * `order.verify_payment` or `order.view`, the file looked up by proof id (never a path from the
  * request), and never cached or sniffed as anything but WebP.
  */
+const NO_STORE = { "Cache-Control": "private, no-store" };
+
 export async function GET(_request: Request, { params }: RouteContext<"/api/files/proof/[id]">) {
   const auth = await authorizeRequest(PERMISSIONS.ORDER_VERIFY_PAYMENT, PERMISSIONS.ORDER_VIEW);
-  if (!auth.ok) return new NextResponse(null, { status: auth.status });
+  if (!auth.ok) return new NextResponse(null, { status: auth.status, headers: NO_STORE });
 
   const id = idSchema.safeParse((await params).id);
   const relativePath = id.success ? await getProofFile(id.data) : null;
   const filePath = relativePath ? proofFilePath(relativePath) : null;
-  if (!filePath) return new NextResponse(null, { status: 404 });
+  if (!filePath) return new NextResponse(null, { status: 404, headers: NO_STORE });
 
   let size: number;
   try {
     size = (await stat(filePath)).size;
   } catch {
-    return new NextResponse(null, { status: 404 });
+    return new NextResponse(null, { status: 404, headers: NO_STORE });
   }
 
   return new NextResponse(Readable.toWeb(createReadStream(filePath)) as ReadableStream, {
