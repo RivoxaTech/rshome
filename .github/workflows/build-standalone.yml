@@ -1,0 +1,71 @@
+name: Build standalone (Linux)
+
+# docs/DEPLOY.md §1/§2: the deploy bundle must be built on Linux (sharp's native binary is
+# platform-specific, ARCHITECTURE.md D3) — this is that Linux machine. Manual only: a build here
+# produces a real deploy artifact, so it runs on request, not on every push.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Typecheck and lint
+        run: |
+          npm run typecheck
+          npm run lint
+
+      # `next build` always runs with NODE_ENV=production, so env.ts's production checks apply here
+      # too. These values only need the right shape to satisfy that validation — build-standalone.mjs
+      # deletes every .env* from the bundle before it's zipped (CLAUDE.md #13, SEC-01), so none of
+      # this ever reaches the host or ships in the artifact. Real production values are set only in
+      # cPanel's Node app screen (docs/DEPLOY.md §4), never here.
+      - name: Write a build-time-only .env.local (format-valid placeholders, never shipped)
+        run: |
+          cat <<'EOF' > .env.local
+          DATABASE_URL=mysql://user:password@127.0.0.1:3306/rs_home
+          SESSION_SECRET=ci-build-time-placeholder-0123456789abcdef0123456789
+          UPLOAD_DIR=/tmp/rshome-uploads
+          APP_URL=https://example.com
+          VAPID_PUBLIC_KEY=ci-placeholder
+          VAPID_PRIVATE_KEY=ci-placeholder
+          VAPID_SUBJECT=mailto:ci@example.com
+          SMTP_HOST=ci.example.com
+          SMTP_PORT=587
+          SMTP_USER=ci@example.com
+          SMTP_PASS=ci-placeholder
+          MAIL_FROM=ci@example.com
+          EOF
+
+      - run: npm run build:standalone
+
+      - name: Verify no .env file and the Linux sharp binary shipped (docs/DEPLOY.md §2)
+        run: |
+          if ls -a .next/standalone | grep -q '^\.env'; then
+            echo "::error::An .env file is in the standalone bundle."
+            exit 1
+          fi
+          if ! ls .next/standalone/node_modules/@img/ 2>/dev/null | grep -q 'sharp-linux'; then
+            echo "::error::No linux-x64 sharp package in the bundle."
+            exit 1
+          fi
+
+      - name: Zip
+        run: |
+          cd .next/standalone
+          zip -qr "../../rshome-${GITHUB_SHA::7}.zip" .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rshome-standalone-${{ github.sha }}
+          path: rshome-*.zip
+          retention-days: 30

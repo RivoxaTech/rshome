@@ -7,10 +7,12 @@ How the standalone build gets onto a cPanel host (Passenger, CloudLinux Node sel
 - cPanel with the Node.js selector (Passenger), Node 20.9 or newer, glibc 2.26 or newer, an upload body limit of at least 6 MB (mod_security) and SSL on the domain (AutoSSL is fine).
 - A MySQL or MariaDB database and a user with full rights on it, plus either Remote MySQL (to migrate from your machine) or SSH.
 - A mailbox on the domain for `SMTP_*`/`MAIL_FROM` (cPanel Email Accounts).
-- A Linux machine to build on: GitHub Actions, WSL or Docker. A Windows build bundles win32 sharp binaries that will not run on the host.
+- A Linux machine to build on: GitHub Actions, WSL or Docker. A Windows build bundles win32 sharp binaries that will not run on the host. **As built:** `.github/workflows/build-standalone.yml`, triggered by hand (Actions tab → "Build standalone (Linux)" → Run workflow). It typechecks and lints, builds on `ubuntu-latest`, checks the bundle for a leaked `.env` file and the Linux sharp binary, zips `.next/standalone` and uploads it as a downloadable workflow artifact (30-day retention). It writes its own placeholder `.env.local` for the build step only — `next build` always runs with `NODE_ENV=production`, so `env.ts`'s production checks need *some* validly-shaped values present, but `build:standalone` deletes every `.env*` before zipping, so nothing here ever ships or needs to be a real secret.
 - A password manager entry for the production environment variables (section 4): they live only in cPanel's Node app screen, so there is no file to recover them from.
 
 ## 2. Build (Linux only)
+
+Easiest: run the `.github/workflows/build-standalone.yml` workflow by hand (Actions tab → "Build standalone (Linux)" → Run workflow), wait for it to finish, then download the `rshome-standalone-<sha>` artifact — it's already the zip from the steps below. On WSL or Docker instead:
 
 ```
 npm ci
