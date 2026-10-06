@@ -19,6 +19,12 @@ jobs:
 
       - run: npm ci
 
+      # tsc needs the ambient PageProps/LayoutProps/RouteContext types Next generates into
+      # .next/types — present locally only because dev/build has already run there at least
+      # once; a clean CI checkout has neither, so typecheck fails without this first.
+      - name: Generate route types
+        run: npx next typegen
+
       - name: Typecheck and lint
         run: |
           npm run typecheck
