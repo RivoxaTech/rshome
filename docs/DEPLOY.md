@@ -133,6 +133,26 @@ SELECT ip, user_agent, created_at FROM sessions ORDER BY created_at DESC LIMIT 1
 4. Upload and extract the zip into `~/rshome/app/`, replacing the old files. `UPLOAD_DIR` is untouched.
 5. Restart, then run section 7's health and header checks and as much of the smoke test as the change warrants.
 
+### As actually deployed on PKWebHost (7 Oct), and three gotchas worth knowing before you repeat it
+
+The first real deploy didn't use the `~/rshome/app/` + separate zip layout above — it used cPanel's **Git Version Control** feature to clone the repo straight into the Node app's own root (`~/public_html/<domain>/`), tracking a branch directly, with `~/rshome-uploads` as `UPLOAD_DIR` (a sibling, not nested). Updating that layout:
+
+```
+cd ~/public_html/<domain>
+git fetch origin
+git pull origin main          # or production — whichever you're tracking
+```
+then run the GitHub Actions build, download the artifact, and **extract only `server.js`, `.next/`, and `public/` from it into this same folder — never `node_modules/`** (see gotcha 1). Then, in the activated Node app shell (`source ~/nodevenv/<path>/<version>/bin/activate`):
+```
+npm install --include=dev
+DATABASE_URL="…" npm run db:migrate
+```
+then Restart from Setup Node.js App, and the health/header checks from section 7.
+
+1. **Never extract the CI zip's `node_modules/` onto this host.** CloudLinux's Node Selector manages `node_modules` as its own symlink into a separate virtualenv folder; overwriting it with a real directory (what the zip contains) breaks `npm install` there outright ("Cloudlinux NodeJS Selector demands to store node modules … in separate folder"). Recovery: `rm -rf node_modules && npm install --include=dev` — the activated shell's `npm` then recreates the symlink correctly. Going forward, just never extract that folder from the artifact at all; `npm install --include=dev` on the server replaces it every time, with both runtime and dev dependencies (`tsx`, `dotenv`, etc. — needed for `db:migrate`/`db:seed`, which the CI zip's pruned `node_modules` never has).
+2. **A downloaded GitHub Actions artifact is a zip of a zip.** Extracting the one you downloaded gives you one file (`rshome-<sha>.zip`, the workflow's own zip) — extract *that* too before you have real files to work with. Easy to accidentally delete that inner zip before realizing it was never actually unpacked; check for `server.js` before deleting anything.
+3. **A fresh terminal session does not have the Node app's configured Environment Variables.** `source .../activate` only switches the Node/npm version; it does not export what you set in Setup Node.js App's Environment Variables screen into that shell. Passenger *does* correctly pass them to the running `server.js` — this only affects manual commands like `db:migrate`/`db:seed`. Export them by hand for the session (or source a local reference file) before running those.
+
 ## 9. Rollback
 
 Extract the previous zip over `app/` and restart. If the release's migration must also be undone, restore the backup from step 8.2 first; a migration that only added a column or table can stay in place, since the previous build ignores it.
