@@ -5,14 +5,28 @@ import { Switch } from "@/components/panel/Switch";
 import { Icon, ICON_PATHS } from "@/components/ui/Icon";
 import { isSoundEnabled, setSoundEnabled } from "@/lib/panel-sound";
 
-type BellState = "checking" | "unsupported" | "ios-install" | "blocked" | "off" | "on";
+type BellState = "checking" | "unsupported" | "ios-install" | "ios-needs-safari" | "blocked" | "off" | "on";
 
-/** iOS Safari only supports web push once added to the Home Screen (iOS 16.4+), never in-tab. */
+/**
+ * iOS Safari only supports web push once added to the Home Screen (iOS 16.4+), never in-tab — and
+ * `window.Notification` doesn't exist at all until then, so this must be checked *before* the
+ * generic feature-detect below, not after (that order previously made every iOS browser report
+ * "unsupported" instead of the actionable message here).
+ */
 function isIosNotInstalled(): boolean {
   const ua = window.navigator.userAgent;
   const isIos = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && "ontouchend" in document);
   const nav = window.navigator as Navigator & { standalone?: boolean };
   return isIos && nav.standalone !== true;
+}
+
+/**
+ * Chrome/Firefox/Edge on iOS are WebKit wrappers (Apple's rule): their own "Add to Home Screen"
+ * only creates a bookmark shortcut, not the standalone web app Apple's Push API requires — only
+ * Safari's Add to Home Screen does that. So on iOS, this has to be done from Safari specifically.
+ */
+function isIosNonSafariBrowser(): boolean {
+  return /CriOS|FxiOS|EdgiOS|OPiOS/.test(window.navigator.userAgent);
 }
 
 function base64UrlToUint8Array(base64Url: string): Uint8Array<ArrayBuffer> {
@@ -58,12 +72,16 @@ export function NotificationBell({ vapidPublicKey }: { vapidPublicKey: string | 
   }
 
   const refresh = useCallback(async () => {
-    if (!vapidPublicKey || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+    if (!vapidPublicKey) {
       setState("unsupported");
       return;
     }
     if (isIosNotInstalled()) {
-      setState("ios-install");
+      setState(isIosNonSafariBrowser() ? "ios-needs-safari" : "ios-install");
+      return;
+    }
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      setState("unsupported");
       return;
     }
     if (Notification.permission === "denied") {
@@ -208,6 +226,13 @@ export function NotificationBell({ vapidPublicKey }: { vapidPublicKey: string | 
           {state === "ios-install" && (
             <p className="text-muted-foreground">
               Add this panel to your Home Screen (Share → Add to Home Screen) to enable notifications. Requires iOS 16.4 or later.
+            </p>
+          )}
+
+          {state === "ios-needs-safari" && (
+            <p className="text-muted-foreground">
+              On iPhone, notifications only work through Safari — open this page in Safari, tap Share → Add to Home Screen, then launch
+              the app from your Home Screen icon. This browser can&apos;t enable them, even after adding a shortcut.
             </p>
           )}
 
