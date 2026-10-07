@@ -36,6 +36,10 @@ self.addEventListener("push", (event) => {
     // A repeat of a tag already shown (e.g. a second wholesale inquiry while the first
     // notification is still up) still alerts the user instead of silently replacing it.
     renotify: true,
+    // The full logo for the notification itself; a plain version for Android's monochrome
+    // status-bar badge (the OS silhouettes it, so detail there would be lost anyway).
+    icon: "/notification-icon.png",
+    badge: "/notification-badge.png",
     data: { url: panelUrl(payload.url || "/panel") },
   };
   event.waitUntil(
