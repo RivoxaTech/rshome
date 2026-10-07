@@ -25,6 +25,10 @@ export const categories = mysqlTable(
     imagePath: varchar("image_path", { length: 255 }),
     sortOrder: int("sort_order").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
+    /** Whether the home page gives this category its own full-width story section (6 Oct
+     * follow-up, ARCHITECTURE.md D64) — replaces the old build-time-only `homeContent.stories`
+     * lookup, which silently showed nothing for any category staff added or renamed. */
+    showOnHomepage: boolean("show_on_homepage").notNull().default(true),
     createdAt: datetime("created_at").notNull().$defaultFn(() => new Date()),
     updatedAt: datetime("updated_at")
       .notNull()

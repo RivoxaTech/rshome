@@ -6,7 +6,7 @@ import { StorySection } from "@/components/store/home/StorySection";
 import { WholesaleSection } from "@/components/store/home/WholesaleSection";
 import { WhySection } from "@/components/store/home/WhySection";
 import { features } from "@/config/features";
-import { HERO_IMAGES, homeContent } from "@/config/home-content";
+import { HERO_IMAGES, homeContent, storyFor } from "@/config/home-content";
 import { siteConfig } from "@/config/site.config";
 import { getHomeFeaturedProducts, getStoreCategories } from "@/features/catalog/service";
 import { buildOrganizationJsonLd, serializeJsonLd } from "@/features/seo/jsonld";
@@ -77,25 +77,26 @@ export default async function HomePage() {
         products={featuredProducts}
       />
 
-      {categories.map((category) => {
-        const story = homeContent.stories[category.slug];
-        if (!story || !category.imagePath) return null;
-        return (
-          <StorySection
-            key={category.id}
-            id={category.slug}
-            imagePath={category.imagePath}
-            imageAlt={category.name}
-            eyebrow={story.eyebrow}
-            title={story.title}
-            copy={story.copy}
-            cta={story.cta}
-            ctaHref={`/category/${category.slug}`}
-            reverse={story.reverse}
-            dark={story.dark}
-          />
-        );
-      })}
+      {categories
+        .filter((category) => category.showOnHomepage && category.imagePath)
+        .map((category, index) => {
+          const story = storyFor(category, index);
+          return (
+            <StorySection
+              key={category.id}
+              id={category.slug}
+              imagePath={category.imagePath!}
+              imageAlt={category.name}
+              eyebrow={story.eyebrow}
+              title={story.title}
+              copy={story.copy}
+              cta={story.cta}
+              ctaHref={`/category/${category.slug}`}
+              reverse={story.reverse}
+              dark={story.dark}
+            />
+          );
+        })}
 
       {features.wholesale && (
         <WholesaleSection

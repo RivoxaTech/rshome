@@ -17,6 +17,7 @@ type CategoryFormValues = {
   imagePath: string | null;
   sortOrder: number;
   isActive: boolean;
+  showOnHomepage: boolean;
   parentId: number | null;
 };
 
@@ -68,6 +69,7 @@ export function CategoryForm({
   const [slug, setSlug] = useState(initial.slug);
   const slugTouched = useRef(mode === "edit");
   const [isActive, setIsActive] = useState(initial.isActive);
+  const [showOnHomepage, setShowOnHomepage] = useState(initial.showOnHomepage);
   const [parentId, setParentId] = useState(initial.parentId !== null ? String(initial.parentId) : "");
 
   const fieldErrors = state && !state.ok ? state.fieldErrors : undefined;
@@ -150,6 +152,14 @@ export function CategoryForm({
           <Switch name="isActive" checked={isActive} onChange={setIsActive} />
         </div>
         <p className="text-muted-foreground -mt-2 text-xs">Hidden categories (and any sub-categories under a hidden parent) disappear from the storefront.</p>
+
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium">Show on home page</span>
+          <Switch name="showOnHomepage" checked={showOnHomepage} onChange={setShowOnHomepage} />
+        </div>
+        <p className="text-muted-foreground -mt-2 text-xs">
+          Gives this category its own full-width section on the home page, below the featured products. Needs an image above to actually appear.
+        </p>
 
         {formError && <p role="alert" className="text-destructive text-sm">{formError}</p>}
 

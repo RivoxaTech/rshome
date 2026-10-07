@@ -50,6 +50,7 @@ export default async function EditCategoryPage({
           imagePath: category.imagePath,
           sortOrder: category.sortOrder,
           isActive: category.isActive,
+          showOnHomepage: category.showOnHomepage,
           parentId: category.parentId,
         }}
         deleteSlot={<DeleteCategoryDialog id={category.id} guard={deleteGuard} />}

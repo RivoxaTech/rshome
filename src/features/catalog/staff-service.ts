@@ -44,6 +44,7 @@ export type StaffCategoryListItem = {
   productCount: number;
   sortOrder: number;
   isActive: boolean;
+  showOnHomepage: boolean;
 };
 
 export async function listStaffCategories(query: {
@@ -69,6 +70,7 @@ export async function listStaffCategories(query: {
     productCount: productCounts.get(row.id) ?? 0,
     sortOrder: row.sortOrder,
     isActive: row.isActive,
+    showOnHomepage: row.showOnHomepage,
   }));
 
   return { items, total, page: query.page, pageSize: query.pageSize, pageCount: pageCountOf(total, query.pageSize) };
@@ -138,7 +140,10 @@ async function assertSlugAvailable(slug: string, excludeId?: number): Promise<vo
   }
 }
 
-type CategoryAuditFields = Pick<CategoryRow, "name" | "slug" | "description" | "imagePath" | "sortOrder" | "isActive" | "parentId">;
+type CategoryAuditFields = Pick<
+  CategoryRow,
+  "name" | "slug" | "description" | "imagePath" | "sortOrder" | "isActive" | "showOnHomepage" | "parentId"
+>;
 
 function auditValues(category: CategoryAuditFields) {
   return {
@@ -148,6 +153,7 @@ function auditValues(category: CategoryAuditFields) {
     imagePath: category.imagePath,
     sortOrder: category.sortOrder,
     isActive: category.isActive,
+    showOnHomepage: category.showOnHomepage,
     parentId: category.parentId,
   };
 }
@@ -172,6 +178,7 @@ export async function createCategory(rawInput: unknown, actor: Actor): Promise<S
         imagePath: input.imagePath,
         sortOrder: input.sortOrder,
         isActive: input.isActive,
+        showOnHomepage: input.showOnHomepage,
         parentId: input.parentId,
         createdAt: now,
         updatedAt: now,
@@ -228,6 +235,7 @@ export async function updateCategoryById(id: number, rawInput: unknown, actor: A
         imagePath: input.imagePath,
         sortOrder: input.sortOrder,
         isActive: input.isActive,
+        showOnHomepage: input.showOnHomepage,
         parentId: input.parentId,
         updatedAt: now,
       });

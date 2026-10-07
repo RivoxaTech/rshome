@@ -34,6 +34,8 @@ export type StoreCategory = {
   slug: string;
   description: string | null;
   imagePath: string | null;
+  /** Whether the home page gives this category its own story section (D64). */
+  showOnHomepage: boolean;
 };
 
 export type ProductCard = {
@@ -112,6 +114,7 @@ export const getStoreCategories = cache(async (): Promise<StoreCategory[]> => {
       slug: row.slug,
       description: row.description,
       imagePath: row.imagePath,
+      showOnHomepage: row.showOnHomepage,
     }));
 });
 

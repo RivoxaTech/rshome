@@ -22,11 +22,18 @@ export const HERO_IMAGES = {
   },
 } as const satisfies Record<string, StaticImageSet>;
 
+export type StoryContent = { eyebrow: string; title: string; copy: string; cta: string; reverse: boolean; dark: boolean };
+
 /**
  * Marketing copy for the home page that isn't product/category data (CLAUDE.md #9: no
  * client-specific text in components). Ported from design-reference/src/routes/index.tsx.
- * Story sections are keyed by category slug; a category without an entry here simply gets
- * no story section, so adding a category in the panel never crashes the home page.
+ *
+ * Story sections (ARCHITECTURE.md D64, 6 Oct follow-up): whether a category gets one at all is
+ * the panel's own `categories.show_on_homepage` toggle, not this file — a category added or
+ * renamed in the panel must never silently lose its section. `stories` below is only a set of
+ * hand-written overrides for the categories the demo itself wrote custom copy for; any other
+ * category derives its section from its own name/description instead (`storyFor` in
+ * `app/(store)/page.tsx`), so every category with the toggle on and an image gets a real section.
  */
 export const homeContent = {
   hero: {
@@ -78,7 +85,7 @@ export const homeContent = {
       reverse: true,
       dark: false,
     },
-  } as Record<string, { eyebrow: string; title: string; copy: string; cta: string; reverse: boolean; dark: boolean }>,
+  } as Record<string, StoryContent>,
   wholesale: {
     eyebrow: "Wholesale & Bulk Orders",
     heading: "Shopping for your business?",
@@ -98,3 +105,22 @@ export const homeContent = {
     ],
   },
 } as const;
+
+/**
+ * A story section's content for one category (D64): the hand-written override above when one
+ * exists for this slug, otherwise derived straight from the category's own name/description —
+ * so a category the panel adds or renames always gets a real section, never a blank one.
+ * `index` alternates the image side, the same left/right rhythm the hand-written set already has.
+ */
+export function storyFor(category: { slug: string; name: string; description: string | null }, index: number): StoryContent {
+  const override: StoryContent | undefined = homeContent.stories[category.slug];
+  if (override) return override;
+  return {
+    eyebrow: category.name,
+    title: category.name,
+    copy: category.description ?? "",
+    cta: `Shop ${category.name} →`,
+    reverse: index % 2 === 1,
+    dark: false,
+  };
+}

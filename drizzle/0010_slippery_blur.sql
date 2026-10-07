@@ -1,0 +1,1 @@
+ALTER TABLE `categories` ADD `show_on_homepage` boolean DEFAULT true NOT NULL;

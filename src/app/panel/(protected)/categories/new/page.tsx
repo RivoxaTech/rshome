@@ -26,7 +26,7 @@ export default async function NewCategoryPage({ searchParams }: { searchParams: 
         parentOptions={parentOptions}
         hasChildren={false}
         backHref={backHref}
-        initial={{ id: null, name: "", slug: "", description: null, imagePath: null, sortOrder: 0, isActive: true, parentId: null }}
+        initial={{ id: null, name: "", slug: "", description: null, imagePath: null, sortOrder: 0, isActive: true, showOnHomepage: true, parentId: null }}
       />
     </>
   );

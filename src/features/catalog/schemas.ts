@@ -89,6 +89,7 @@ export const categoryInputSchema = z.object({
   imagePath: optionalPathField(CATEGORY_MEDIA_PATH_PATTERN, SEED_CATEGORY_IMAGE_PATTERN),
   sortOrder: z.coerce.number().int("Enter a whole number.").min(0, "Use 0 or higher.").max(100_000, "Enter a smaller number."),
   isActive: activeField,
+  showOnHomepage: activeField,
   parentId: parentIdField,
 });
 
