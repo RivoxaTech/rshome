@@ -21,6 +21,16 @@ describe("decimalToPaisa", () => {
   it("handles a negative amount", () => {
     expect(decimalToPaisa("-50.25")).toBe(-5025);
   });
+
+  // S22 follow-up, 7 Oct: MariaDB (production) and MySQL (dev) report the column type of a raw
+  // `coalesce(sum(case ... end), 'literal')` SQL expression differently for the same query — one
+  // hands mysql2 a string, the other a plain number — so this function has to tolerate whichever
+  // it's given, not just what Drizzle's own typed columns promise.
+  it("tolerates a plain number, as a driver can hand back for a raw SQL expression", () => {
+    expect(decimalToPaisa(4500)).toBe(450000);
+    expect(decimalToPaisa(99.5)).toBe(9950);
+    expect(decimalToPaisa(0)).toBe(0);
+  });
 });
 
 describe("paisaToDecimal", () => {

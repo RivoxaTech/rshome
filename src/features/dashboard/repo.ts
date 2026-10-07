@@ -44,10 +44,16 @@ type OrderAggregates = {
 export async function getOrderAggregates(from: Date | null, to: Date): Promise<OrderAggregates> {
   const [row] = await db
     .select({
-      revenue: sql<string>`coalesce(sum(case when ${orders.orderStatus} != 'cancelled' and ${orders.paymentStatus} in ('verified','cod_collected') then ${goodsTotalSql} else 0 end), '0.00')`,
-      pending: sql<string>`coalesce(sum(case when ${orders.orderStatus} not in ('cancelled','rejected') and ${orders.paymentStatus} not in ('verified','cod_collected') then ${goodsTotalSql} else 0 end), '0.00')`,
+      // cast(... as decimal(12,2)): without it, MySQL and MariaDB disagree on the reported column
+      // type of a `coalesce(sum(case ... then DECIMAL else 0 end), 'string')` expression — one
+      // reports it as DECIMAL (mysql2 stringifies it), the other as a plain number, and
+      // decimalToPaisa throws on whichever reports a number (S22 follow-up, 7 Oct, found live on
+      // production/MariaDB: "decimal.trim is not a function" the moment a period's sum is nonzero,
+      // never reproducible on a dev MySQL install or on an always-zero aggregate).
+      revenue: sql<string>`cast(coalesce(sum(case when ${orders.orderStatus} != 'cancelled' and ${orders.paymentStatus} in ('verified','cod_collected') then ${goodsTotalSql} else 0 end), 0) as decimal(12,2))`,
+      pending: sql<string>`cast(coalesce(sum(case when ${orders.orderStatus} not in ('cancelled','rejected') and ${orders.paymentStatus} not in ('verified','cod_collected') then ${goodsTotalSql} else 0 end), 0) as decimal(12,2))`,
       orderCount: sql<number>`count(case when ${orders.orderStatus} not in ('cancelled','rejected') then 1 end)`,
-      totalForAvg: sql<string>`coalesce(sum(case when ${orders.orderStatus} not in ('cancelled','rejected') then ${orders.total} else 0 end), '0.00')`,
+      totalForAvg: sql<string>`cast(coalesce(sum(case when ${orders.orderStatus} not in ('cancelled','rejected') then ${orders.total} else 0 end), 0) as decimal(12,2))`,
     })
     .from(orders)
     .where(createdAtWhere(orders.createdAt, { from, to }));
@@ -78,7 +84,7 @@ export async function getDailyRevenueSeries(from: Date, to: Date): Promise<Daily
   const rows = await db
     .select({
       karachiDate,
-      revenue: sql<string>`coalesce(sum(case when ${orders.orderStatus} != 'cancelled' and ${orders.paymentStatus} in ('verified','cod_collected') then ${goodsTotalSql} else 0 end), '0.00')`,
+      revenue: sql<string>`cast(coalesce(sum(case when ${orders.orderStatus} != 'cancelled' and ${orders.paymentStatus} in ('verified','cod_collected') then ${goodsTotalSql} else 0 end), 0) as decimal(12,2))`,
       orderCount: sql<number>`count(case when ${orders.orderStatus} not in ('cancelled','rejected') then 1 end)`,
     })
     .from(orders)
