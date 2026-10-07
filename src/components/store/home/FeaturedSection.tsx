@@ -29,7 +29,10 @@ export function FeaturedSection({
         <span className="text-muted-foreground text-[10px] tracking-[0.28em] uppercase">Scroll →</span>
       </div>
 
-      <div className="-mx-6 mt-14 flex snap-x gap-6 overflow-x-auto px-6 pb-6 lg:mx-0 lg:px-0">
+      {/* scroll-pl matches pl so CSS scroll snap treats the padded edge as the valid "start" —
+          without it, proximity snapping nudges the rest position past the gutter on load, since
+          it otherwise only considers the raw (unpadded) viewport edge a snap target. */}
+      <div className="-mx-6 mt-14 flex snap-x gap-6 overflow-x-auto pr-0 pb-6 pl-6 lg:mx-0 lg:pl-0 scroll-pl-6 lg:scroll-pl-0">
         {products.map((product) => (
           <article
             key={product.id}
@@ -63,6 +66,10 @@ export function FeaturedSection({
             </div>
           </article>
         ))}
+        {/* Chrome/WebKit drop a scroll container's trailing padding from its scrollable width, so
+            the px-6 meant to gutter the last card never shows up once scrolled all the way right;
+            a real (empty) flex item after it is immune to that and keeps the two ends matching. */}
+        <div aria-hidden className="shrink-0 lg:hidden" />
       </div>
     </Section>
   );
