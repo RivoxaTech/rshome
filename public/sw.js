@@ -38,7 +38,7 @@ self.addEventListener("push", (event) => {
     renotify: true,
     // The full logo for the notification itself; a plain version for Android's monochrome
     // status-bar badge (the OS silhouettes it, so detail there would be lost anyway).
-    icon: "/notification-icon.png",
+    icon: "/android-chrome-192x192.png",
     badge: "/notification-badge.png",
     data: { url: panelUrl(payload.url || "/panel") },
   };

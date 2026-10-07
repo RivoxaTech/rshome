@@ -26,13 +26,31 @@ export const metadata: Metadata = {
   // mode, never an ordinary Safari tab (see manifest.ts) — this is the meta tag that actually
   // makes "Add to Home Screen" produce that standalone launch instead of a plain bookmark.
   appleWebApp: { capable: true, title: siteConfig.storeName, statusBarStyle: "default" },
+  // icon.png/apple-icon.png (Next's file-convention icons) already cover the modern cases; these
+  // are the precise small sizes some browsers' bookmark bars and tab strips still prefer, plus
+  // the Windows pinned-tile config (browserconfig.xml, scripts/_make-favicons.mjs generated both
+  // from the same logo as icon.png — rerun it if the logo ever changes).
+  icons: {
+    icon: [
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+  },
+  other: {
+    // Keep in sync with manifest.ts's theme_color and browserconfig.xml's TileColor.
+    "msapplication-TileColor": "#3a2f22",
+    "msapplication-config": "/browserconfig.xml",
+  },
 };
 
 // `viewportFit: "cover"` lets the floating buttons read the phone's safe-area insets.
+// `themeColor` tints the browser chrome itself on Android/iOS (the address bar area) — keep in
+// sync with manifest.ts's theme_color and browserconfig.xml's TileColor.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#3a2f22",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
